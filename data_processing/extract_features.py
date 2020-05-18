@@ -72,7 +72,8 @@ def read_pcap(pcap_fname, n=1): # n is the number of grams to extract from packe
             pkt = EthernetFrame(KaitaiStream(BytesIO(raw)))
             if pkt.ether_type.value == 2048:
                 frame_size = pkt.body.total_length
-                src_ip, dst_ip, src_port, dst_port, proto, plen, flags, window, payload = read_ip_pkt(pkt.body)
+                src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window, payload = read_ip_pkt(pkt.body)
+                header_size = 14 + read_size - payload_size
                 payload_grams = ngram(payload, n)
 
                 # features
@@ -86,10 +87,11 @@ def read_pcap(pcap_fname, n=1): # n is the number of grams to extract from packe
                     dst_port, # 5
                     proto, # 6
                     frame_size, # 7
-                    flags, # 8
-                    window, # 9
-                    plen, # 10
-                    payload_grams # 11..266
+                    header_size, # 8
+                    payload_size, # 9
+                    flags, # 10
+                    window, # 11
+                    payload_grams # 12..267
                 ]
 
                 # label
