@@ -117,17 +117,3 @@ def find_data_files(dir, prefix='', postfix=''):
                 if osp.isfile(fp) and fp.startswith(osp.join(fp, prefix)) and fp.endswith(postfix):
                     data_files[-1].append(f)
     return data_dirs, data_files
-
-if __name__ == '__main__':
-
-    # test using cicids17
-
-    dnames, fnames = find_data_files(cicids17pcaps, postfix='pcap')
-    pcap_fnames = []
-    for dname,fname_list in zip(dnames, fnames):
-        dfs = osp.join(dname, fname_list)
-        pcap_fnames.append(osp.join(cicids17pcaps, dfs))
-    print(len(pcap_fnames))
-    features = read_pcap(pcap_fnames[0])
-    print(features[0])
-    print(len(features))
