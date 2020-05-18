@@ -104,7 +104,7 @@ def read_pcap(pcap_fname, n=1): # n is the number of grams to extract from packe
             pass
     return features_and_labels
 
-def find_data_files(dir, prefix='', postfix=''):
+def find_data_files(dir):
     data_files = []
     data_dirs = []
     for d in os.listdir(dir):
@@ -114,7 +114,6 @@ def find_data_files(dir, prefix='', postfix=''):
             data_files.append([])
             for f in os.listdir(dp):
                 fp = osp.join(dp, f)
-                print(fp, osp.join(fp, prefix))
-                if osp.isfile(fp) and fp.startswith(osp.join(fp, prefix)) and fp.endswith(postfix):
+                if osp.isfile(fp):
                     data_files[-1].append(f)
     return data_dirs, data_files
