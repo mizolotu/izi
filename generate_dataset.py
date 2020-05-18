@@ -7,7 +7,7 @@ if __name__ == '__main__':
 
     # test packet extraction using cicids17
 
-    dnames, fnames = find_data_files(cicids17pcaps, postfix='pcap')
+    dnames, fnames = find_data_files(cicids17pcaps, postfix='')
     print(dnames, fnames)
     pcap_fnames = []
     for dname,fname_list in zip(dnames, fnames):
