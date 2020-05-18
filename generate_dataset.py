@@ -10,8 +10,8 @@ if __name__ == '__main__':
     dnames, fnames = find_data_files(cicids17pcaps, postfix='pcap')
     pcap_fnames = []
     for dname,fname_list in zip(dnames, fnames):
-        dfs = osp.join(dname, fname_list)
-        pcap_fnames.append(osp.join(cicids17pcaps, dfs))
+        dfs = [osp.join(dname, fname) for fname in fname_list]
+        pcap_fnames.extend([osp.join(cicids17pcaps, df) for df in dfs])
     print(len(pcap_fnames))
     features = read_pcap(pcap_fnames[0])
     print(features[0])
