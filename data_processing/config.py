@@ -7,17 +7,17 @@ Some data related configurations including
 
 # pcaps
 
-cicids17pcaps = '/mnt/nfs/NGI-trust/netcaps/cicids17'
-unswnb15pcaps = '/mnt/nfs/NGI-trust/netcaps/unswnb15'
+cicids17pcaps = '/mnt/nfs/NGI-project/netcaps/cicids17'
+unswnb15pcaps = '/mnt/nfs/NGI-project/netcaps/unswnb15'
 
 # packet features
 
-cicids17pkts = '/mnt/nfs/NGI-trust/packets/cicids17'
-unswnb15pkts = '/mnt/nfs/NGI-trust/packets/unswnb15'
+cicids17pkts = '/mnt/nfs/NGI-project/packets/cicids17'
+unswnb15pkts = '/mnt/nfs/NGI-project/packets/unswnb15'
 
 # flow features
 
-cicids17flows = '/mnt/nfs/NGI-trust/flows/cicids17'
-unswnb15flows = '/mnt/nfs/NGI-trust/flows/unswnb15'
+cicids17flows = '/mnt/nfs/NGI-project/flows/cicids17'
+unswnb15flows = '/mnt/nfs/NGI-project/flows/unswnb15'
 
 
