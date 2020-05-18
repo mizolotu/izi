@@ -114,6 +114,7 @@ def find_data_files(dir, prefix='', postfix=''):
             data_files.append([])
             for f in os.listdir(dp):
                 fp = osp.join(dp, f)
+                print(fp)
                 if osp.isfile(fp) and fp.startswith(osp.join(fp, prefix)) and fp.endswith(postfix):
                     data_files[-1].append(f)
     return data_dirs, data_files
