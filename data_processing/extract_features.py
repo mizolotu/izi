@@ -100,8 +100,8 @@ def read_pcap(pcap_fname, n=1): # n is the number of grams to extract from packe
             elif pkt.ether_type.value == 2054:
                 # ARP packet analysis can be here, but we for now focus on IP traffic
                 pass
-        except:
-            pass
+        except Exception as e:
+            print(e)
     return features_and_labels
 
 def find_data_files(dir):
