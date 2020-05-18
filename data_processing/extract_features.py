@@ -74,6 +74,7 @@ def read_pcap(pcap_fname, n=1): # n is the number of grams to extract from packe
                 frame_size = pkt.body.total_length
                 src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window, payload = read_ip_pkt(pkt.body)
                 header_size = 14 + read_size - payload_size
+                print(payload)
                 payload_grams = ngram(payload, n)
 
                 # features
