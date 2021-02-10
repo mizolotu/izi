@@ -436,136 +436,137 @@ def extract_flow_features(input, output, meta_fname, tstep, labeler, intervals=[
     ulabels = []
     tstart = None
 
-    reader = pcap.pcap(input)
-    for timestamp, raw in reader:
-        id, features, flags = read_pkt(raw)
-        if id is not None:
-            if tstart is None:
-                tstart = int(timestamp)
-                nsteps = 1
-                seconds = nsteps * tstep
+    try:
+        reader = pcap.pcap(input)
+        for timestamp, raw in reader:
+            id, features, flags = read_pkt(raw)
+            if id is not None:
+                if tstart is None:
+                    tstart = int(timestamp)
+                    nsteps = 1
+                    seconds = nsteps * tstep
 
-            # add packets to flows
+                # add packets to flows
 
-            reverse_id = [id[dst_ip_idx], id[dst_port_idx], id[src_ip_idx], id[src_port_idx], id[proto_idx]]
+                reverse_id = [id[dst_ip_idx], id[dst_port_idx], id[src_ip_idx], id[src_port_idx], id[proto_idx]]
 
-            if timestamp > (tstart + seconds):
+                if timestamp > (tstart + seconds):
+
+                    for interval_i, interval in enumerate(intervals):
+                        if (seconds % interval) == 0:
+
+                            # remove old flows
+
+                            tmp_ids = []
+                            tmp_objects = []
+                            tmp_labels = []
+                            for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
+                                if o.is_active:
+                                    tmp_ids.append(i)
+                                    tmp_objects.append(o)
+                                    tmp_labels.append(l)
+                            flow_ids[interval_i] = list(tmp_ids)
+                            flow_objects[interval_i] = list(tmp_objects)
+                            flow_labels[interval_i] = list(tmp_labels)
+
+                            # calculate_features
+
+                            flow_features_t = []
+                            for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
+                                o_features = o.get_features()
+                                flow_features_t.append([*o_features, l])
+                            flow_features[interval_i].extend(flow_features_t)
+
+                    # update time
+
+                    nsteps += 1
+                    seconds = nsteps * tstep
+
+                # add packets
 
                 for interval_i, interval in enumerate(intervals):
                     if (seconds % interval) == 0:
+                        if id in flow_ids[interval_i]:
+                            direction = 1
+                            idx = flow_ids[interval_i].index(id)
+                            flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
+                        elif reverse_id in flow_ids:
+                            direction = -1
+                            idx = flow_ids[interval_i].index(reverse_id)
+                            flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
+                        else:
+                            label, description = labeler(timestamp, id[src_ip_idx], id[dst_ip_idx], id[src_port_idx], id[dst_port_idx])
+                            flow_ids[interval_i].append(id)
+                            flow_objects[interval_i].append(Flow(timestamp, id, features, flags))
+                            flow_labels[interval_i].append(label)
+                            if label not in ulabels:
+                                ulabels.append(label)
 
-                        # remove old flows
+        # lists to arrays
 
-                        tmp_ids = []
-                        tmp_objects = []
-                        tmp_labels = []
-                        for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
-                            if o.is_active:
-                                tmp_ids.append(i)
-                                tmp_objects.append(o)
-                                tmp_labels.append(l)
-                        flow_ids[interval_i] = list(tmp_ids)
-                        flow_objects[interval_i] = list(tmp_objects)
-                        flow_labels[interval_i] = list(tmp_labels)
+        for i in range(len(flow_features)):
+            flow_features[i] = np.array(flow_features[i])
 
-                        # calculate_features
+        # load meta
 
-                        flow_features_t = []
-                        for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
-                            o_features = o.get_features()
-                            flow_features_t.append([*o_features, l])
-                        flow_features[interval_i].extend(flow_features_t)
+        try:
+            with open(meta_fname, 'r') as jf:
+                meta = json.load(jf)
+                labels = meta['labels']
+                nfeatures = meta['nfeatures']
+                nsamples = meta['nsamples']
+                xmin = meta['xmin']
+                xmax = meta['xmax']
+        except:
+            nfeatures = None
 
-                # update time
+        # update meta
 
-                nsteps += 1
-                seconds = nsteps * tstep
+        nvectors = np.array([flow_features_.shape[0] for flow_features_ in flow_features])
+        if np.any(nvectors > 0):
+            if nfeatures is None:
+                labels = ulabels
+                nfeatures = flow_features[0].shape[1]
+                nsamples = nvectors.tolist()
+                xmin = np.min(flow_features[0][:, :-1], axis=0)
+                xmax = np.max(flow_features[0][:, :-1], axis=0)
+            else:
+                assert nfeatures == flow_features[0].shape[1]
+                labels = list(set(labels + ulabels))
+                nsamples = [n1 + n2 for n1, n2 in zip(nsamples, nvectors.tolist())]
+                xmin = np.min(np.vstack([xmin, flow_features[0][:, :-1]]), axis=0)
+                xmax = np.max(np.vstack([xmax, flow_features[0][:, :-1]]), axis=0)
 
-            # add packets
+            # split and save data
 
-            for interval_i, interval in enumerate(intervals):
-                if (seconds % interval) == 0:
-                    if id in flow_ids[interval_i]:
-                        direction = 1
-                        idx = flow_ids[interval_i].index(id)
-                        flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
-                    elif reverse_id in flow_ids:
-                        direction = -1
-                        idx = flow_ids[interval_i].index(reverse_id)
-                        flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
-                    else:
-                        label, description = labeler(timestamp, id[src_ip_idx], id[dst_ip_idx], id[src_port_idx], id[dst_port_idx])
-                        flow_ids[interval_i].append(id)
-                        flow_objects[interval_i].append(Flow(timestamp, id, features, flags))
-                        flow_labels[interval_i].append(label)
-                        if label not in ulabels:
-                            ulabels.append(label)
+            for l in ulabels:
+                fname_ = output.format(int(l))
+                if not osp.isdir(osp.dirname(fname_)):
+                    os.mkdir(osp.dirname(fname_))
+                for nv, values, interval in zip(nvectors, flow_features, intervals):
+                    if nv > 0:
+                        ls = values[:, -1]
+                        idx = np.where(ls == l)[0]
+                        if len(idx) > 0:
+                            values_l = values[idx, :]
+                            inds = np.arange(len(values_l))
+                            inds_splitted = [[] for _ in stages]
+                            np.random.shuffle(inds)
+                            val, remaining = np.split(inds, [int(splits[1] * len(inds))])
+                            tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
+                            inds_splitted[0] = tr
+                            inds_splitted[1] = te
+                            inds_splitted[2] = val
+                            for fi, stage in enumerate(stages):
+                                fname = '{0}_{1}_{2}'.format(fname_, interval, stage)
+                                pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
 
-    # lists to arrays
+            # save meta
 
-    for i in range(len(flow_features)):
-        flow_features[i] = np.array(flow_features[i])
+            with open(meta_fname, 'w') as jf:
+                json.dump({'labels': labels, 'nsamples': nsamples, 'nfeatures': nfeatures, 'xmin': xmin.tolist(), 'xmax': xmax.tolist()}, jf)
 
-    # load meta
-
-    try:
-        with open(meta_fname, 'r') as jf:
-            meta = json.load(jf)
-            labels = meta['labels']
-            nfeatures = meta['nfeatures']
-            nsamples = meta['nsamples']
-            xmin = meta['xmin']
-            xmax = meta['xmax']
-    except:
-        nfeatures = None
-
-    # update meta
-
-    nvectors = np.array([flow_features_.shape[0] for flow_features_ in flow_features])
-    if np.any(nvectors > 0):
-        if nfeatures is None:
-            labels = ulabels
-            nfeatures = flow_features[0].shape[1]
-            nsamples = nvectors.tolist()
-            xmin = np.min(flow_features[0][:, :-1], axis=0)
-            xmax = np.max(flow_features[0][:, :-1], axis=0)
-        else:
-            assert nfeatures == flow_features[0].shape[1]
-            labels = list(set(labels + ulabels))
-            nsamples = [n1 + n2 for n1, n2 in zip(nsamples, nvectors.tolist())]
-            xmin = np.min(np.vstack([xmin, flow_features[0][:, :-1]]), axis=0)
-            xmax = np.max(np.vstack([xmax, flow_features[0][:, :-1]]), axis=0)
-
-        # split and save data
-
-        for l in ulabels:
-            fname_ = output.format(int(l))
-            if not osp.isdir(osp.dirname(fname_)):
-                os.mkdir(osp.dirname(fname_))
-            for nv, values, interval in zip(nvectors, flow_features, intervals):
-                if nv > 0:
-                    ls = values[:, -1]
-                    idx = np.where(ls == l)[0]
-                    if len(idx) > 0:
-                        values_l = values[idx, :]
-                        inds = np.arange(len(values_l))
-                        inds_splitted = [[] for _ in stages]
-                        np.random.shuffle(inds)
-                        val, remaining = np.split(inds, [int(splits[1] * len(inds))])
-                        tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
-                        inds_splitted[0] = tr
-                        inds_splitted[1] = te
-                        inds_splitted[2] = val
-                        for fi, stage in enumerate(stages):
-                            fname = '{0}_{1}_{2}'.format(fname_, interval, stage)
-                            pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
-
-        # save meta
-
-        with open(meta_fname, 'w') as jf:
-            json.dump({'labels': labels, 'nsamples': nsamples, 'nfeatures': nfeatures, 'xmin': xmin.tolist(), 'xmax': xmax.tolist()}, jf)
-
-    #except Exception as e:
-    #    exc_type, exc_obj, exc_tb = sys.exc_info()
-    #    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-    #    print(e, fname, exc_tb.tb_lineno)
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(e, fname, exc_tb.tb_lineno)
