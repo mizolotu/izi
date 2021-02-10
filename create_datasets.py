@@ -38,7 +38,6 @@ if __name__ == '__main__':
         exclude_patterns = args.exclude.split(',')
     else:
         exclude_patterns = []
-    print(exclude_patterns)
 
     # process data
 
