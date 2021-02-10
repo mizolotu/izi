@@ -13,6 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', help='Directory for output data', default='data/features')
     parser.add_argument('-s', '--step', help='Polling time step', default=1, type=float)
     parser.add_argument('-e', '--exclude', help='Exclude days', default='20180220,20180221')
+    parser.add_argument('-v', '--verbose', help='Verbose', default=True, type=bool)
     args = parser.parse_args()
 
     # create output directory if needed
@@ -41,8 +42,9 @@ if __name__ == '__main__':
 
     # process data
 
-    count = 0
+    dcount = 0
     for dname, fname_list in zip(dnames, fnames):
+        dcount += 1
         for exclude_pattern in exclude_patterns:
             fname_list = [fname for fname in fname_list if exclude_pattern not in fname]
         idfs = [osp.join(dname, fname) for fname in fname_list]
@@ -50,7 +52,8 @@ if __name__ == '__main__':
         #output_fname_patterns = [osp.join(output_pattern, '{0}_{1}'.format(dname, fname.split('_')[2])) for fname in fname_list]
         output_fname_patterns = [osp.join(output_pattern, dname) for fname in fname_list]
         meta_fpath = osp.join(args.output, meta_fname)
+        fcount = 0
         for input_fname, output_fname in zip(input_fnames, output_fname_patterns):
-            count += 1
-            print('{0}: {1} -> {2}, {3} bytes'.format(count, input_fname, output_fname, Path(input_fname).stat().st_size))
+            fcount += 1
+            print('Directory: {0}/{1}, file: {2}/{3}, size: {4}, input: {5}, output: {6}'.format(dcount, len(dnames), fcount, len(input_fnames), Path(input_fname).stat().st_size, input_fname, output_fname))
             extract_flow_features(input_fname, output_fname, meta_fpath, args.step, labeler)
