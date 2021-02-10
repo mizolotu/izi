@@ -1,0 +1,9 @@
+[Unit]
+Description=odl
+After=network.target
+
+[Service]
+ExecStart=/home/vagrant/opendaylight-0.12.2/bin/karaf server
+
+[Install]
+WantedBy=multi-user.target

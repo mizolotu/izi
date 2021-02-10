@@ -1,0 +1,15 @@
+[
+  {"name":  "client1", "ip": "172.10.0.101", "vm":  "ovs1", "applications":  [22]},
+  {"name":  "client2", "ip": "172.10.0.102", "vm":  "ovs1", "applications":  [22]},
+  {"name":  "client3", "ip": "172.10.0.103", "vm":  "ovs1", "applications":  [22]},
+  {"name":  "client4", "ip": "172.10.0.104", "vm":  "ovs1", "applications":  [22]},
+
+  {"name":  "server1", "ip": "172.10.0.201", "vm":  "ovs2", "applications":  [80]},
+  {"name":  "server2", "ip": "172.10.0.202", "vm":  "ovs2", "applications":  [80]},
+  {"name":  "server3", "ip": "172.10.0.203", "vm":  "ovs2", "applications":  [80]},
+  {"name":  "server4", "ip": "172.10.0.204", "vm":  "ovs2", "applications":  [80]},
+
+  {"name":  "attacker1", "ip": "172.20.0.109", "vm":  "ext1", "applications":  []},
+  {"name":  "attacker2", "ip": "172.21.0.110", "vm":  "ext1", "applications":  []},
+  {"name":  "attacker3", "ip": "172.22.0.205", "vm":  "ext1", "applications":  [8080]}
+]
