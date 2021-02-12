@@ -9,6 +9,7 @@ from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from common.ml import set_seeds, load_batches, load_meta, classification_mapper
+from common.utils import isint
 
 if __name__ == '__main__':
 
@@ -17,7 +18,8 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', help='Directory with trained models', default='models/classifiers')
     parser.add_argument('-m', '--model', help='Model', default='mlp')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
-    parser.add_argument('-n', '--neurons', help='Number of neurons', default=1024, type=int)
+    parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
+    parser.add_argument('-a', '--attack', help='Attack label', default=1, type=int)
     parser.add_argument('-s', '--step', help='Polling step', default='1')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
     parser.add_argument('-e', '--epochsteps', type=int, default=1000, help='Steps per epoch')
@@ -52,10 +54,13 @@ if __name__ == '__main__':
     if seed is not None:
         set_seeds(seed)
 
-    # meta
+    # meta and labels
 
     meta = load_meta(args.input)
     labels = sorted(meta['labels'])
+    if args.attack in labels and args.attack > 0:
+        labels = [0, args.attack]
+        print('Training to detect attack {0}'.format(args.attack))
 
     # batch_sizes
 
@@ -136,7 +141,7 @@ if __name__ == '__main__':
 
     # create model and results directories
 
-    m_path = osp.join(models_path, '{0}_{1}'.format(model_name, args.step))
+    m_path = osp.join(models_path, '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
     if not osp.isdir(m_path):
         os.mkdir(m_path)
 
@@ -187,7 +192,7 @@ if __name__ == '__main__':
 
             results = [str(sk_auc)]
 
-            r_path = osp.join(foutput[label], '{0}_{1}'.format(model_name, args.step))
+            r_path = osp.join(foutput[label], '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
             if not osp.isdir(r_path):
                 os.mkdir(r_path)
             stats_path = osp.join(r_path, 'stats.csv')
