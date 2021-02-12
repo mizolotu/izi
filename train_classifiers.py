@@ -2,22 +2,25 @@ import os
 import os.path as osp
 import argparse as arp
 import numpy as np
+import tensorflow as tf
+import common.ml as models
 
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import *
+from common.ml import set_seeds, load_batches, load_meta, classification_mapper
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Detect intrusions')
     parser.add_argument('-i', '--input', help='Directory with datasets', default='data/features')
     parser.add_argument('-o', '--output', help='Directory with trained models', default='models/classifiers')
+    parser.add_argument('-m', '--model', help='Model', default='mlp')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
     parser.add_argument('-n', '--neurons', help='Number of neurons', default=1024, type=int)
     parser.add_argument('-s', '--step', help='Polling step', default='1')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
-    parser.add_argument('-e', '--epochsteps', type=int, default=5000, help='Steps per epoch')
+    parser.add_argument('-e', '--epochsteps', type=int, default=1000, help='Steps per epoch')
 
     args = parser.parse_args()
 
@@ -126,7 +129,8 @@ if __name__ == '__main__':
             if num_batches[stage] is not None:
                 batches[stage] = batches[stage].take(num_batches[stage])
 
-    model, model_name = mlp(nfeatures, args.layers, args.neurons)
+    model_type = getattr(models, args.model)
+    model, model_name = model_type(nfeatures, args.layers, args.neurons)
     print('Training {0}'.format(model_name))
     model.summary()
 

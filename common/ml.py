@@ -1,4 +1,4 @@
-import os, json
+import json
 import os.path as osp
 import tensorflow as tf
 import numpy as np
@@ -34,33 +34,6 @@ def classification_mapper(features, label, xmin, xmax, eps=1e-10):
     label = tf.clip_by_value(label, 0, 1)
     return features, label
 
-def mlp_comp(nfeatures, p1=[2], p2=[128,256,512,1024,2048], dropout=0.5, batchnorm=True, lr=5e-5):
-
-    nlayers = p1
-    nhidden = p2
-
-    models = []
-    model_names = []
-
-    for nh in nhidden:
-        for nl in nlayers:
-            inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
-            if batchnorm:
-                hidden = tf.keras.layers.BatchNormalization()(inputs)
-            else:
-                hidden = inputs
-            for _ in range(nl):
-                hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
-                if dropout is not None:
-                    hidden = tf.keras.layers.Dropout(dropout)(hidden)
-            outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
-            model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-            #model.compile(loss='binary_crossentropy', optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=['accuracy'])
-            model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
-            models.append(model)
-            model_names.append('mlp_{0}_{1}'.format(nl, nh))
-    return models, model_names
-
 def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     if batchnorm:
@@ -74,4 +47,57 @@ def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
-    return model, 'mlp_{0}_{1}'
+    return model, 'mlp_{0}_{1}'.format(nh, nl)
+
+def identity_block(x, nhidden):  # h = f(x) + x
+    h = tf.keras.layers.Dense(nhidden)(x)
+    h = tf.keras.layers.BatchNormalization()(h)
+    h = tf.keras.layers.Add()([x, h])
+    h = tf.keras.layers.Activation(activation='relu')(h)
+    return h
+
+def dense_block(x, nhidden):  # h = f(x) + g(x)
+    h = tf.keras.layers.Dense(nhidden)(x)
+    h = tf.keras.layers.BatchNormalization()(h)
+    s = tf.keras.layers.Dense(nhidden)(x)
+    s = tf.keras.layers.BatchNormalization()(s)
+    h = tf.keras.layers.Add()([s, h])
+    h = tf.keras.layers.Activation(activation='relu')(h)
+    return h
+
+def res(nfeatures, nb, nh, dropout=0.5, lr=1e-5):
+    inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
+    hidden = tf.keras.layers.Dense(nh)(inputs)
+    for _ in range(nb):
+        hidden = identity_block(hidden, nh)
+        hidden = dense_block(hidden, nh)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
+    return model, 'resnet_{0}_{1}'.format(nb, nh)
+
+def attention_block(x, nh):
+    q = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    k = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    v = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    a = tf.keras.layers.Multiply()([q, k])
+    a = tf.keras.layers.Softmax(axis=-1)(a)
+    h = tf.keras.layers.Multiply()([a, v])
+    return h
+
+def att(nfeatures, nb, nh, dropout=0.5, batchnorm=True, lr=1e-5):
+    inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs)
+    else:
+        hidden = inputs
+    for _ in range(nb):
+        hidden = attention_block(hidden, nh)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
+    return model, 'attnet_{0}_{1}'.format(nb, nh)
