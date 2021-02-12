@@ -55,5 +55,6 @@ if __name__ == '__main__':
         fcount = 0
         for input_fname, output_fname in zip(input_fnames, output_fname_patterns):
             fcount += 1
-            print('Directory: {0}/{1}, file: {2}/{3}, size: {4}, input: {5}, output: {6}'.format(dcount, len(dnames), fcount, len(input_fnames), Path(input_fname).stat().st_size, input_fname, output_fname))
+            if args.verbose:
+                print('Directory: {0}/{1}, file: {2}/{3}, size: {4}, input: {5}, output: {6}'.format(dcount, len(dnames), fcount, len(input_fnames), Path(input_fname).stat().st_size, input_fname, output_fname))
             extract_flow_features(input_fname, output_fname, meta_fpath, args.step, labeler)
