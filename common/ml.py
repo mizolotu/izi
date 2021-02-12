@@ -60,3 +60,18 @@ def mlp_comp(nfeatures, p1=[2], p2=[128,256,512,1024,2048], dropout=0.5, batchno
             models.append(model)
             model_names.append('mlp_{0}_{1}'.format(nl, nh))
     return models, model_names
+
+def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
+    inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs)
+    else:
+        hidden = inputs
+    for _ in range(nl):
+        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
+    return model, 'mlp_{0}_{1}'

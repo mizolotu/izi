@@ -9,7 +9,7 @@ def moving_average(x, step=1, window=10):
         seq.append(np.mean(x[idx, :], axis=0))
     return np.vstack(seq)
 
-def generate_line_scatter(names, values, colors, xlabel, ylabel, show_legend=True):
+def generate_line_scatter(names, values, colors, xlabel, ylabel, xrange, yrange, show_legend=True):
 
     traces = []
 
@@ -37,7 +37,7 @@ def generate_line_scatter(names, values, colors, xlabel, ylabel, show_legend=Tru
             showticklabels=True,
             ticks='outside',
             zeroline=False,
-            #range=[0,20000]
+            range=xrange
         ),
         yaxis=dict(
             title=ylabel,
@@ -45,7 +45,8 @@ def generate_line_scatter(names, values, colors, xlabel, ylabel, show_legend=Tru
             showline=False,
             showticklabels=True,
             ticks='outside',
-            zeroline=False
+            zeroline=False,
+            range=yrange
         ),
     )
 

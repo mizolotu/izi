@@ -13,9 +13,11 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Detect intrusions')
     parser.add_argument('-i', '--input', help='Directory with datasets', default='data/features')
     parser.add_argument('-o', '--output', help='Directory with trained models', default='models/classifiers')
+    parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
+    parser.add_argument('-n', '--neurons', help='Number of neurons', default=1024, type=int)
     parser.add_argument('-s', '--step', help='Polling step', default='1')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
-    parser.add_argument('-e', '--epochsteps', type=int, default=1000, help='Steps per epoch')
+    parser.add_argument('-e', '--epochsteps', type=int, default=5000, help='Steps per epoch')
 
     args = parser.parse_args()
 
@@ -124,71 +126,68 @@ if __name__ == '__main__':
             if num_batches[stage] is not None:
                 batches[stage] = batches[stage].take(num_batches[stage])
 
-    models, model_names = mlp_comp(nfeatures)
+    model, model_name = mlp(nfeatures, args.layers, args.neurons)
+    print('Training {0}'.format(model_name))
+    model.summary()
 
-    for model, model_name in zip(models, model_names):
+    # create model and results directories
 
-        print('Training {0}'.format(model_name))
-        model.summary()
+    m_path = osp.join(models_path, '{0}_{1}'.format(model_name, args.step))
+    if not osp.isdir(m_path):
+        os.mkdir(m_path)
 
-        # create model and results directories
+    # fit the model
 
-        m_path = osp.join(models_path, '{0}_{1}'.format(model_name, args.step))
-        if not osp.isdir(m_path):
-            os.mkdir(m_path)
+    model.fit(
+        batches['train'],
+        validation_data=batches['validate'],
+        epochs=epochs,
+        steps_per_epoch=steps_per_epoch,
+        callbacks=[tf.keras.callbacks.EarlyStopping(
+            monitor='val_auc',
+            verbose=0,
+            patience=patience,
+            mode='max',
+            restore_best_weights=True
+        )]
+    )
 
-        # fit the model
+    model.save(m_path)
 
-        model.fit(
-            batches['train'],
-            validation_data=batches['validate'],
-            epochs=epochs,
-            steps_per_epoch=steps_per_epoch,
-            callbacks=[tf.keras.callbacks.EarlyStopping(
-                monitor='val_auc',
-                verbose=0,
-                patience=patience,
-                mode='max',
-                restore_best_weights=True
-            )]
-        )
+    # predict and calculate inference statistics
 
-        model.save(m_path)
+    for label in labels:
+        if label > 0:
+            t_test = 0
+            probs = []
+            testy = []
+            categorical = []
+            for x, y in batches['test'][label]:
+                t_now = time()
+                predictions = model.predict(x)
+                probs = np.hstack([probs, predictions[:, 0]])
+                testy = np.hstack([testy, y])
+                t_test += (time() - t_now)
+                predictions_labeled = np.zeros_like(y)
+                predictions_labeled[np.where(predictions[:, 0] > 0.5)[0]] = 1
+                categorical = np.hstack([categorical, predictions_labeled])
 
-        # predict and calculate inference statistics
+            sk_auc = roc_auc_score(testy, probs)
+            ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
+            roc = np.zeros((ns_fpr.shape[0], 3))
+            roc[:, 0] = ns_fpr
+            roc[:, 1] = ns_tpr
+            roc[:, 2] = ns_thr
 
-        for label in labels:
-            if label > 0:
-                t_test = 0
-                probs = []
-                testy = []
-                categorical = []
-                for x, y in batches['test'][label]:
-                    t_now = time()
-                    predictions = model.predict(x)
-                    probs = np.hstack([probs, predictions[:, 0]])
-                    testy = np.hstack([testy, y])
-                    t_test += (time() - t_now)
-                    predictions_labeled = np.zeros_like(y)
-                    predictions_labeled[np.where(predictions[:, 0] > 0.5)[0]] = 1
-                    categorical = np.hstack([categorical, predictions_labeled])
+            # save the results
 
-                sk_auc = roc_auc_score(testy, probs)
-                ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
-                roc = np.zeros((ns_fpr.shape[0], 3))
-                roc[:, 0] = ns_fpr
-                roc[:, 1] = ns_tpr
-                roc[:, 2] = ns_thr
+            results = [str(sk_auc)]
 
-                # save the results
-
-                results = [str(sk_auc)]
-
-                r_path = osp.join(foutput[label], '{0}_{1}'.format(model_name, args.step))
-                if not osp.isdir(r_path):
-                    os.mkdir(r_path)
-                stats_path = osp.join(r_path, 'stats.csv')
-                roc_path = osp.join(r_path, 'roc.csv')
-                with open(stats_path, 'w') as f:
-                    f.write(','.join(results))
-                np.savetxt(roc_path, roc)
+            r_path = osp.join(foutput[label], '{0}_{1}'.format(model_name, args.step))
+            if not osp.isdir(r_path):
+                os.mkdir(r_path)
+            stats_path = osp.join(r_path, 'stats.csv')
+            roc_path = osp.join(r_path, 'roc.csv')
+            with open(stats_path, 'w') as f:
+                f.write(','.join(results))
+            np.savetxt(roc_path, roc)
