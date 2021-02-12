@@ -65,7 +65,7 @@ def dense_block(x, nhidden):  # h = f(x) + g(x)
     h = tf.keras.layers.Activation(activation='relu')(h)
     return h
 
-def res(nfeatures, nb, nh, dropout=0.5, lr=1e-5):
+def res(nfeatures, nb, nh, dropout=0.5, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     hidden = tf.keras.layers.Dense(nh)(inputs)
     for _ in range(nb):
@@ -87,7 +87,7 @@ def attention_block(x, nh):
     h = tf.keras.layers.Multiply()([a, v])
     return h
 
-def att(nfeatures, nb, nh, dropout=0.5, batchnorm=True, lr=1e-5):
+def att(nfeatures, nb, nh, dropout=0.5, batchnorm=True, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
