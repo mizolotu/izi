@@ -1,4 +1,4 @@
-import paramiko, requests
+import paramiko, requests, os
 import os.path as osp
 
 from time import sleep
@@ -113,6 +113,13 @@ def download_controller(dir='sources', version='0.12.3', source='https://nexus.o
     if not osp.isfile(fpath):
         r = requests.get(url, allow_redirects=True)
         open(fpath, 'wb').write(r.content)
+
+def clean_dir(dir_name, postfix):
+    for f in os.listdir(dir_name):
+        if osp.isfile(osp.join(dir_name, f)) and f.endswith(postfix):
+            os.remove(osp.join(dir_name, f))
+
+
 
 
 

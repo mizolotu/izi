@@ -1,16 +1,9 @@
 import vagrant, json
-import argparse as arp
 
 from common.utils import find_vms, find_mgmt_ip, find_vm_ips
+from config import *
 
 if __name__ == '__main__':
-
-    # parse args
-
-    parser = arp.ArgumentParser(description='Create VMs')
-    parser.add_argument('-v', '--vms', help='File with vms', default='logs/vms.json')
-    parser.add_argument('-t', '--tunnels', help='File with tunnels', default='logs/tunnels.json')
-    args = parser.parse_args()
 
     # start vagrant
 
@@ -36,9 +29,9 @@ if __name__ == '__main__':
 
     # save vms with ips and keys
 
-    vms_ips = []
+    vms_with_ips = []
     for vm, ip, mgmt_ip, key in zip(vms, ips, mgmt_ips, keyfiles):
-        vms_ips.append({'vm': vm, 'ip': ip, 'mgmt': mgmt_ip, 'key': key})
-    with open(args.vms, 'w') as f:
-        json.dump(vms_ips, f)
+        vms_with_ips.append({'vm': vm, 'ip': ip, 'mgmt': mgmt_ip, 'key': key})
+    with open(vms_fpath, 'w') as f:
+        json.dump(vms_with_ips, f)
 

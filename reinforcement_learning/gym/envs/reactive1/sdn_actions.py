@@ -4,8 +4,8 @@ from common.odl import Odl
 from config import *
 from common.utils import ip_ptoto
 
-def mirror_ip_to_ids(controller, ovs_node, table_id, priority, ips, ids, tunnels):
-    tunnel_to_ids = [tunnel['ofport'] for tunnel in tunnels if tunnel['vm'] == 'ovs' and tunnel['remote'] == ids]
+def mirror_ip_to_ids(controller, ovs_node, table_id, priority, ips, tunnels, ovs, ids):
+    tunnel_to_ids = [tunnel['ofport'] for tunnel in tunnels if tunnel['vm'] == ovs and tunnel['remote'] == ids]
     assert len(tunnel_to_ids) == 1
     tunnel_to_ids = tunnel_to_ids[0]
     for ip in ips:
@@ -17,8 +17,8 @@ def mirror_ip_to_ids(controller, ovs_node, table_id, priority, ips, ids, tunnels
             else:
                 controller.ip_output_and_resubmit(ovs_node, table_id, priority, ip_direction, ip, tunnel_to_ids, table_id + 1)
 
-def mirror_app_to_ids(controller, ovs_node, table_id, priority, application, ids, tunnels):
-    tunnel_to_ids = [tunnel['ofport'] for tunnel in tunnels if tunnel['vm'] == 'ovs' and tunnel['remote'] == ids]
+def mirror_app_to_ids(controller, ovs_node, table_id, priority, application, tunnels, ovs, ids):
+    tunnel_to_ids = [tunnel['ofport'] for tunnel in tunnels if tunnel['vm'] == ovs and tunnel['remote'] == ids]
     assert len(tunnel_to_ids) == 1
     tunnel_to_ids = tunnel_to_ids[0]
     proto_name = application[0]

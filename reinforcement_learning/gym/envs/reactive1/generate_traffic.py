@@ -44,7 +44,8 @@ if __name__ == '__main__':
     meta = load_meta(meta_dir)
     labels = np.array(meta['labels'])
     mlabels = labels[labels > 0]
-    label = 6 # np.random.choice(mlabels)
+    env_idx = 1
+    label = 6
 
     # load profiles
 
@@ -54,14 +55,10 @@ if __name__ == '__main__':
 
     prcs = []
     for p in profiles:
-        print(p['probs'].shape)
         fpath = select_file(p, label)
-        print(fpath)
-        po = replay_pcap(fpath, traffic_generation_iface)
+        po = replay_pcap(fpath, traffic_generation_ifaces[env_idx])
         prcs.append(po)
 
-    while True:
-        print('here')
-        sleep(1)
+    sleep(episode_duration)
 
     print('Passed!')

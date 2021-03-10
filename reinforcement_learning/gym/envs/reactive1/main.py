@@ -7,6 +7,7 @@ from config import *
 from time import sleep, time
 from common.odl import Odl
 from collections import deque
+from common.ids import restart_ids
 
 from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, mirror_ip_to_ids, block_ip
@@ -17,7 +18,11 @@ from reinforcement_learning.gym.envs.reactive1.generate_traffic import calculate
 
 class AttackMitigationEnv():
 
-    def __init__(self, label, nsteps):
+    def __init__(self, env_id, label, nsteps):
+
+        # id
+
+        self.id = env_id
 
         # load logs
 
@@ -41,17 +46,19 @@ class AttackMitigationEnv():
 
         # ovs vm
 
-        ovs_vms = sorted([vm for vm in self.vms if vm['role'] == 'ovs'])
+        ovs_vms = [vm for vm in self.vms if vm['role'] == 'ovs' and int(vm['vm'].split('_')[1]) == self.id]
         assert len(ovs_vms) == 1
         ovs_vm = ovs_vms[0]
         self.ovs_node = self.nodes[ovs_vm['vm']]
 
         # ids vms
 
-        self.ids_vms = [vm for vm in self.vms if vm['role'] == 'ids']
+        self.ids_vms = [vm for vm in self.vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == self.id]
         self.n_ids = len(self.ids_vms)
         self.ids_nodes = [self.nodes[vm['vm']] for vm in self.ids_vms]
-        assert (self.n_ids + 5) <= ntables
+        assert (self.n_ids + 4) <= ntables
+        for vm in self.ids_vms:
+            restart_ids(vm)
 
         # controller
 
@@ -59,7 +66,7 @@ class AttackMitigationEnv():
         assert len(controller_vm) == 1
         controller_name = controller_vm[0]['vm']
         controller_ip = controller_vm[0]['ip']
-        if controller_name == 'odl':
+        if controller_name == ctrl_name:
             self.controller = Odl(controller_ip)
 
         # init tables
@@ -115,7 +122,6 @@ class AttackMitigationEnv():
 
         reward_flows, reward_counts_before = get_flow_counts(self.controller, self.ovs_node, reward_tables[0])
         reward_flows_after, reward_counts_after_ = get_flow_counts(self.controller, self.ovs_node, reward_tables[1])
-        #assert len(reward_flows) == len(reward_flows_after)
         reward_counts_after = np.zeros_like(reward_counts_before)
         for i in range(len(reward_flows)):
             if reward_flows[i] in reward_flows_after:
@@ -134,8 +140,6 @@ class AttackMitigationEnv():
                 if intrusion[2] not in new_intrusions and intrusion[2] not in self.internal_hosts:
                     new_intrusions.append(intrusion[2])
             self.intrusions[i] = list(set(self.intrusions[i] + new_intrusions))
-            #if len(self.intrusions[i]) > 0:
-            #    print(i, self.intrusions[i])
 
     def _get_obs(self):
 
@@ -214,7 +218,7 @@ class AttackMitigationEnv():
             else:
                 app = self.intrusions[np.where(e[ids_i[0]] == 0)[0][app_i[0] - self.n_apps]]
                 action_fun = mirror_ip_to_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_i[0]], priorities['high'], app, ids_name, self.tunnels)
+            args = (self.controller, self.ovs_node, ids_tables[ids_i[0]], priorities['high'], app, self.tunnels, 'ovs_{0}'.format(self.id), ids_name)
             self.actions_on_off[i] = 1 - self.actions_on_off[i]
         elif i < self.n_mirror_actions + self.n_block_actions:
             ids_i = i - self.n_mirror_actions
@@ -291,7 +295,7 @@ class AttackMitigationEnv():
 
         for p in self.profiles:
             fpath = select_file(p, self.label)
-            replay_pcap(fpath, traffic_generation_iface)
+            replay_pcap(fpath, traffic_generation_ifaces[self.id])
 
         self.tstart = time()
 

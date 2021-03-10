@@ -1,24 +1,21 @@
 import argparse as arp
 import os.path as osp
-import numpy as np
-import os
 
 from common.data import find_data_files, count_labels
 from common.ml import load_meta
 from common.data import label_cicids17 as labeler  # move this to args TO DO
 from pathlib import Path
+from config import *
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Generate datasets')
-    parser.add_argument('-i', '--input', help='Directory with input data', default='data/spl')
-    parser.add_argument('-m', '--meta', help='Meta directory', default='data/features')
     parser.add_argument('-e', '--exclude', help='Exclude days', default='20180220,20180221')
     args = parser.parse_args()
 
     # input data
 
-    dnames, fnames = find_data_files(args.input)
+    dnames, fnames = find_data_files()
 
     # exclude file names
 
@@ -29,7 +26,7 @@ if __name__ == '__main__':
 
     # labels
 
-    meta = load_meta(args.meta)
+    meta = load_meta(feature_dir)
     labels = sorted(meta['labels'])
 
     # process data
@@ -40,8 +37,8 @@ if __name__ == '__main__':
         for exclude_pattern in exclude_patterns:
             fname_list = [fname for fname in fname_list if exclude_pattern not in fname]
         idfs = [osp.join(dname, fname) for fname in fname_list]
-        input_fnames = [osp.join(args.input, df) for df in idfs]
-        output_fname = osp.join(args.input, '{0}.csv'.format(dname))
+        input_fnames = [osp.join(spl_dir, df) for df in idfs]
+        output_fname = osp.join(spl_dir, '{0}.csv'.format(dname))
         fcount = 0
         for input_fname in input_fnames:
             fcount += 1

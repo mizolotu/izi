@@ -1,20 +1,15 @@
 import os, pandas, shutil
-import argparse as arp
 import os.path as osp
-import tensorflow as tf
 import numpy as np
 
-from common.utils import download_controller
+from common.utils import download_controller, clean_dir
+from config import *
 
 if __name__ == '__main__':
 
-    # parse args
+    # clean logs
 
-    parser = arp.ArgumentParser(description='Prepare sources')
-    parser.add_argument('-i', '--input', help='Directory with trained models', default='models/classifiers')
-    parser.add_argument('-o', '--output', help='Output directory name', default='sources/ids/')
-    parser.add_argument('-f', '--fpr', help='FPR', default='0.01,0.0001,0.000001')
-    args = parser.parse_args()
+    clean_dir(log_dir, postfix='.json')
 
     # download controller
 
@@ -22,17 +17,17 @@ if __name__ == '__main__':
 
     # input directories
 
-    m_dir = osp.join(args.input, 'checkpoints')
-    r_dir = osp.join(args.input, 'results')
+    m_dir = osp.join(classfier_models_dir, 'checkpoints')
+    r_dir = osp.join(classfier_models_dir, 'results')
 
     # output directories
 
-    if not osp.isdir(args.output):
-        os.mkdir(args.output)
-    w_dir = osp.join(args.output, 'weights')
+    if not osp.isdir(ids_sources_dir):
+        os.mkdir(ids_sources_dir)
+    w_dir = osp.join(ids_sources_dir, 'weights')
     if not osp.isdir(w_dir):
         os.mkdir(w_dir)
-    t_dir = osp.join(args.output, 'thresholds')
+    t_dir = osp.join(ids_sources_dir, 'thresholds')
     if not osp.isdir(t_dir):
         os.mkdir(t_dir)
 
@@ -50,7 +45,6 @@ if __name__ == '__main__':
 
     # select thresholds
 
-    fpr_levels = [float(item) for item in args.fpr.split(',')]
     label_names = [item for item in os.listdir(r_dir) if osp.isdir(osp.join(r_dir, item))]
     for label_name in label_names:
         label_input = osp.join(r_dir, label_name)
@@ -67,11 +61,11 @@ if __name__ == '__main__':
 
     # copy feature extraction functions
 
-    if not osp.isdir('sources/ids/common'):
-        os.mkdir('sources/ids/common')
-    shutil.copy('common/pcap.py', 'sources/ids/common/')
-    shutil.copy('common/data.py', 'sources/ids/common/')
+    if not osp.isdir('{0}/common'.format(ids_sources_dir)):
+        os.mkdir('{0}/common'.format(ids_sources_dir))
+    shutil.copy('common/pcap.py', '{0}/common/'.format(ids_sources_dir))
+    shutil.copy('common/data.py', '{0}/common/'.format(ids_sources_dir))
 
     # copy meta
 
-    shutil.copy('data/features/metainfo.json', 'sources/ids/')
+    shutil.copy('{0}/metainfo.json'.format(feature_dir), ids_sources_dir)
