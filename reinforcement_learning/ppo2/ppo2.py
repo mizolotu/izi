@@ -53,8 +53,8 @@ class PPO2(ActorCriticRLModel):
     :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
         If None, the number of cpu of the current machine will be used.
     """
-    def __init__(self, policy, env, gamma=0.99, n_steps=256, ent_coef=0.0001, learning_rate=2.5e-4, vf_coef=0.001,
-                 max_grad_norm=0.5, lam=0.95, nminibatches=1, noptepochs=10, cliprange=0.2, cliprange_vf=None,
+    def __init__(self, policy, env, gamma=0.99, n_steps=256, ent_coef=0.0001, learning_rate=2.5e-4, vf_coef=0.1,
+                 max_grad_norm=0.5, lam=0.95, nminibatches=1, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
 
@@ -406,6 +406,7 @@ class PPO2(ActorCriticRLModel):
                         logger.logkv('ep_reward_mean', safe_mean([ep_info['r'] for ep_info in self.ep_info_buf]))
                         logger.logkv('ep_normal_mean', safe_mean([ep_info['n'] for ep_info in self.ep_info_buf]))
                         logger.logkv('ep_attack_mean', safe_mean([ep_info['a'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_bonus_mean', safe_mean([ep_info['b'] for ep_info in self.ep_info_buf]))
                     logger.logkv('time_elapsed', t_start - t_first_start)
                     for (loss_val, loss_name) in zip(loss_vals, self.loss_names):
                         logger.logkv(loss_name, loss_val)
@@ -482,6 +483,7 @@ class Runner(AbstractEnvRunner):
         scores = [[] for _ in range(self.n_envs)]
         normals = [[] for _ in range(self.n_envs)]
         attacks = [[] for _ in range(self.n_envs)]
+        bonuses = [[] for _ in range(self.n_envs)]
         for _ in range(self.n_steps):
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
             mb_obs.append(self.obs.copy())
@@ -498,6 +500,7 @@ class Runner(AbstractEnvRunner):
                 scores[ri].append(infos[ri]['r'])
                 normals[ri].append(infos[ri]['n'])
                 attacks[ri].append(infos[ri]['a'])
+                bonuses[ri].append(infos[ri]['b'])
 
             self.model.num_timesteps += self.n_envs
 
@@ -510,8 +513,8 @@ class Runner(AbstractEnvRunner):
                     return [None] * 9
             mb_rewards.append(rewards)
 
-        for s, n, a in zip(scores, normals, attacks):
-            maybe_ep_info = {'r': np.mean(s), 'n': np.mean(n), 'a': np.mean(a, axis=0)} # info.get('episode')
+        for s, n, a, b in zip(scores, normals, attacks, bonuses):
+            maybe_ep_info = {'r': np.mean(s), 'n': np.mean(n), 'a': np.mean(a), 'b': np.mean(b)} # info.get('episode')
             if maybe_ep_info is not None:
                 ep_infos.append(maybe_ep_info)
 

@@ -2,7 +2,6 @@ import vagrant, json
 import argparse as arp
 
 from common.utils import find_vms, find_mgmt_ip, find_vm_ips
-from common.odl import download_controller
 
 if __name__ == '__main__':
 
@@ -12,10 +11,6 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--vms', help='File with vms', default='logs/vms.json')
     parser.add_argument('-t', '--tunnels', help='File with tunnels', default='logs/tunnels.json')
     args = parser.parse_args()
-
-    # download controller
-
-    download_controller(version='0.12.3')
 
     # start vagrant
 

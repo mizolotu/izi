@@ -92,10 +92,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args.vms, args.scenario, args.image, args.containers)
-
-
-
-
-
-
-

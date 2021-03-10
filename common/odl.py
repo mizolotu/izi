@@ -4,24 +4,16 @@ import os.path as osp
 from lxml import etree
 from dicttoxml import dicttoxml
 
-def download_controller(dir='sources', version='0.12.3', source='https://nexus.opendaylight.org/content/repositories/opendaylight.release/org/opendaylight/integration/opendaylight'):
-    fname = 'opendaylight-{0}.tar.gz'.format(version)
-    fpath = osp.join(dir, fname)
-    url = '{0}/{1}/{2}'.format(source, version, fname)
-    if not osp.isfile(fpath):
-        r = requests.get(url, allow_redirects=True)
-        open(fpath, 'wb').write(r.content)
-
 class Odl:
 
     ns = {
         'n': 'urn:opendaylight:inventory',
         'f': 'urn:opendaylight:flow:inventory',
         'e': 'urn:opendaylight:openflowplugin:extension:nicira:action',
+        's': 'urn:opendaylight:flow:statistics'
     }
 
     xpath = {
-        'mac_by_port_id': '//n:nodes/n:node/n:node-connector[./n:id/text()=$port_id]/f:hardware-address/text()',
         'tables_on_node': '//n:nodes/n:node[./n:id/text()=$node_id]/f:table[./f:flow]/f:id/text()',
         'flows_in_table_on_node': '//n:nodes/n:node[./n:id/text()=$node_id]/f:table[./f:id/text()=$table_id]/f:flow/f:id/text()'
     }
@@ -33,6 +25,18 @@ class Odl:
         self.headers = {'Content-Type': 'application/xml', 'Accept': 'application/xml'}
         self.op = 'http://' + ip + ':' + str(port) + '/restconf/operational/opendaylight-inventory:nodes'
         self.cfg = 'http://' + ip + ':' + str(port) + '/restconf/config/opendaylight-inventory:nodes'
+
+    def get_flow_statistics(self, node_id, table_id, count_type):
+        url = '{0}/node/{1}/table/{2}'.format(self.op, node_id, table_id)
+        req = requests.get(url, auth=self.auth, headers=self.headers, stream=True)
+        req.raw.decode_content = True
+        tree = etree.parse(req.raw)
+        nodes_root = tree.getroot()
+        xp_names = '//f:table/f:flow/f:id/text()'
+        xp_stats = '//f:table/f:flow/s:flow-statistics/s:{0}-count/text()'.format(count_type)
+        names = nodes_root.xpath(xp_names, namespaces=self.ns)
+        stats = nodes_root.xpath(xp_stats, namespaces=self.ns)
+        return names, stats
 
     def push_flow(self, node, flow_body):
         xml_root = flow_body.getroot()
@@ -52,7 +56,7 @@ class Odl:
             code = -1
         return code
 
-    def delete_flow(self, node_id, table_id, flow_id):
+    def delete_config_flow(self, node_id, table_id, flow_id):
         url = '{0}/node/{1}/table/{2}/flow/{3}'.format(self.cfg, node_id, table_id, flow_id)
         r = requests.delete(url=url, headers=self.headers, auth=self.auth)
         if int(r.status_code) >= 200 and int(r.status_code) < 300:
@@ -61,7 +65,24 @@ class Odl:
             code = 1
         return code
 
-    def find_tables(self, node_id):
+    def delete_operational_flow(self, node_id, table_id, flow_id):
+        url = '{0}/node/{1}/table/{2}/flow/{3}'.format(self.op, node_id, table_id, flow_id)
+        r = requests.delete(url=url, headers=self.headers, auth=self.auth)
+        if int(r.status_code) >= 200 and int(r.status_code) < 300:
+            code = 0
+        else:
+            code = 1
+        return code
+
+    def find_config_tables(self, node_id):
+        req = requests.get(self.cfg, auth=self.auth, headers=self.headers, stream=True)
+        req.raw.decode_content = True
+        tree = etree.parse(req.raw)
+        nodes_root = tree.getroot()
+        table_ids = nodes_root.xpath(self.xpath['tables_on_node'], node_id=node_id, namespaces=self.ns)
+        return table_ids
+
+    def find_operational_tables(self, node_id):
         req = requests.get(self.op, auth=self.auth, headers=self.headers, stream=True)
         req.raw.decode_content = True
         tree = etree.parse(req.raw)
@@ -69,8 +90,16 @@ class Odl:
         table_ids = nodes_root.xpath(self.xpath['tables_on_node'], node_id=node_id, namespaces=self.ns)
         return table_ids
 
-    def find_flows(self, node_id, table_id):
+    def find_operational_flows(self, node_id, table_id):
         req = requests.get(self.op, auth=self.auth, headers=self.headers, stream=True)
+        req.raw.decode_content = True
+        tree = etree.parse(req.raw)
+        nodes_root = tree.getroot()
+        flow_ids = nodes_root.xpath(self.xpath['flows_in_table_on_node'], node_id=node_id, table_id=table_id, namespaces=self.ns)
+        return flow_ids
+
+    def find_config_flows(self, node_id, table_id):
+        req = requests.get(self.cfg, auth=self.auth, headers=self.headers, stream=True)
         req.raw.decode_content = True
         tree = etree.parse(req.raw)
         nodes_root = tree.getroot()
@@ -86,16 +115,124 @@ class Odl:
             code = 1
         return code
 
-    def resubmit_proto(self, node_id, table_id, priority, eth_type, goto_table):
-        id = 'table{0}_{1}_goto_table{2}'.format(table_id, eth_type, goto_table)
-        flow = Flow(node_id, table_id, id, priority, self.ns)
-        flow.match([Flow.ethernet_type(eth_type)])
+    def resubmit_proto(self, node_id, table_id, priority, proto_name, proto_number, goto_table):
+        flow_id = 'proto_{0}'.format(proto_name)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number)])
         flow.instructions([Flow.go_to_table(goto_table)], [0])
-        resulut = self.push_flow(node_id, flow.body)
-        pushed_flows = []
-        if resulut == 0:
-            pushed_flows.append({'node_id': node_id, 'table_id': table_id, 'flow_id': id})
-        return pushed_flows
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def resubmit_app(self, node_id, table_id, priority, proto_name, proto_number, port_dir, port, goto_table):
+        flow_id = '{0}_{1}_{2}'.format(proto_name, port_dir, port)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.port_direction(proto_name, port_dir, port)])
+        flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def resubmit_ip(self, node_id, table_id, priority, ip_dir, ip, goto_table, mask=32):
+        flow_id = '{0}_{1}'.format(ip_dir, ip)
+        ip_with_mask = '{0}/{1}'.format(ip, mask)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def flow_exists_in_config(self, node_id, table_id, flow_id):
+        url = '{0}/node/{1}/table/{2}'.format(self.cfg, node_id, table_id)
+        req = requests.get(url, auth=self.auth, headers=self.headers, stream=True)
+        req.raw.decode_content = True
+        tree = etree.parse(req.raw)
+        nodes_root = tree.getroot()
+        xp = '//f:table/f:flow[./f:id/text()=$flow_id]/f:id'
+        flow_ids = nodes_root.xpath(xp, flow_id=flow_id, namespaces=self.ns)
+        if len(flow_ids) > 0:
+            result = True
+        else:
+            result = False
+        return result
+
+    def flow_exists_in_operational(self, node_id, table_id, flow_id):
+        url = '{0}/node/{1}/table/{2}'.format(self.op, node_id, table_id)
+        req = requests.get(url, auth=self.auth, headers=self.headers, stream=True)
+        req.raw.decode_content = True
+        tree = etree.parse(req.raw)
+        nodes_root = tree.getroot()
+        xp = '//f:table/f:flow[./f:id/text()=$flow_id]/f:id'
+        flow_ids = nodes_root.xpath(xp, flow_id=flow_id, namespaces=self.ns)
+        if len(flow_ids) > 0:
+            result = True
+        else:
+            result = False
+        return result
+
+    def app_output_and_resubmit(self, node_id, table_id, priority, proto_name, proto_number, port_dir, port, output, goto_table):
+        flow_id = '{0}_{1}_{2}_output_{3}'.format(proto_name, port_dir, port, output)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.port_direction(proto_name, port_dir, port)])
+        flow.instructions([
+            Flow.go_to_table(goto_table),
+            ['apply-actions', [
+                {'action': [Flow.output_to_port(output)], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0, 1])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def ip_output_and_resubmit(self, node_id, table_id, priority, ip_dir, ip, output, goto_table, mask=32):
+        flow_id = '{0}_{1}_output_{2}'.format(ip_dir, ip, output)
+        ip_with_mask = '{0}/{1}'.format(ip, mask)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.instructions([
+            Flow.go_to_table(goto_table),
+            ['apply-actions', [
+                {'action': [Flow.output_to_port(output)], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0, 1])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def ip_drop(self, node_id, table_id, priority, ip_dir, ip, mask=32):
+        flow_id = '{0}_{1}_drop'.format(ip_dir, ip)
+        ip_with_mask = '{0}/{1}'.format(ip, mask)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.instructions([
+            ['apply-actions', [
+                {'action': [['drop-action', None]], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+############################# OLD ########################################################
 
     def arp_auto_reply(self, node_id, table_id, priority, ip, mac):
         ip_with_mask = '{0}/32'.format(ip[0])
@@ -600,6 +737,16 @@ class Flow():
     def ip_protocol(proto):
         ip_proto = ['ip-match', 'ip-protocol', proto]
         return ip_proto
+
+    @staticmethod
+    def ip_direction(direction, ip):
+        result = ['ipv4-{0}'.format(direction), ip]
+        return result
+
+    @staticmethod
+    def port_direction(proto_name, direction, port):
+        result = ['{0}-{1}-port'.format(proto_name, direction), port]
+        return result
 
     @staticmethod
     def ip_src(src):

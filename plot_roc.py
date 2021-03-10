@@ -18,10 +18,6 @@ if __name__ == '__main__':
 
     colors = ['rgb(237,2,11)', 'rgb(255,165,0)', 'rgb(139,0,139)', 'rgb(0,51,102)', 'rgb(255,0,255)', 'rgb(210,105,30)', 'rgb(0,255,0)', 'rgb(0,0,128)']
 
-    all_models = os.listdir(args.input)
-    models_h = []
-    models_w =
-
     for label in os.listdir(args.input):
 
         # prepare data
@@ -29,17 +25,28 @@ if __name__ == '__main__':
         data = []
         names = []
         models_path = osp.join(args.input, label)
+        models = os.listdir(models_path)
+        model_names = []
+        for m in models:
+            spl = m.split('_')
+            w = spl[-2]
+            if spl[-1] == '0':
+                m_type = 'general'
+            else:
+                m_type = 'special'
+            model_names.append('{0}, {1} sec.'.format(m_type, w))
+        m_idx = sorted(range(len(model_names)), key=lambda k: model_names[k])
 
-        for model_dir in os.listdir(models_path):
-            model_path = osp.join(models_path, model_dir)
+        for idx in m_idx:
+            model_path = osp.join(models_path, models[idx])
             if osp.isdir(model_path) and args.roc in os.listdir(model_path):
                 roc_path = osp.join(model_path, args.roc)
                 roc = np.genfromtxt(roc_path, dtype=float, delimiter=' ')
-                model_name = '-'.join(model_dir.split('_'))
+                model_name = '-'.join(models[idx].split('_'))
                 x = roc[:, 0]
                 y = roc[:, 1]
                 data.append([x, y])
-                names.append(model_name)
+                names.append(model_names[idx])
 
         # generate layout and traces
 

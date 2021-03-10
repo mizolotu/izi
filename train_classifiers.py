@@ -8,8 +8,7 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, load_meta, classification_mapper
-from common.utils import isint
+from common.ml import set_seeds, load_batches, classification_mapper, load_meta
 
 if __name__ == '__main__':
 

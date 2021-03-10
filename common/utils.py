@@ -1,4 +1,5 @@
-import paramiko
+import paramiko, requests
+import os.path as osp
 
 from time import sleep
 
@@ -104,6 +105,14 @@ def parse_fname_ip(fname, prefix='172.31.69.'):
     else:
         result = None
     return result
+
+def download_controller(dir='sources', version='0.12.3', source='https://nexus.opendaylight.org/content/repositories/opendaylight.release/org/opendaylight/integration/opendaylight'):
+    fname = 'opendaylight-{0}.tar.gz'.format(version)
+    fpath = osp.join(dir, fname)
+    url = '{0}/{1}/{2}'.format(source, version, fname)
+    if not osp.isfile(fpath):
+        r = requests.get(url, allow_redirects=True)
+        open(fpath, 'wb').write(r.content)
 
 
 
