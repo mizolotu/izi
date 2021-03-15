@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # input data
 
-    dnames, fnames = find_data_files()
+    dnames, fnames = find_data_files(spl_dir)
 
     # exclude file names
 
