@@ -57,7 +57,7 @@ if __name__ == '__main__':
         print(id, count)
     print('Reward:')
     for reward_table in reward_tables:
-        ids, counts = get_flow_counts(controller, ovs_node, reward_table)
+        ids, counts = get_flow_counts(controller, ovs_node, reward_table, count_type='byte')
         for id, count in zip(ids, counts):
             print(id, count)
     print('Time elapsed: {0}'.format(time() - tstart))

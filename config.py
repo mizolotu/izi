@@ -89,7 +89,7 @@ csv_postfix = '.csv'
 
 # rl
 
-nenvs = 4
+train_attacks = [3, 7, 8, 9]
 episode_duration = 32
 nsteps = 128
 nepisodes = 100000

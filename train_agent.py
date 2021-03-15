@@ -8,6 +8,7 @@ from reinforcement_learning.common.policies import MlpPolicy
 from reinforcement_learning import logger
 from reinforcement_learning.common.callbacks import CheckpointCallback
 from config import *
+from common.ml import load_meta
 
 def make_env(env_class, *args):
     fn = lambda: env_class(*args)
@@ -15,22 +16,30 @@ def make_env(env_class, *args):
 
 if __name__ == '__main__':
 
-    parser = arp.ArgumentParser(description='Forward flow to IDS.')
-    parser.add_argument('-a', '--attack', help='Attack', default=1, type=int, choices=[1, 2, 3, 4, 5, 6, 7, 8])
+    parser = arp.ArgumentParser(description='Train RL agent.')
     parser.add_argument('-c', '--checkpoint', help='Checkpoint', default='')
     args = parser.parse_args()
+
+    meta = load_meta(feature_dir)
+    labels = sorted(meta['labels'])
+    attack_indexes = []
+    for a in train_attacks:
+        if a in labels:
+            idx = labels.index(a)
+            if idx not in attack_indexes:
+                attack_indexes.append(idx)
 
     env_class = AttackMitigationEnv
     algorithm = ppo
     policy = MlpPolicy
     total_steps = nsteps * nepisodes
 
-    modeldir = '{0}/{1}/{2}/{3}'.format(rl_models_dir, env_class.__name__, algorithm.__name__, args.attack)
-    logdir = '{0}/{1}/{2}/{3}'.format(rl_results_dir, env_class.__name__, algorithm.__name__, args.attack)
+    modeldir = '{0}/{1}/{2}'.format(rl_models_dir, env_class.__name__, algorithm.__name__)
+    logdir = '{0}/{1}/{2}'.format(rl_results_dir, env_class.__name__, algorithm.__name__)
     format_strs = os.getenv('', 'stdout,log,csv').split(',')
     logger.configure(os.path.abspath(logdir), format_strs)
 
-    env_fns = [make_env(env_class, env_idx, args.attack, nsteps) for env_idx in range(nenvs)]
+    env_fns = [make_env(env_class, env_idx, attack_idx, nsteps) for env_idx, attack_idx in enumerate(attack_indexes)]
     env = SubprocVecEnv(env_fns)
 
     try:

@@ -102,7 +102,7 @@ class AttackMitigationEnv():
         # obs
 
         self.stack_size = 16
-        obs_shape = (self.stack_size, self.n_apps, (1 + (self.n_ids + 1) * 2))
+        obs_shape = (self.stack_size, self.n_apps, (2 + (self.n_ids + 1) * 3))
         self.app_counts_stack = deque(maxlen=self.stack_size)
         self.before_counts_stack = deque(maxlen=self.stack_size)
         self.after_counts_stack = deque(maxlen=self.stack_size)
@@ -115,10 +115,16 @@ class AttackMitigationEnv():
 
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=obs_shape, dtype=np.float32)
         self.action_space = spaces.Discrete(act_dim)
-        print(obs_shape, act_dim)
 
-    def _get_counts(self, table):
-        flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
+        print('Observation shape: {0}'.formnat(obs_shape))
+        print('Number of actions: {0}'.formnat(act_dim))
+
+    def _get_pcounts(self, table):
+        flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='packet')
+        return flows, counts
+
+    def _get_bcounts(self, table):
+        flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='byte')
         return flows, counts
 
     def _process_app_counts(self, flows, counts, count_ips=False):
@@ -380,30 +386,34 @@ class AttackMitigationEnv():
 
         # calculate obs
 
-        app_flows, app_counts = self._get_counts(app_table)
-        before_flows, before_counts = self._get_counts(reward_tables[0])
-        after_flows, after_counts = self._get_counts(reward_tables[1])
+        app_pflows, app_pcounts = self._get_pcounts(app_table)
+        app_bflows, app_bcounts = self._get_bcounts(app_table)
+        before_flows, before_counts = self._get_pcounts(reward_tables[0])
+        after_flows, after_counts = self._get_pcounts(reward_tables[1])
 
-        processed_app_counts = self._process_app_counts(app_flows, app_counts)
+        processed_app_pcounts = self._process_app_counts(app_pflows, app_pcounts)
+        processed_app_bcounts = self._process_app_counts(app_bflows, app_bcounts)
         processed_before_counts = self._process_reward_counts(before_flows, before_counts)
         processed_after_counts = self._process_reward_counts(after_flows, after_counts)
 
-        frame = np.hstack([processed_app_counts, np.zeros((self.n_apps, 2 * (self.n_ids + 1)))])
+        frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 3 * (self.n_ids + 1)))])
         self.app_counts_stack.append(frame)
         self.before_counts_stack.append(processed_before_counts)
         self.after_counts_stack.append(processed_after_counts)
 
         while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
 
-            app_flows, app_counts = self._get_counts(app_table)
-            before_flows, before_counts = self._get_counts(reward_tables[0])
-            after_flows, after_counts = self._get_counts(reward_tables[1])
+            app_pflows, app_pcounts = self._get_pcounts(app_table)
+            app_bflows, app_bcounts = self._get_bcounts(app_table)
+            before_flows, before_counts = self._get_pcounts(reward_tables[0])
+            after_flows, after_counts = self._get_pcounts(reward_tables[1])
 
-            processed_app_counts = self._process_app_counts(app_flows, app_counts)
+            processed_app_pcounts = self._process_app_counts(app_pflows, app_pcounts)
+            processed_app_bcounts = self._process_app_counts(app_bflows, app_bcounts)
             processed_before_counts = self._process_reward_counts(before_flows, before_counts)
             processed_after_counts = self._process_reward_counts(after_flows, after_counts)
 
-            frame = np.hstack([processed_app_counts, np.zeros((self.n_apps, 2 * (self.n_ids + 1)))])
+            frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 3 * (self.n_ids + 1)))])
             self.app_counts_stack.append(frame)
             self.before_counts_stack.append(processed_before_counts)
             self.after_counts_stack.append(processed_after_counts)
@@ -424,17 +434,23 @@ class AttackMitigationEnv():
 
         # get and process counts
 
-        app_flows, app_counts = self._get_counts(app_table)
-        before_flows, before_counts = self._get_counts(reward_tables[0])
-        after_flows, after_counts = self._get_counts(reward_tables[1])
+        app_pflows, app_pcounts = self._get_pcounts(app_table)
+        app_bflows, app_bcounts = self._get_bcounts(app_table)
+        before_flows, before_counts = self._get_pcounts(reward_tables[0])
+        after_flows, after_counts = self._get_pcounts(reward_tables[1])
 
         processed_counts = []
-        processed_counts.append(self._process_app_counts(app_flows, app_counts))
+        processed_counts.append(self._process_app_counts(app_pflows, app_pcounts))
+        processed_counts.append(self._process_app_counts(app_bflows, app_bcounts))
         for i in range(self.n_ids):
-            flows, counts = self._get_counts(ids_tables[i])
-            processed_counts.append(self._process_app_counts(flows, counts, count_ips=True))
-        flows, counts = self._get_counts(block_table)
-        processed_counts.append(self._process_app_counts(flows, counts, count_ips=True))
+            pflows, pcounts = self._get_pcounts(ids_tables[i])
+            processed_counts.append(self._process_app_counts(pflows, pcounts, count_ips=False))
+            bflows, bcounts = self._get_bcounts(ids_tables[i])
+            processed_counts.append(self._process_app_counts(bflows, bcounts, count_ips=True))
+        pflows, pcounts = self._get_pcounts(block_table)
+        processed_counts.append(self._process_app_counts(pflows, pcounts, count_ips=False))
+        bflows, bcounts = self._get_bcounts(block_table)
+        processed_counts.append(self._process_app_counts(bflows, bcounts, count_ips=True))
         frame = np.hstack(processed_counts)
 
         processed_before_counts = self._process_reward_counts(before_flows, before_counts)
