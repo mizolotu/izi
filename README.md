@@ -31,12 +31,13 @@ data
 ```
 
 4. Install: 
-  - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip) 
+  - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip)
   - numpy (pip), pandas (pip), sklearn (pip) 
   - tensorflow 2 (pip), tflite-runtime (pip)
-  - libvirt (apt), vagrant (apt)
+  - libvirt (apt), vagrant (apt), python-vagrant (pip), paramiko (pip)
   - plotly (pip), orca (manual)
-  - flask (pip)
+  - flask (pip), requests (pip)
+  - vagrant-libvirt (vagrant)
 
 ## Prepare ML classifiers
 
