@@ -9,19 +9,17 @@ from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 from common.ml import set_seeds, load_batches, classification_mapper, load_meta
+from config import *
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Detect intrusions')
-    parser.add_argument('-i', '--input', help='Directory with datasets', default='data/features')
-    parser.add_argument('-o', '--output', help='Directory with trained models', default='models/classifiers')
     parser.add_argument('-m', '--model', help='Model', default='mlp')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
     parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
     parser.add_argument('-a', '--attack', help='Attack label', default=0, type=int)
     parser.add_argument('-s', '--step', help='Polling step', default='1')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
-    parser.add_argument('-e', '--epochsteps', type=int, default=1000, help='Steps per epoch')
 
     args = parser.parse_args()
 
@@ -29,12 +27,6 @@ if __name__ == '__main__':
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
     # global params
-
-    seed = 0
-    batch_size = 1024  # batch size will actually be double that
-    patience = 10
-    epochs = 1000
-    steps_per_epoch = args.epochsteps
 
     num_batches = {
         'train': None,
@@ -55,7 +47,7 @@ if __name__ == '__main__':
 
     # meta and labels
 
-    meta = load_meta(args.input)
+    meta = load_meta(feature_dir)
     labels = sorted(meta['labels'])
     if args.attack in labels and args.attack > 0:
         labels = [0, args.attack]
@@ -67,25 +59,25 @@ if __name__ == '__main__':
 
     # fpath
 
-    fpaths = [osp.join(args.input, str(int(label))) for label in labels]
+    fpaths = [osp.join(feature_dir, str(int(label))) for label in labels]
     fpaths_label = {}
     for label in labels:
         if label > 0:
             fpaths_label[label] = [
-                osp.join(args.input, '0'),
-                osp.join(args.input, str(int(label))),
+                osp.join(feature_dir, '0'),
+                osp.join(feature_dir, str(int(label))),
             ]
 
     # create output directories
 
-    if not osp.isdir(args.output):
-        os.mkdir(args.output)
+    if not osp.isdir(classfier_models_dir):
+        os.mkdir(classfier_models_dir)
 
-    models_path = osp.join(args.output, 'checkpoints')
+    models_path = osp.join(classfier_models_dir, 'checkpoints')
     if not osp.isdir(models_path):
         os.mkdir(models_path)
 
-    results_path = osp.join(args.output, 'results')
+    results_path = osp.join(classfier_models_dir, 'results')
     if not osp.isdir(results_path):
         os.mkdir(results_path)
 

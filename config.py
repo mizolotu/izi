@@ -20,6 +20,11 @@ traffic_generation_ifaces = ['virbr5', 'virbr2', 'virbr3', 'virbr4']  # change t
 
 # ids
 
+seed = 0
+batch_size = 1024  # batch size will actually be double that
+patience = 10
+epochs = 1000
+steps_per_epoch = 1000
 fpr_levels = [0.01, 0.0001, 0.000001]
 ids_port = 5000
 ids_params = ['nflows', 'delay']
