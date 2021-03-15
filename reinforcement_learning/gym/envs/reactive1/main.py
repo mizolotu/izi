@@ -176,8 +176,6 @@ class AttackMitigationEnv():
             elif f.startswith('def'):
                 idx = -1
                 x[idx] += c
-            else:
-                print(f, c)
         return x
 
     def _update_intrusions(self):
