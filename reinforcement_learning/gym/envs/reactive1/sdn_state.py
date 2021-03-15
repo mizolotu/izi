@@ -12,6 +12,10 @@ def get_flow_counts(controller, ovs_node, table, count_type='packet'):
 
 if __name__ == '__main__':
 
+    # params
+
+    env_idx = 0
+
     # load data
 
     with open(vms_fpath, 'r') as f:
@@ -25,16 +29,16 @@ if __name__ == '__main__':
 
     # ovs vm
 
-    ovs_vms = sorted([vm for vm in vms if vm['role'] == 'ovs'])
+    ovs_vms = [vm for vm in vms if vm['role'] == 'ovs' and int(vm['vm'].split('_')[1]) == env_idx]
     assert len(ovs_vms) == 1
     ovs_vm = ovs_vms[0]
     ovs_node = nodes[ovs_vm['vm']]
 
     # ids vms
 
-    ids_vms = [vm for vm in vms if vm['role'] == 'ids']
+    ids_vms = [vm for vm in vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == env_idx]
     ids_nodes = [nodes[vm['vm']] for vm in ids_vms]
-    assert (len(ids_nodes) + 5) <= ntables
+    assert (len(ids_nodes) + 4) <= ntables
 
     # controller
 
@@ -48,9 +52,6 @@ if __name__ == '__main__':
 
     tstart = time()
     print('Observation:')
-    ids, counts = get_flow_counts(controller, ovs_node, ip_table)
-    for id, count in zip(ids, counts):
-        print(id, count)
     ids, counts = get_flow_counts(controller, ovs_node, app_table)
     for id, count in zip(ids, counts):
         print(id, count)

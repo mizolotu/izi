@@ -21,7 +21,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     env_class = AttackMitigationEnv
-    nenvs = 3
     algorithm = ppo
     policy = MlpPolicy
     total_steps = nsteps * nepisodes

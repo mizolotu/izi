@@ -72,15 +72,27 @@ def nat_ip(ip, prefix):
     spl = pspl + ispl[l:]
     return '.'.join(spl)
 
-def ip_ptoto(proto):
-    if proto == 'icmp':
-        proto_number = 1
-    elif proto == 'tcp':
-        proto_number = 6
-    elif proto == 'udp':
-        proto_number = 17
+def ip_proto(value):
+    if isint(value):
+        proto_number = int(value)
+        if proto_number == 1:
+            proto = 'icmp'
+        elif proto_number == 6:
+            proto = 'tcp'
+        elif proto_number == 17:
+            proto = 'udp'
+        else:
+            raise NotImplemented
     else:
-        raise NotImplemented
+        proto = value
+        if proto == 'icmp':
+            proto_number = 1
+        elif proto == 'tcp':
+            proto_number = 6
+        elif proto == 'udp':
+            proto_number = 17
+        else:
+            raise NotImplemented
     return proto, proto_number
 
 def isint(value):

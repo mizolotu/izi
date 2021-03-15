@@ -1,5 +1,4 @@
 import requests
-import os.path as osp
 
 from lxml import etree
 from dicttoxml import dicttoxml
@@ -115,43 +114,6 @@ class Odl:
             code = 1
         return code
 
-    def resubmit_proto(self, node_id, table_id, priority, proto_name, proto_number, goto_table):
-        flow_id = 'proto_{0}'.format(proto_name)
-        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
-        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number)])
-        flow.instructions([Flow.go_to_table(goto_table)], [0])
-        result = self.push_flow(node_id, flow.body)
-        if result == 0:
-            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
-        else:
-            pushed_flow = {}
-        return pushed_flow
-
-    def resubmit_app(self, node_id, table_id, priority, proto_name, proto_number, port_dir, port, goto_table):
-        flow_id = '{0}_{1}_{2}'.format(proto_name, port_dir, port)
-        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
-        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.port_direction(proto_name, port_dir, port)])
-        flow.instructions([Flow.go_to_table(goto_table)], [0])
-        result = self.push_flow(node_id, flow.body)
-        if result == 0:
-            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
-        else:
-            pushed_flow = {}
-        return pushed_flow
-
-    def resubmit_ip(self, node_id, table_id, priority, ip_dir, ip, goto_table, mask=32):
-        flow_id = '{0}_{1}'.format(ip_dir, ip)
-        ip_with_mask = '{0}/{1}'.format(ip, mask)
-        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
-        flow.match([Flow.ethernet_type(2048), Flow.ip_direction(ip_dir, ip_with_mask)])
-        flow.instructions([Flow.go_to_table(goto_table)], [0])
-        result = self.push_flow(node_id, flow.body)
-        if result == 0:
-            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
-        else:
-            pushed_flow = {}
-        return pushed_flow
-
     def flow_exists_in_config(self, node_id, table_id, flow_id):
         url = '{0}/node/{1}/table/{2}'.format(self.cfg, node_id, table_id)
         req = requests.get(url, auth=self.auth, headers=self.headers, stream=True)
@@ -180,8 +142,57 @@ class Odl:
             result = False
         return result
 
+    def default_resubmit(self, node_id, table_id, priority, goto_table):
+        flow_id = 'def'
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048)])
+        flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def proto_resubmit(self, node_id, table_id, priority, proto_name, proto_number, goto_table):
+        flow_id = 'p_{0}'.format(proto_name)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number)])
+        flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def app_resubmit(self, node_id, table_id, priority, proto_name, proto_number, port_dir, port, goto_table):
+        flow_id = 'ppp_{0}_{1}_{2}'.format(proto_name, port_dir, port)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.port_direction(proto_name, port_dir, port)])
+        flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def ip_resubmit(self, node_id, table_id, priority, ip_dir, ip, goto_table, mask=32):
+        flow_id = 'ii_{0}_{1}'.format(ip_dir, ip)
+        ip_with_mask = '{0}/{1}'.format(ip, mask)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
     def app_output_and_resubmit(self, node_id, table_id, priority, proto_name, proto_number, port_dir, port, output, goto_table):
-        flow_id = '{0}_{1}_{2}_output_{3}'.format(proto_name, port_dir, port, output)
+        flow_id = 'ppp_{0}_{1}_{2}'.format(proto_name, port_dir, port)
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.port_direction(proto_name, port_dir, port)])
         flow.instructions([
@@ -197,11 +208,10 @@ class Odl:
             pushed_flow = {}
         return pushed_flow
 
-    def ip_output_and_resubmit(self, node_id, table_id, priority, ip_dir, ip, output, goto_table, mask=32):
-        flow_id = '{0}_{1}_output_{2}'.format(ip_dir, ip, output)
-        ip_with_mask = '{0}/{1}'.format(ip, mask)
+    def proto_output_and_resubmit(self, node_id, table_id, priority, proto_name, proto_number, output, goto_table):
+        flow_id = 'p_{0}'.format(proto_name)
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
-        flow.match([Flow.ethernet_type(2048), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number)])
         flow.instructions([
             Flow.go_to_table(goto_table),
             ['apply-actions', [
@@ -215,11 +225,64 @@ class Odl:
             pushed_flow = {}
         return pushed_flow
 
-    def ip_drop(self, node_id, table_id, priority, ip_dir, ip, mask=32):
-        flow_id = '{0}_{1}_drop'.format(ip_dir, ip)
+    def ip_app_output_and_resubmit(self, node_id, table_id, priority, ip_dir, ip, proto_name, proto_number, port_dir, port, output, goto_table, mask=32):
+        flow_id = 'iippp_{0}_{1}_{2}_{3}_{4}'.format(ip_dir, ip, proto_name, port_dir, port)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        ip_with_mask = '{0}/{1}'.format(ip, mask)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.ip_direction(ip_dir, ip_with_mask), Flow.port_direction(proto_name, port_dir, port)])
+        flow.instructions([
+            Flow.go_to_table(goto_table),
+            ['apply-actions', [
+                {'action': [Flow.output_to_port(output)], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0, 1])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def ip_proto_output_and_resubmit(self, node_id, table_id, priority, ip_dir, ip, proto_name, proto_number, output, goto_table, mask=32):
+        flow_id = 'iip_{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
         ip_with_mask = '{0}/{1}'.format(ip, mask)
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
-        flow.match([Flow.ethernet_type(2048), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.instructions([
+            Flow.go_to_table(goto_table),
+            ['apply-actions', [
+                {'action': [Flow.output_to_port(output)], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0, 1])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def ip_app_drop(self, node_id, table_id, priority, ip_dir, ip, proto_name, proto_number, port_dir, port, mask=32):
+        flow_id = 'iippp_{0}_{1}_{2}_{3}_{4}'.format(ip_dir, ip, proto_name, port_dir, port)
+        ip_with_mask = '{0}/{1}'.format(ip, mask)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.ip_direction(ip_dir, ip_with_mask), Flow.port_direction(proto_name, port_dir, port)])
+        flow.instructions([
+            ['apply-actions', [
+                {'action': [['drop-action', None]], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def ip_proto_drop(self, node_id, table_id, priority, ip_dir, ip, proto_name, proto_number, mask=32):
+        flow_id = '{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
+        ip_with_mask = '{0}/{1}'.format(ip, mask)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.ip_direction(ip_dir, ip_with_mask)])
         flow.instructions([
             ['apply-actions', [
                 {'action': [['drop-action', None]], 'order': 0, 'ns': 'f'}

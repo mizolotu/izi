@@ -1,8 +1,7 @@
-import json, os
-import os.path as osp
+import json
 
 from common.odl import Odl
-from common.utils import ip_ptoto
+from common.utils import ip_proto
 from config import *
 
 def clean_ids_tables(controller, ids_nodes):
@@ -25,7 +24,7 @@ def clean_ids_tables(controller, ids_nodes):
             for flow in flows:
                 controller.delete_config_flow(node, table, flow)
 
-def init_ovs_tables(controller, ovs_node, servers):
+def init_ovs_tables(controller, ovs_node):
 
     # delete flows if there are any
 
@@ -44,34 +43,32 @@ def init_ovs_tables(controller, ovs_node, servers):
     # default action flows
 
     for i in range(ntables):
-        #if i != ip_table:
-        for proto_name in ip_proto_names:
-            _, proto_number = ip_ptoto(proto_name)
-            controller.resubmit_proto(ovs_node, i, priorities['low'], proto_name, proto_number, i + 1)
-
-    # ip flows
-
-    #for ip_direction in directions:
-    #    for ip in servers:
-    #        controller.resubmit_ip(ovs_node, ip_table, priorities['medium'], ip_direction, ip, ip_table + 1)
-
-    # app flows
+        controller.default_resubmit(ovs_node, i, priorities['lowest'], i + 1)
 
     for application in applications:
-        proto_name = application[0]
-        _, proto_number = ip_ptoto(proto_name)
-        port = application[1]
-        for port_direction in directions:
-            controller.resubmit_app(ovs_node, app_table, priorities['medium'], proto_name, proto_number, port_direction, port, app_table + 1)
+        if len(application) == 2:
+            proto_name = application[0]
+            _, proto_number = ip_proto(proto_name)
+            port = application[1]
+            for port_direction in directions:
+                controller.app_resubmit(ovs_node, app_table, priorities['medium'], proto_name, proto_number, port_direction, port, app_table + 1)
+        elif len(application) == 1:
+            proto_name = application[0]
+            _, proto_number = ip_proto(proto_name)
+            controller.proto_resubmit(ovs_node, app_table, priorities['lower'], proto_name, proto_number, app_table + 1)
 
     # reward flows
 
     for i in reward_tables:
         for ip_direction in directions:
             for ip in list(set(attackers)):
-                controller.resubmit_ip(ovs_node, i, priorities['medium'], ip_direction, ip, i + 1)
+                controller.ip_resubmit(ovs_node, i, priorities['lower'], ip_direction, ip, i + 1)
 
 if __name__ == '__main__':
+
+    # env index
+
+    env_idx = 0
 
     # load data
 
@@ -86,14 +83,14 @@ if __name__ == '__main__':
 
     # ovs vm
 
-    ovs_vms = sorted([vm for vm in vms if vm['role'] == 'ovs'])
+    ovs_vms = [vm for vm in vms if vm['role'] == 'ovs' and int(vm['vm'].split('_')[1]) == env_idx]
     assert len(ovs_vms) == 1
     ovs_vm = ovs_vms[0]
     ovs_node = nodes[ovs_vm['vm']]
 
     # ids vms
 
-    ids_vms = [vm for vm in vms if vm['role'] == 'ids']
+    ids_vms = [vm for vm in vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == env_idx]
     ids_nodes = [nodes[vm['vm']] for vm in ids_vms]
     assert (len(ids_nodes) + 5) <= ntables
 
@@ -107,13 +104,9 @@ if __name__ == '__main__':
     if controller_name == 'odl':
         controller = Odl(controller_ip)
 
-    # servers
-
-    servers = sorted([item.split(csv_postfix)[0] for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith(csv_postfix)])
-
     # init tables
 
-    init_ovs_tables(controller, ovs_node, servers)
+    init_ovs_tables(controller, ovs_node)
 
     # clean ids nodes
 
