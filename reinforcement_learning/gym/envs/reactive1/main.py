@@ -116,8 +116,8 @@ class AttackMitigationEnv():
         self.observation_space = spaces.Box(low=0, high=np.inf, shape=obs_shape, dtype=np.float32)
         self.action_space = spaces.Discrete(act_dim)
 
-        print('Observation shape: {0}'.formnat(obs_shape))
-        print('Number of actions: {0}'.formnat(act_dim))
+        print('Observation shape: {0}'.format(obs_shape))
+        print('Number of actions: {0}'.format(act_dim))
 
     def _get_pcounts(self, table):
         flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='packet')
@@ -172,9 +172,12 @@ class AttackMitigationEnv():
                 spl = f.split('_')
                 ip = spl[2]
                 idx = attackers.index(ip)
+                x[idx] += c
             elif f.startswith('def'):
                 idx = -1
-            x[idx] += c
+                x[idx] += c
+            else:
+                print(f, c)
         return x
 
     def _update_intrusions(self):

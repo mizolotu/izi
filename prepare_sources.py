@@ -38,6 +38,7 @@ if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
     label_names = [str(item) for item in sorted(meta['labels'])]
+    non_zero_label_names = [str(item) for item in sorted(meta['labels']) if item > 0]
 
     # compile models
 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
     # select thresholds
 
     #label_names = [item for item in os.listdir(r_dir) if osp.isdir(osp.join(r_dir, item))]
-    for label_name in label_names:
+    for label_name in non_zero_label_names:
         label_input = osp.join(r_dir, label_name)
         model_results = [osp.join(label_input, item) for item in os.listdir(label_input) if osp.isdir(osp.join(label_input, item))]
         for model_result in model_results:
