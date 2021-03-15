@@ -9,10 +9,13 @@ vms_fpath = '{0}/vms.json'.format(log_dir)
 tunnels_fpath = '{0}/tunnels.json'.format(log_dir)
 nodes_fpath = '{0}/nodes.json'.format(log_dir)
 classfier_models_dir = 'models/classifiers'
+classfier_results_dir = '{0}/results'.format(classfier_models_dir)
 ids_sources_dir = 'sources/ids/'
 rl_models_dir = 'models'
 rl_results_dir = 'results'
 ids_model_weights_dir = '{0}/weights'.format(ids_sources_dir)
+figures_dir = 'figures'
+roc_dir = '{0}/roc'.format(figures_dir)
 
 # ifaces
 
@@ -29,6 +32,7 @@ fpr_levels = [0.01, 0.0001, 0.000001]
 ids_port = 5000
 ids_params = ['nflows', 'delay']
 n_ids_params = len(ids_params)
+roc_fname = 'roc.csv'
 
 # sdn
 
