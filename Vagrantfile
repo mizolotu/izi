@@ -8,7 +8,7 @@ Vagrant.configure("2") do |config|
 
   # Define libvirt storage pool to use
   config.vm.provider :libvirt do |libvirt|
-    #libvirt.storage_pool_name = "iamges-1"
+    #libvirt.storage_pool_name = "images-1"
     libvirt.management_network_name = "default"
     libvirt.management_network_address = "192.168.122.0/24"
   end
