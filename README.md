@@ -23,11 +23,12 @@ mkdir data
 mkdir data/raw
 ```
 3. Download network traffic PCAP data, e.g. from https://www.unb.ca/cic/datasets/ids-2018.html or any other source into ```data/raw``` directory, file path should look as follows:
-
+```bash
 data
   └── raw
       └── subdir (e.g. date)
              └── PCAP file
+```
 
 4. Install: 
   - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip) 
