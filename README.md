@@ -102,6 +102,13 @@ python3 calculate_probabilities.py
 1. Start training an RL agent:
 
 ```bash
-python3 train_agent.py
+sudo python3 train_agent.py
 ```
 
+2. Continue training the agent:
+
+```bash
+sudo python3 train_agent.py -c <path_to_checkpoint_file>
+```
+
+3. Evaluate the agent: TO DO
