@@ -1,5 +1,6 @@
 import numpy as np
-import reinforcement_learning.gym.spaces as spaces
+#import reinforcement_learning.gym.spaces as spaces
+from reinforcement_learning.gym import spaces
 from reinforcement_learning.gym import ObservationWrapper
 
 
