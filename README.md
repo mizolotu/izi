@@ -30,14 +30,15 @@ data
              └── PCAP file
 ```
 
-4. Install (use sudo user for pip): 
+4. Install (makes sense to use sudo user for pip): 
   - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip)
-  - numpy (pip), pandas (pip), sklearn (pip), scipy (pip), cloudpickle (pip)
+  - numpy (pip), pandas (pip), sklearn (pip), scipy (pip)
   - tensorflow 2 (pip), tflite-runtime (pip)
   - libvirt (apt), vagrant (apt), python-vagrant (pip), paramiko (pip)
   - plotly (pip), orca (manual)
   - flask (pip), requests (pip)
   - vagrant-libvirt (vagrant)
+  - cloudpickle (pip), python-opencv (pip)
 
 ## Prepare ML classifiers
 
