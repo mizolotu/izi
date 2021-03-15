@@ -9,10 +9,6 @@ from config import *
 
 if __name__ == '__main__':
 
-    # clean logs
-
-    clean_dir(log_dir, postfix='.json')
-
     # download controller
 
     download_controller(version='0.12.3')
@@ -32,6 +28,11 @@ if __name__ == '__main__':
     t_dir = osp.join(ids_sources_dir, 'thresholds')
     if not osp.isdir(t_dir):
         os.mkdir(t_dir)
+
+    # clean directories
+
+    clean_dir(w_dir, postfix='.tflite')
+    clean_dir(t_dir, postfix='.thr')
 
     # label names
 

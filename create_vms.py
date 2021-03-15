@@ -1,6 +1,6 @@
 import vagrant, json
 
-from common.utils import find_vms, find_mgmt_ip, find_vm_ips
+from common.utils import find_vms, find_mgmt_ip, find_vm_ips, clean_dir
 from config import *
 
 if __name__ == '__main__':
@@ -27,6 +27,10 @@ if __name__ == '__main__':
         keyfile = fpath.format(vm)
         keyfiles.append(keyfile)
 
+    # clean old logs
+
+    clean_dir(log_dir, postfix='.json')
+
     # save vms with ips and keys
 
     vms_with_ips = []
@@ -34,4 +38,3 @@ if __name__ == '__main__':
         vms_with_ips.append({'vm': vm, 'ip': ip, 'mgmt': mgmt_ip, 'key': key})
     with open(vms_fpath, 'w') as f:
         json.dump(vms_with_ips, f)
-
