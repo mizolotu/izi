@@ -38,7 +38,7 @@ data
   - plotly (pip), orca (manual)
   - flask (pip), requests (pip)
   - vagrant-libvirt (vagrant)
-  - cloudpickle (pip), opencv-python (pip)
+  - cloudpickle (pip), opencv-python (pip), lxml (pip), dicttoxml (pip)
 
 ## Prepare ML classifiers
 
