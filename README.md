@@ -79,11 +79,23 @@ ROC curves will be saved in ```bash figures/roc``` directory.
 python3 prepare_sources.py
 ```
 
-2. Create VMs: 
+2. Create VMs (this will not generate any output, so if there is an error, you will never know): 
 
 ```bash
 sudo python3 create_vms.py
 ```
+Instead, you can create VMs one-by-one using vagrant command line tool, e.g. 
+
+```bash
+sudo vagrant up <vm name>
+```
+This will provide more debug information. VM names can be found in ```bash Vagrantfile```: odl, ovs_0, etc. Once all VMs are created, you still have to run:
+
+```bash
+sudo python3 create_vms.py
+```
+
+to collect necessary information about VM ips, keys, etc. VM provision will be omitted. 
 
 3. Connect VMs with VXLAN tunnels: 
 
