@@ -31,7 +31,7 @@ data
 ```
 
 4. Install (makes sense to use sudo user for pip): 
-  - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip)
+  - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip), tcpreplay (apt)
   - numpy (pip), pandas (pip), sklearn (pip), scipy (pip)
   - tensorflow 2 (pip), tflite-runtime (pip)
   - libvirt (apt), vagrant (apt), python-vagrant (pip), paramiko (pip)
