@@ -70,7 +70,7 @@ python3 plot_roc.py
 ```
 ROC curves will be saved in ```bash figures/roc``` directory.
 
-## Creating environment
+## Create environment
 
 1. Download SDN controller and convert tensorflow models into tflite format:
 
