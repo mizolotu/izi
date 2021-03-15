@@ -82,13 +82,13 @@ python3 prepare_sources.py
 2. Create VMs: 
 
 ```bash
-python3 create_vms.py
+sudo python3 create_vms.py
 ```
 
 3. Connect VMs with VXLAN tunnels: 
 
 ```bash
-python3 connect_switches.py
+sudo python3 connect_switches.py
 ```
 
 4. Calculate probabilities for sampling certain traffic files depending on the attack scenario:
@@ -102,6 +102,13 @@ python3 calculate_probabilities.py
 1. Start training an RL agent:
 
 ```bash
-python3 train_agent.py
+sudo python3 train_agent.py
 ```
 
+2. Continue training the agent:
+
+```bash
+sudo python3 train_agent.py -c <path_to_checkpoint_file>
+```
+
+3. Evaluate the agent: TO DO
