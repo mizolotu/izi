@@ -9,7 +9,7 @@ from config import *
 
 if __name__ == '__main__':
 
-    parser = arp.ArgumentParser(description='Generate datasets')
+    parser = arp.ArgumentParser(description='Calculate probabilities')
     parser.add_argument('-e', '--exclude', help='Exclude days', default='20180220,20180221')
     args = parser.parse_args()
 
