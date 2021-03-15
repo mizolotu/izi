@@ -17,6 +17,7 @@ git clone https://github.com/mizolotu/izi
 2. Create data directory:
 
 ```bash
+cd izi
 mkdir data
 mkdir data/raw
 ```
