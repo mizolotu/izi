@@ -1,4 +1,4 @@
-# RL-based SFC porototype
+# RL-based SFC prototype
 
 ## Requirements
 
