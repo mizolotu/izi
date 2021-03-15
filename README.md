@@ -26,7 +26,7 @@ mkdir data/raw
 ```bash
 data
   └── raw
-      └── subdir (e.g. date)
+       └── subdir
              └── PCAP file
 ```
 
