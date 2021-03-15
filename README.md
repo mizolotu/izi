@@ -82,13 +82,13 @@ python3 prepare_sources.py
 2. Create VMs: 
 
 ```bash
-python3 create_vms.py
+sudo python3 create_vms.py
 ```
 
 3. Connect VMs with VXLAN tunnels: 
 
 ```bash
-python3 connect_switches.py
+sudo python3 connect_switches.py
 ```
 
 4. Calculate probabilities for sampling certain traffic files depending on the attack scenario:
