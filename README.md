@@ -30,9 +30,9 @@ data
              └── PCAP file
 ```
 
-4. Install: 
+4. Install (use sudo user for pip): 
   - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip)
-  - numpy (pip), pandas (pip), sklearn (pip) 
+  - numpy (pip), pandas (pip), sklearn (pip), scipy (pip)
   - tensorflow 2 (pip), tflite-runtime (pip)
   - libvirt (apt), vagrant (apt), python-vagrant (pip), paramiko (pip)
   - plotly (pip), orca (manual)
