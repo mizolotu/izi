@@ -37,7 +37,7 @@ if __name__ == '__main__':
     # label names
 
     meta = load_meta(feature_dir)
-    label_names = [str(item) for item in sorted(meta['labels']) if item > 0]
+    label_names = [str(item) for item in sorted(meta['labels'])]
 
     # compile models
 
