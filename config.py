@@ -16,6 +16,7 @@ rl_results_dir = 'results'
 ids_model_weights_dir = '{0}/weights'.format(ids_sources_dir)
 figures_dir = 'figures'
 roc_dir = '{0}/roc'.format(figures_dir)
+progress_dir = '{0}/progress'.format(figures_dir)
 
 # ifaces
 

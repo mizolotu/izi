@@ -2,14 +2,17 @@ import plotly.graph_objs as go
 import numpy as np
 
 def moving_average(x, step=1, window=10):
+
     seq = []
     n = x.shape[0]
+
     for i in np.arange(0, n, step):
         idx = np.arange(np.maximum(0, i - window), np.minimum(n - 1, i + window + 1))
         seq.append(np.mean(x[idx, :], axis=0))
+
     return np.vstack(seq)
 
-def generate_line_scatter(names, values, colors, xlabel, ylabel, xrange, yrange, show_legend=True):
+def generate_line_scatter(names, values, colors, xlabel, ylabel, xrange, show_legend=True):
 
     traces = []
 
@@ -45,8 +48,7 @@ def generate_line_scatter(names, values, colors, xlabel, ylabel, xrange, yrange,
             showline=False,
             showticklabels=True,
             ticks='outside',
-            zeroline=False,
-            range=yrange
+            zeroline=False
         ),
     )
 
