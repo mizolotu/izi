@@ -133,4 +133,12 @@ sudo python3 train_agent.py
 sudo python3 train_agent.py -c <path_to_checkpoint_file>
 ```
 
-3. Evaluate the agent: TO DO
+3. Plot the results:
+
+```bash
+python3 plot_progress.py
+```
+
+Progress figures will be saved in ```figures/progress``` directory.
+
+<img src="figures/progress/benign.png" width="250"/> <img src="figures/progress/malicious.png" width="250"/> <img src="figures/progress/reward.png" width="250"/>
