@@ -73,7 +73,7 @@ For correct attack labels, check parameter ```labels``` in file ```data/features
 python3 plot_roc.py
 
 ```
-ROC curves will be saved in ```bash figures/roc``` directory.
+ROC curves will be saved in ```figures/roc``` directory.
 
 ## Create environment
 
