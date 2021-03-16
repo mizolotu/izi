@@ -75,6 +75,12 @@ python3 plot_roc.py
 ```
 ROC curves will be saved in ```figures/roc``` directory.
 
+<img src="figures/roc/1.png" width="200"/> <img src="figures/roc/2.png" width="200"/> <img src="figures/roc/3.png" width="200"/>
+<img src="figures/roc/4.png" width="200"/> 
+
+<img src="figures/roc/5.png" width="200"/> <img src="figures/roc/7.png" width="200"/> <img src="figures/roc/8.png" width="200"/> <img src="figures/roc/9.png" width="200"/>
+
+
 ## Create environment
 
 1. Download SDN controller and convert tensorflow models into tflite format:
