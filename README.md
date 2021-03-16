@@ -141,4 +141,4 @@ python3 plot_progress.py
 
 Progress figures will be saved in ```figures/progress``` directory.
 
-<img src="figures/progress/benign.png" width="250"/> <img src="figures/progress/malicious.png" width="250"/> <img src="figures/progress/reward.png" width="250"/>
+<img src="figures/progress/benign.png" width="280"/> <img src="figures/progress/malicious.png" width="280"/> <img src="figures/progress/reward.png" width="280"/>
