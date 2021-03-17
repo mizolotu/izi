@@ -78,6 +78,7 @@ class AttackMitigationEnv():
         # time
 
         self.tstart = None
+        self.tstep = None
         self.step_duration = episode_duration / nsteps
 
         # traffic
@@ -97,15 +98,16 @@ class AttackMitigationEnv():
         self.n_ids_actions = (self.n_models + self.n_steps) * self.n_ids
         act_dim = self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + \
                   self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
-        self.intrusions = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
 
         # obs
 
         self.stack_size = 16
-        obs_shape = (self.stack_size, self.n_apps, (2 + (self.n_ids + 1) * 3))
+        obs_shape = (self.stack_size, self.n_apps, (2 * (1 + self.n_ids + 1) + self.n_ids))
         self.app_counts_stack = deque(maxlen=self.stack_size)
         self.before_counts_stack = deque(maxlen=self.stack_size)
         self.after_counts_stack = deque(maxlen=self.stack_size)
+        self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
 
         # reward
 
@@ -127,42 +129,19 @@ class AttackMitigationEnv():
         flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='byte')
         return flows, counts
 
-    def _process_app_counts(self, flows, counts, count_ips=False):
-        if count_ips:
-            uips = [[] for _ in range(self.n_apps)]
-            x = np.zeros((self.n_apps, 2))
-            for f, c in zip(flows, counts):
-                if f.startswith('iippp'):
-                    spl = f.split('_')
-                    ip = spl[2]
-                    app = (spl[3], int(spl[5]))
-                    app_idx = applications.index(app)
-                    if ip not in uips[app_idx]:
-                        uips[app_idx].append(ip)
-                    x[app_idx, 0] += c
-                    x[app_idx, 1] = len(uips[app_idx])
-                elif f.startswith('iip'):
-                    spl = f.split('_')
-                    ip = spl[2]
-                    app = (spl[3],)
-                    app_idx = applications.index(app)
-                    if ip not in uips[app_idx]:
-                        uips[app_idx].append(ip)
-                    x[app_idx, 0] += c
-                    x[app_idx, 1] = len(uips[app_idx])
-        else:
-            x = np.zeros((self.n_apps, 1))
-            for f, c in zip(flows, counts):
-                if f.startswith('ppp'):
-                    spl = f.split('_')
-                    app = (spl[1], int(spl[3]))
-                    idx = applications.index(app)
-                    x[idx, 0] += c
-                elif f.startswith('p'):
-                    spl = f.split('_')
-                    app = (spl[1], )
-                    idx = applications.index(app)
-                    x[idx, 0] += c
+    def _process_app_counts(self, flows, counts):
+        x = np.zeros((self.n_apps, 1))
+        for f, c in zip(flows, counts):
+            if f.startswith('ppp'):
+                spl = f.split('_')
+                app = (spl[1], int(spl[3]))
+                idx = applications.index(app)
+                x[idx, 0] += c
+            elif f.startswith('p'):
+                spl = f.split('_')
+                app = (spl[1],)
+                idx = applications.index(app)
+                x[idx, 0] += c
         return x
 
     def _process_reward_counts(self, flows, counts):
@@ -181,7 +160,6 @@ class AttackMitigationEnv():
     def _update_intrusions(self):
         for i in range(self.n_ids):
             intrusions = get_intrusions(self.ids_vms[i]['ip'])
-            new_intrusions = [[] for _ in range(self.n_apps)]
             for intrusion in intrusions:
                 src_ip = intrusion[0]
                 src_port = intrusion[1]
@@ -194,11 +172,18 @@ class AttackMitigationEnv():
                     app_idx = applications.index((proto, dst_port))
                 else:
                     app_idx = applications.index((proto,))
-                if src_ip not in new_intrusions[app_idx] and src_ip not in self.internal_hosts:
-                    new_intrusions[app_idx].append(src_ip)
-                if dst_ip not in new_intrusions[app_idx] and dst_ip not in self.internal_hosts:
-                    new_intrusions.append(dst_ip)
-                self.intrusions[i][app_idx] = list(set(self.intrusions[i][app_idx] + new_intrusions[app_idx]))
+                if src_ip not in self.intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
+                    self.intrusion_ips[i][app_idx].append(src_ip)
+                    self.intrusion_numbers[i][app_idx].append(1)
+                elif src_ip in self.intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
+                    idx = self.intrusion_ips[i][app_idx].index(src_ip)
+                    self.intrusion_numbers[i][app_idx][idx] += 1
+                if dst_ip not in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
+                    self.intrusion_ips[i].append(dst_ip)
+                    self.intrusion_numbers[i][app_idx].append(1)
+                elif dst_ip in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
+                    idx = self.intrusion_ips[i][app_idx].index(dst_ip)
+                    self.intrusion_numbers[i][app_idx][idx] += 1
 
     def _get_reward(self):
 
@@ -206,7 +191,6 @@ class AttackMitigationEnv():
         after_count_deltas = self.after_counts_stack[-1] - self.after_counts_stack[0]
         normal = []
         attack = []
-        fa = []
         for i in range(self.n_attackers + 1):
             b = before_count_deltas[i]
             a = after_count_deltas[i]
@@ -230,16 +214,19 @@ class AttackMitigationEnv():
 
         # count intrusions
 
-        intrusions = []
-        for intrusions_by_ids in self.intrusions:
-            for intrusions_by_app_and_ids in intrusions_by_ids:
-                intrusions = list(set(intrusions + intrusions_by_app_and_ids))
-        bonus = 0
-        for intrusion in intrusions:
-            if intrusion in attackers:
-                bonus += 1.0 / self.n_attackers
-            else:
-                bonus -= 1.0 / self.n_attackers
+        tp = 0
+        fp = 0
+        for intrusion_ips_by_ids, intrusion_numbers_by_ids in zip(self.intrusion_ips, self.intrusion_numbers):
+            for intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids in zip(intrusion_ips_by_ids, intrusion_numbers_by_ids):
+                for ip, n in zip(intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids):
+                    if ip in attackers:
+                        tp += n
+                    else:
+                        fp -= n
+        if (tp + fp) > 0:
+            bonus = tp / (tp + fp) - 0.5
+        else:
+            bonus = 0
 
         return normal, attack, bonus
 
@@ -277,7 +264,7 @@ class AttackMitigationEnv():
             ids_name = self.ids_vms[ids_to]['vm']
             app_idx = app_i[0]
             app = applications[app_idx]
-            ips = self.intrusions[ids_from][app_idx]
+            ips = self.intrusion_ips[ids_from][app_idx]
             action_fun = mirror_ip_app_to_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, self.tunnels, 'ovs_{0}'.format(self.id), ids_name)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions:
@@ -290,7 +277,7 @@ class AttackMitigationEnv():
             ids_to = np.where(e[ids_from] == 0)[0][ids_to[0]]
             app_idx = app_i[0]
             app = applications[app_idx]
-            ips = self.intrusions[ids_from][app_idx]
+            ips = self.intrusion_ips[ids_from][app_idx]
             action_fun = unmirror_ip_app_from_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], ips, app)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions:
@@ -300,7 +287,7 @@ class AttackMitigationEnv():
             app_i, ids_i = np.where(action_array == 1)
             app_idx = app_i[0]
             ids_idx = ids_i[0]
-            ips = self.intrusions[ids_idx][app_idx]
+            ips = self.intrusion_ips[ids_idx][app_idx]
             app = applications[app_idx]
             action_fun = block_ip_app
             args = (self.controller, self.ovs_node, block_table, priorities['higher'], priorities['highest'], ips, app)
@@ -311,7 +298,7 @@ class AttackMitigationEnv():
             app_i, ids_i = np.where(action_array == 1)
             app_idx = app_i[0]
             ids_idx = ids_i[0]
-            ips = self.intrusions[ids_idx][app_idx]
+            ips = self.intrusion_ips[ids_idx][app_idx]
             app = applications[app_idx]
             action_fun = unblock_ip_app
             args = (self.controller, self.ovs_node, block_table, ips, app)
@@ -350,11 +337,18 @@ class AttackMitigationEnv():
 
     def reset(self, sleep_duration=1):
 
+        # end of the episode
+
+        tnow = time()
+        if self.tstart is not None:
+            print('Episode duration: {0}'.format(tnow - self.tstart))
+
         # reset ids
 
         for i in range(self.n_ids):
             reset_ids(self.ids_vms[i]['mgmt'])
-        self.intrusions = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
 
         # reset tables
 
@@ -384,6 +378,7 @@ class AttackMitigationEnv():
             replay_pcap(fpath, traffic_generation_ifaces[self.id])
 
         self.tstart = time()
+        self.tstep = time()
 
         # calculate obs
 
@@ -397,7 +392,7 @@ class AttackMitigationEnv():
         processed_before_counts = self._process_reward_counts(before_flows, before_counts)
         processed_after_counts = self._process_reward_counts(after_flows, after_counts)
 
-        frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 3 * (self.n_ids + 1)))])
+        frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 2 * (self.n_ids + 1) + self.n_ids))])
         self.app_counts_stack.append(frame)
         self.before_counts_stack.append(processed_before_counts)
         self.after_counts_stack.append(processed_after_counts)
@@ -414,7 +409,7 @@ class AttackMitigationEnv():
             processed_before_counts = self._process_reward_counts(before_flows, before_counts)
             processed_after_counts = self._process_reward_counts(after_flows, after_counts)
 
-            frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 3 * (self.n_ids + 1)))])
+            frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 2 * (self.n_ids + 1) + self.n_ids))])
             self.app_counts_stack.append(frame)
             self.before_counts_stack.append(processed_before_counts)
             self.after_counts_stack.append(processed_after_counts)
@@ -427,11 +422,11 @@ class AttackMitigationEnv():
 
         # take an action and measure time
 
-        tstart = time()
         self._take_action(action)
         tnow = time()
-        if (tnow - tstart) < self.step_duration:
-            sleep(self.step_duration - (tnow - tstart))
+        if (tnow - self.tstep) < self.step_duration:
+            sleep(self.step_duration - (tnow - self.tstep))
+        self.tstep = time()
 
         # get and process counts
 
@@ -445,13 +440,19 @@ class AttackMitigationEnv():
         processed_counts.append(self._process_app_counts(app_bflows, app_bcounts))
         for i in range(self.n_ids):
             pflows, pcounts = self._get_pcounts(ids_tables[i])
-            processed_counts.append(self._process_app_counts(pflows, pcounts, count_ips=False))
+            processed_counts.append(self._process_app_counts(pflows, pcounts))
             bflows, bcounts = self._get_bcounts(ids_tables[i])
-            processed_counts.append(self._process_app_counts(bflows, bcounts, count_ips=True))
+            processed_counts.append(self._process_app_counts(bflows, bcounts))
         pflows, pcounts = self._get_pcounts(block_table)
-        processed_counts.append(self._process_app_counts(pflows, pcounts, count_ips=False))
+        processed_counts.append(self._process_app_counts(pflows, pcounts))
         bflows, bcounts = self._get_bcounts(block_table)
-        processed_counts.append(self._process_app_counts(bflows, bcounts, count_ips=True))
+        processed_counts.append(self._process_app_counts(bflows, bcounts))
+
+        nintrusions = np.zeros((self.n_apps, self.n_ids))
+        for i in range(self.n_apps):
+            for j in range(self.n_ids):
+                nintrusions[i, j] = np.sum(self.intrusion_numbers[j][i])
+        processed_counts.append(nintrusions)
         frame = np.hstack(processed_counts)
 
         processed_before_counts = self._process_reward_counts(before_flows, before_counts)

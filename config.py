@@ -91,6 +91,6 @@ csv_postfix = '.csv'
 # rl
 
 train_attacks = [3, 7, 8, 9]
-episode_duration = 60
-nsteps = 240
+episode_duration = 32
+nsteps = 64
 nepisodes = 100000

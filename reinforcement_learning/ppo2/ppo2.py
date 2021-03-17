@@ -484,6 +484,7 @@ class Runner(AbstractEnvRunner):
         normals = [[] for _ in range(self.n_envs)]
         attacks = [[] for _ in range(self.n_envs)]
         bonuses = [[] for _ in range(self.n_envs)]
+        telapsed = 0
         for _ in range(self.n_steps):
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
             mb_obs.append(self.obs.copy())
@@ -495,7 +496,9 @@ class Runner(AbstractEnvRunner):
             # Clip the actions to avoid out of bound error
             if isinstance(self.env.action_space, gym.spaces.Box):
                 clipped_actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
+            tnow = time.time()
             self.obs[:], rewards, self.dones, infos = self.env.step(clipped_actions)
+            telapsed += time.time() - tnow
             for ri in range(self.n_envs):
                 scores[ri].append(infos[ri]['r'])
                 normals[ri].append(infos[ri]['n'])
@@ -512,6 +515,8 @@ class Runner(AbstractEnvRunner):
                     # Return dummy values
                     return [None] * 9
             mb_rewards.append(rewards)
+
+        print('Time step: {0}'.format(telapsed / self.n_steps))
 
         for s, n, a, b in zip(scores, normals, attacks, bonuses):
             maybe_ep_info = {'r': np.mean(s), 'n': np.mean(n), 'a': np.mean(a), 'b': np.mean(b)} # info.get('episode')
