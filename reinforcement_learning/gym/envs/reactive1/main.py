@@ -291,8 +291,12 @@ class AttackMitigationEnv():
             app = applications[app_idx]
             action_fun = block_ip_app
             args = (self.controller, self.ovs_node, block_table, priorities['higher'], priorities['highest'], ips, app)
-            for ip in ips:
-                print('Blocking {0}:{1}:{2} in {3}'.format(app[0], ip, app[1], self.id))
+            if len(app) == 2:
+                for ip in ips:
+                    print('Blocking {0}:{1}:{2} in {3}'.format(app[0], ip, app[1], self.id))
+            elif len(app) == 1:
+                for ip in ips:
+                    print('Blocking {0}:{1}:all in {2}'.format(app[0], ip, self.id))
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions:
             action_array = np.zeros(self.n_unblock_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions] = 1
