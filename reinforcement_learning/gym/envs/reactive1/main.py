@@ -222,7 +222,7 @@ class AttackMitigationEnv():
                     if ip in attackers:
                         tp += n
                     else:
-                        fp -= n
+                        fp += n
         if (tp + fp) > 0:
             bonus = tp / (tp + fp) - 0.5
         else:
