@@ -28,15 +28,15 @@ if __name__ == '__main__':
     a = moving_average(a.reshape(len(a), 1)).reshape(x.shape)
 
     data = [[[x, r]], [[x, n]], [[x, a]]]
-    names = [['Reward'], ['Benign traffic'], ['Malicious traffic']]
+    names = [['Reward'], ['Benign traffic allowed, %'], ['Malicious traffic blocked, %']]
     fnames = ['reward', 'benign', 'malicious']
-    ylabels = ['Reward value', 'Benign traffic', 'Malicious traffic']
+    ylabels = ['Reward value', 'Benign traffic allowed, %', 'Malicious traffic blocked, %']
 
     for d, n, f, y, c in zip(data, names, fnames, ylabels, colors):
 
         # generate scatter
 
-        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 1142784])
+        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 432896])
 
         # save results
 

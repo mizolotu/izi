@@ -20,7 +20,7 @@ progress_dir = '{0}/progress'.format(figures_dir)
 
 # ifaces
 
-traffic_generation_ifaces = ['virbr5', 'virbr2', 'virbr3', 'virbr4']  # change these to the names of the interfaces which have ips 100.0.0.1, 101.0.0.1, etc
+traffic_generation_ifaces = ['virbr5', 'virbr6', 'virbr7', 'virbr8']  # change these to the names of the interfaces which have ips 100.0.0.1, 101.0.0.1, etc
 
 # ids
 
