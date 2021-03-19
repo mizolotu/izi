@@ -425,7 +425,7 @@ class Flow():
             self.idl_min  # 64
         ])
 
-def extract_flow_features(input, output, meta_fname, tstep, labeler, intervals=[1,2,4,8,16], stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
+def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals=[1,2,4,8,16], stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
 
     src_ip_idx = 0
     src_port_idx = 1

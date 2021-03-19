@@ -32,7 +32,7 @@ data
 ```
 
 4. Install (makes sense to use sudo user for pip): 
-  - libpcap-dev (apt), pcappy (pip), kaitaistruct (pip), tcpreplay (apt)
+  - libpcap-dev (apt), pypcap (pip), kaitaistruct (pip), tcpreplay (apt), wireshark (apt)
   - numpy (pip), pandas (pip), sklearn (pip), scipy (pip)
   - tensorflow 2 (pip), tflite-runtime (pip)
   - libvirt (apt), vagrant (apt), python-vagrant (pip), paramiko (pip)
@@ -73,7 +73,13 @@ For correct attack labels, check parameter ```labels``` in file ```data/features
 python3 plot_roc.py
 
 ```
-ROC curves will be saved in ```bash figures/roc``` directory.
+ROC curves will be saved in ```figures/roc``` directory.
+
+<img src="figures/roc/1.png" width="200"/> <img src="figures/roc/2.png" width="200"/> <img src="figures/roc/3.png" width="200"/>
+<img src="figures/roc/4.png" width="200"/> 
+
+<img src="figures/roc/5.png" width="200"/> <img src="figures/roc/7.png" width="200"/> <img src="figures/roc/8.png" width="200"/> <img src="figures/roc/9.png" width="200"/>
+
 
 ## Create environment
 
@@ -127,4 +133,12 @@ sudo python3 train_agent.py
 sudo python3 train_agent.py -c <path_to_checkpoint_file>
 ```
 
-3. Evaluate the agent: TO DO
+3. Plot the results:
+
+```bash
+python3 plot_progress.py
+```
+
+Progress figures will be saved in ```figures/progress``` directory.
+
+<img src="figures/progress/benign.png" width="300"/> <img src="figures/progress/malicious.png" width="300"/> <img src="figures/progress/reward.png" width="300"/>
