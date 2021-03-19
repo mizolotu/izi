@@ -127,7 +127,7 @@ python3 calculate_probabilities.py
 ip a | grep 100.0.0.1 
 ```
 
-IP addresses can be found in ```Vagrantfile```.
+Those IP addresses can be calculated by taking IP address of the second interface of a switch from ```Vagrantfile``` and substituting the last number with ```1```, e.g. since ovs_0's IP address is 100.0.0.2, the traffic generation interface would be 100.0.0.1, etc. You can write a script to get those addresses automatically.
 
 2. Start training an RL agent:
 
