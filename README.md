@@ -134,9 +134,7 @@ IP addresses can be found in ```Vagrantfile```.
 ```bash
 sudo python3 train_agent.py
 ```
-
 or continue training the agent for a saved checkpoint:
-
 ```bash
 sudo python3 train_agent.py -c <path_to_checkpoint_file>
 ```
