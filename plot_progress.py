@@ -22,21 +22,23 @@ if __name__ == '__main__':
     r = p['ep_reward_mean'].values
     n = p['ep_normal_mean'].values
     a = p['ep_attack_mean'].values
+    b = p['ep_bonus_mean'].values
     x = p['total_timesteps'].values
     r = moving_average(r.reshape(len(r), 1)).reshape(x.shape)
-    n = moving_average(n.reshape(len(n), 1)).reshape(x.shape)
-    a = moving_average(a.reshape(len(a), 1)).reshape(x.shape)
+    n = moving_average(n.reshape(len(n), 1)).reshape(x.shape) * 100
+    a = moving_average(a.reshape(len(a), 1)).reshape(x.shape) * 100
+    p = moving_average(b.reshape(len(a), 1)).reshape(x.shape) + 0.5
 
-    data = [[[x, r]], [[x, n]], [[x, a]]]
-    names = [['Reward'], ['Benign traffic allowed, %'], ['Malicious traffic blocked, %']]
-    fnames = ['reward', 'benign', 'malicious']
-    ylabels = ['Reward value', 'Benign traffic allowed, %', 'Malicious traffic blocked, %']
+    data = [[[x, r]], [[x, n]], [[x, a]], [[x, p]]]
+    names = [['Reward'], ['Benign traffic allowed, %'], ['Malicious traffic blocked, %'], ['Precision']]
+    fnames = ['reward', 'benign', 'malicious', 'precision']
+    ylabels = ['Reward value', 'Benign traffic allowed, %', 'Malicious traffic blocked, %', 'Precision']
 
     for d, n, f, y, c in zip(data, names, fnames, ylabels, colors):
 
         # generate scatter
 
-        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 432896])
+        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 457472])
 
         # save results
 
