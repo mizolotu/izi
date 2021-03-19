@@ -121,13 +121,21 @@ python3 calculate_probabilities.py
 
 ## Train and evaluate RL-agent
 
-1. Start training an RL agent:
+1. Find parameter ```traffic_generation_ifaces``` in ```config.py``` and modify the interface names to the ones corresponding to your setup. For example, you can find the interface name corresponding to IP address 100.0.0.1 as follows:
+
+```bash
+ip a | grep 100.0.0.1 
+```
+
+IP addresses can be found in ```Vagrantfile```.
+
+2. Start training an RL agent:
 
 ```bash
 sudo python3 train_agent.py
 ```
 
-2. Continue training the agent:
+or continue training the agent for a saved checkpoint:
 
 ```bash
 sudo python3 train_agent.py -c <path_to_checkpoint_file>
@@ -141,4 +149,6 @@ python3 plot_progress.py
 
 Progress figures will be saved in ```figures/progress``` directory.
 
-<img src="figures/progress/benign.png" width="300"/> <img src="figures/progress/malicious.png" width="300"/> <img src="figures/progress/reward.png" width="300"/>
+<img src="figures/progress/benign.png" width="400"/> <img src="figures/progress/malicious.png" width="400"/> 
+
+<img src="figures/progress/precision.png" width="400"/> <img src="figures/progress/reward.png" width="400"/>
