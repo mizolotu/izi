@@ -381,7 +381,6 @@ class AttackMitigationEnv():
 
         for p in self.profiles:
             fpath = select_file(p, self.label)
-            print(self.id, fpath)
             replay_pcap(fpath, traffic_generation_ifaces[self.id])
 
         self.tstart = time()
