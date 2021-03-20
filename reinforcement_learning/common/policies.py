@@ -687,7 +687,7 @@ class CnnLnLstmPolicy(LstmPolicy):
                                               layer_norm=True, feature_extraction="cnn", **_kwargs)
 
 
-class MlpPolicy(FeedForwardPolicy):
+class MlpPolicyDefault(FeedForwardPolicy):
     """
     Policy object that implements actor critic, using a MLP (2 layers of 64)
 
@@ -702,24 +702,12 @@ class MlpPolicy(FeedForwardPolicy):
     """
 
     def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, **_kwargs):
-        super(MlpPolicy, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse,
+        super(MlpPolicyDefault, self).__init__(sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse,
                                         feature_extraction="mlp", **_kwargs)
 
-class MlpPolicy2(FeedForwardPolicy):
+class MlpPolicy(FeedForwardPolicy):
     def __init__(self, *args, **kwargs):
-        super(MlpPolicy2, self).__init__(*args, **kwargs, net_arch=[64, dict(vf=[64])], feature_extraction="mlp")
-
-class MlpPolicy3(FeedForwardPolicy):
-    def __init__(self, *args, **kwargs):
-        super(MlpPolicy3, self).__init__(*args, **kwargs, net_arch=[64, dict(pi=[64])], feature_extraction="mlp")
-
-class MlpPolicy4(FeedForwardPolicy):
-    def __init__(self, *args, **kwargs):
-        super(MlpPolicy4, self).__init__(*args, **kwargs, net_arch=[64, dict(vf=[64], pi=[64])], feature_extraction="mlp")
-
-class MlpPolicy5(FeedForwardPolicy):
-    def __init__(self, *args, **kwargs):
-        super(MlpPolicy5, self).__init__(*args, **kwargs, net_arch=[dict(vf=[64, 64], pi=[64, 64])], feature_extraction="mlp")
+        super(MlpPolicy, self).__init__(*args, **kwargs, net_arch=[256, dict(vf=[256], pi=[256])], feature_extraction="mlp")
 
 class MlpLstmPolicy(LstmPolicy):
     """

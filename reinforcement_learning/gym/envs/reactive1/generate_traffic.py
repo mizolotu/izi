@@ -17,13 +17,16 @@ def calculate_probs(samples_dir, postfix='.csv'):
         fsizes = np.array([Path(f).stat().st_size for f in fnames])
         freqs = vals[:, 1:]
         probs = np.zeros_like(freqs, dtype=float)
-        nfiles = freqs.shape[0]
         nlabels = freqs.shape[1]
         for i in range(nlabels):
             s1 = np.sum(freqs[:, i])
-            s2 = np.sum(fsizes)
             if s1 == 0:
-                probs[:, i] = fsizes / s2
+                probs1 = np.sum(freqs[:, 1:], axis=1)  # sum of frequencies of files with malicious traffic
+                idx0 = np.where(probs1 == 0)[0]  # index of files with no malicious traffic
+                fsizes0 = np.zeros_like(fsizes)
+                fsizes0[idx0] = fsizes[idx0]
+                s2 = np.sum(fsizes0)
+                probs[:, i] = fsizes0 / s2
             else:
                 probs[:, i] = freqs[:, i] / s1
         profiles.append({'fpath': profile_file, 'fnames': fnames, 'probs': probs})
@@ -41,7 +44,7 @@ def replay_pcap(fpath, iface):
 
 if __name__ == '__main__':
 
-    meta = load_meta(meta_dir)
+    meta = load_meta(feature_dir)
     labels = np.array(meta['labels'])
     mlabels = labels[labels > 0]
     env_idx = 1
@@ -49,7 +52,7 @@ if __name__ == '__main__':
 
     # load profiles
 
-    profiles = calculate_probs(samples_dir)
+    profiles = calculate_probs(spl_dir)
 
     # sample files
 

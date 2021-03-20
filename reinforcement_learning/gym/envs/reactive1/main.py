@@ -19,7 +19,7 @@ from reinforcement_learning.gym.envs.reactive1.generate_traffic import calculate
 
 class AttackMitigationEnv():
 
-    def __init__(self, env_id, label, nsteps):
+    def __init__(self, env_id, label):
 
         # id
 
@@ -224,7 +224,7 @@ class AttackMitigationEnv():
                     else:
                         fp += n
         if (tp + fp) > 0:
-            bonus = tp / (tp + fp) - 0.5
+            bonus = tp / (tp + fp)
         else:
             bonus = 0
 
@@ -381,6 +381,7 @@ class AttackMitigationEnv():
 
         for p in self.profiles:
             fpath = select_file(p, self.label)
+            print(self.id, fpath)
             replay_pcap(fpath, traffic_generation_ifaces[self.id])
 
         self.tstart = time()

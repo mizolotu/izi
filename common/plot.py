@@ -1,7 +1,7 @@
 import plotly.graph_objs as go
 import numpy as np
 
-def moving_average(x, step=1, window=10):
+def moving_average(x, step=1, window=1000):
 
     seq = []
     n = x.shape[0]

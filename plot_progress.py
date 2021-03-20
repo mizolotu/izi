@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
         # generate scatter
 
-        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 457472])
+        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 1004800])
 
         # save results
 
