@@ -57,7 +57,8 @@ if __name__ == '__main__':
     labels = np.array(meta['labels'])
     mlabels = labels[labels > 0]
     env_idx = 1
-    label = 6
+    label = 7
+    label_idx = labels.__index__(label)
 
     # load profiles
 
@@ -67,7 +68,7 @@ if __name__ == '__main__':
 
     prcs = []
     for p in profiles:
-        fpath = select_file(p, label)
+        fpath = select_file(p, label_idx)
         po = replay_pcap(fpath, traffic_generation_ifaces[env_idx])
         prcs.append(po)
 
