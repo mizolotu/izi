@@ -20,16 +20,24 @@ def calculate_probs(samples_dir, fsize_min=100000):
         probs = np.zeros_like(freqs, dtype=float)
         nlabels = freqs.shape[1]
         for i in range(nlabels):
-            s1 = np.sum(freqs[:, i])
-            if s1 == 0:
+            s = np.sum(freqs[:, i])
+            if s == 0:
                 probs1 = np.sum(freqs[:, 1:], axis=1)  # sum of frequencies of files with malicious traffic
                 idx0 = np.where((probs1 == 0) & (fsizes > fsize_min))[0]  # index of files with no malicious traffic
                 counts0 = np.zeros_like(freqs0)
                 counts0[idx0] = freqs0[idx0]
-                s2 = np.sum(counts0)
-                probs[:, i] = counts0 / s2
+                s0 = np.sum(counts0)
+                probs[:, i] = counts0 / s0
             else:
-                probs[:, i] = freqs[:, i] / s1
+                idx1 = np.where(fsizes > fsize_min)[0]
+                if len(idx1) > 0:
+                    counts1 = np.zeros_like(freqs[:, i])
+                    counts1[idx1] = freqs[idx1, i]
+                    s1 = np.sum(counts1)
+                    probs[:, i] = counts1 / s1
+                else:
+                    s1 = np.sum(freqs[:, i])
+                    probs[:, i] = freqs[:, i] / s1
         profiles.append({'fpath': profile_file, 'fnames': fnames, 'probs': probs})
     return profiles
 
