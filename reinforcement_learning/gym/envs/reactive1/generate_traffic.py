@@ -8,25 +8,26 @@ from common.ml import load_meta
 from time import sleep
 from pathlib import Path
 
-def calculate_probs(samples_dir, postfix='.csv'):
-    profile_files = sorted([osp.join(samples_dir, item) for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith(postfix)])
+def calculate_probs(samples_dir, fsize_min=100000):
+    profile_files = sorted([osp.join(samples_dir, item) for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith(csv_postfix)])
     profiles = []
     for profile_file in profile_files:
         vals = pandas.read_csv(profile_file, header=None).values
         fnames = vals[:, 0]
         fsizes = np.array([Path(f).stat().st_size for f in fnames])
         freqs = vals[:, 1:]
+        freqs0 = vals[:, 1]
         probs = np.zeros_like(freqs, dtype=float)
         nlabels = freqs.shape[1]
         for i in range(nlabels):
             s1 = np.sum(freqs[:, i])
             if s1 == 0:
                 probs1 = np.sum(freqs[:, 1:], axis=1)  # sum of frequencies of files with malicious traffic
-                idx0 = np.where(probs1 == 0)[0]  # index of files with no malicious traffic
-                fsizes0 = np.zeros_like(fsizes)
-                fsizes0[idx0] = fsizes[idx0]
-                s2 = np.sum(fsizes0)
-                probs[:, i] = fsizes0 / s2
+                idx0 = np.where((probs1 == 0) & (fsizes > fsize_min))[0]  # index of files with no malicious traffic
+                counts0 = np.zeros_like(freqs0)
+                counts0[idx0] = freqs0[idx0]
+                s2 = np.sum(counts0)
+                probs[:, i] = counts0 / s2
             else:
                 probs[:, i] = freqs[:, i] / s1
         profiles.append({'fpath': profile_file, 'fnames': fnames, 'probs': probs})
