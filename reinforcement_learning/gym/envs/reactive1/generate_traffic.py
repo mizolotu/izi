@@ -48,6 +48,7 @@ def select_file(profile, label):
     return fnames[idx]
 
 def replay_pcap(fpath, iface):
+    print('Replaying: {0}'.format(fpath))
     p = Popen(['tcpreplay', '-i', iface, '--duration', str(episode_duration), fpath]) #, stdout=DEVNULL, stderr=DEVNULL)
     return p
 
