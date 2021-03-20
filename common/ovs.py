@@ -1,5 +1,26 @@
 from common.utils import ssh_connect, ssh_command
 
+def create_veth_pair(vm, idx, br='br'):
+    mgmt = vm['mgmt']
+    keyfile = vm['key']
+    ssh = ssh_connect(mgmt, keyfile)
+    ssh_command(ssh, 'sudo ip link add in{0} type veth peer name out{0}'.format(idx))
+    ssh_command(ssh, 'sudo ovs-vsctl add-port {0} out{1}'.format(br, idx))
+    ssh_command(ssh, 'sudo ip link set dev in{0} up'.format(idx))
+    ssh_command(ssh, 'sudo ip link set dev out{0} up'.format(idx))
+
+def delete_veth_pair(vm, idx):
+    mgmt = vm['mgmt']
+    keyfile = vm['key']
+    ssh = ssh_connect(mgmt, keyfile)
+    ssh_command(ssh, 'sudo ip link del in{0} type veth peer name out{0}'.format(idx))
+
+def add_default_tgu_flow(vm, idx, br='br'):
+    mgmt = vm['mgmt']
+    keyfile = vm['key']
+    ssh = ssh_connect(mgmt, keyfile)
+    ssh_command(ssh, 'sudo ovs-ofctl add-flow {0} \"table=0,in_port=out{1},action=output:t_s_{1}\"'.format(br, idx))
+
 def create_vxlan_tunnel(vm, vxlan, ip, br='br'):
     mgmt = vm['mgmt']
     keyfile = vm['key']

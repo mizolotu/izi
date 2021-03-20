@@ -13,39 +13,49 @@ Vagrant.configure("2") do |config|
     libvirt.management_network_address = "192.168.122.0/24"
   end
 
+  config.vm.define "tgu", primary: true do |tgu|
+    tgu.vm.box = "generic/ubuntu1804"
+    tgu.vm.network :private_network, :ip => "192.168.254.10"
+    tgu.vm.network :private_network, :ip => "100.0.0.10"
+    tgu.vm.provision "file", source: "./sources/tgu.service", destination: "/home/vagrant/"
+    tgu.vm.provision "file", source: "./sources/tgu", destination: "/home/vagrant/"
+    tgu.vm.provision :shell, :path => "scripts/tgu.sh", privileged: false
+    tgu.vm.synced_folder './data/spl', '/home/vagrant/data/spl', type: 'nfs', nfs_udp: false
+  end
+
   config.vm.define "odl", primary: true do |odl|
     odl.vm.box = "generic/ubuntu1804"
     odl.vm.network :private_network, :ip => "192.168.254.11"
-    odl.vm.provision "file", source: "sources/opendaylight-0.12.3.tar.gz", destination: "opendaylight-0.12.3.tar.gz"
-    odl.vm.provision "file", source: "sources/odl.service", destination: "/home/vagrant/"
+    odl.vm.provision "file", source: "./sources/opendaylight-0.12.3.tar.gz", destination: "opendaylight-0.12.3.tar.gz"
+    odl.vm.provision "file", source: "./sources/odl.service", destination: "/home/vagrant/"
     odl.vm.provision :shell, :path => "scripts/odl.sh", privileged: false
   end
 
   config.vm.define "ovs_0" do |ovs_0|
     ovs_0.vm.box = "generic/ubuntu1804"
     ovs_0.vm.network :private_network, :ip => "192.168.254.20"
-    ovs_0.vm.network :private_network, :ip => "100.0.0.2"
+    ovs_0.vm.network :private_network, :ip => "100.0.0.20"
     ovs_0.vm.provision :shell, :path => "scripts/ovs.sh", privileged:false
   end
 
   config.vm.define "ovs_1" do |ovs_1|
     ovs_1.vm.box = "generic/ubuntu1804"
     ovs_1.vm.network :private_network, :ip => "192.168.254.21"
-    ovs_1.vm.network :private_network, :ip => "101.0.0.2"
+    ovs_1.vm.network :private_network, :ip => "100.0.0.21"
     ovs_1.vm.provision :shell, :path => "scripts/ovs.sh", privileged:false
   end
 
   config.vm.define "ovs_2" do |ovs_2|
     ovs_2.vm.box = "generic/ubuntu1804"
     ovs_2.vm.network :private_network, :ip => "192.168.254.22"
-    ovs_2.vm.network :private_network, :ip => "102.0.0.2"
+    ovs_2.vm.network :private_network, :ip => "100.0.0.22"
     ovs_2.vm.provision :shell, :path => "scripts/ovs.sh", privileged:false
   end
 
   config.vm.define "ovs_3" do |ovs_3|
     ovs_3.vm.box = "generic/ubuntu1804"
     ovs_3.vm.network :private_network, :ip => "192.168.254.23"
-    ovs_3.vm.network :private_network, :ip => "103.0.0.2"
+    ovs_3.vm.network :private_network, :ip => "100.0.0.23"
     ovs_3.vm.provision :shell, :path => "scripts/ovs.sh", privileged:false
   end
 

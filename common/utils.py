@@ -14,16 +14,26 @@ def find_vms(fname='Vagrantfile'):
     return vms
 
 def find_vm_ips(vms, fname='Vagrantfile'):
-    ips = []
+    control_ips = []
+    data_ips = []
     with open(fname, 'r') as vf:
         lines = vf.readlines()
     for vm in vms:
+        control_ip = None
+        data_ip = None
         for line in lines:
             if '{0}.vm.network :private_network, :ip'.format(vm) in line:
                 spl = line.strip().split(' ')
-                ips.append(spl[-1][1:-1])
-                break
-    return ips
+                ip = spl[-1][1:-1]
+                if control_ip is None:
+                    control_ip = ip
+                elif data_ip is None:
+                    data_ip = ip
+                else:
+                    break
+        control_ips.append(control_ip)
+        data_ips.append(data_ip)
+    return control_ips, data_ips
 
 def find_mgmt_ip(v, vm):
     ip = ''

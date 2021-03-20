@@ -1,4 +1,4 @@
-import os, pandas
+import os, pandas, requests, json, sys
 import os.path as osp
 import numpy as np
 
@@ -52,6 +52,10 @@ def replay_pcap(fpath, iface):
     p = Popen(['tcpreplay', '-i', iface, '--duration', str(episode_duration), fpath]) #, stdout=DEVNULL, stderr=DEVNULL)
     return p
 
+def generate_ip_traffic_on_interface(tgu_mgmt_ip, veth_idx, ip, label_idx, duration):
+    url = 'http://{0}:{1}/replay'.format(tgu_mgmt_ip, ids_port)
+    requests.post(url, json={'ip': ip, 'idx': veth_idx, 'label': label_idx, 'duration': duration})
+
 if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
@@ -61,19 +65,12 @@ if __name__ == '__main__':
     label_idx = labels.index(label)
     ip = '172.31.69.28'
 
-    # load profiles
+    with open(vms_fpath, 'r') as f:
+        vms = json.load(f)
+    tgu_vms = [vm for vm in vms if vm['vm'].startswith('tgu')]
+    assert len(tgu_vms) == 1
+    tgu_vm = tgu_vms[0]
 
-    profiles = calculate_probs(spl_dir)
-
-    # sample files
-
-    prcs = []
-    for p in profiles:
-        if ip in p['fpath']:
-            fpath = select_file(p, label_idx)
-            po = replay_pcap(fpath, traffic_generation_ifaces[env_idx])
-            prcs.append(po)
-
+    generate_ip_traffic_on_interface(tgu_vm['mgmt'], env_idx, ip, label_idx, episode_duration)
     sleep(episode_duration)
-
     print('Passed!')

@@ -15,7 +15,7 @@ from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts
 from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions
-from reinforcement_learning.gym.envs.reactive1.generate_traffic import calculate_probs, replay_pcap, select_file
+from reinforcement_learning.gym.envs.reactive1.generate_traffic import generate_ip_traffic_on_interface
 
 class AttackMitigationEnv():
 
@@ -61,6 +61,12 @@ class AttackMitigationEnv():
         for vm in self.ids_vms:
             restart_ids(vm)
 
+        # tgu vms
+
+        tgu_vms = [vm for vm in self.vms if vm['vm'].startswith('tgu')]
+        assert len(tgu_vms) == 1
+        self.tgu_vm = tgu_vms[0]
+
         # controller
 
         controller_vm = [vm for vm in self.vms if vm['role'] == 'sdn']
@@ -84,7 +90,6 @@ class AttackMitigationEnv():
         # traffic
 
         self.label = label
-        self.profiles = calculate_probs(spl_dir)
 
         # actions
 
@@ -379,11 +384,8 @@ class AttackMitigationEnv():
 
         # sample files
 
-        for p in self.profiles:
-            fpath = select_file(p, self.label)
-            if self.id == 1 and p['fpath'] == 'data/spl/172.31.69.28.csv':
-                print(fpath)
-            replay_pcap(fpath, traffic_generation_ifaces[self.id])
+        for host in self.internal_hosts:
+            generate_ip_traffic_on_interface(self.tgu_vm['mgmt'], self.id, host, self.label, episode_duration)
 
         self.tstart = time()
         self.tstep = time()
