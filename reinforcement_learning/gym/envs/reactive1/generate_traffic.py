@@ -55,10 +55,9 @@ if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
     labels = np.array(meta['labels'])
-    mlabels = labels[labels > 0]
     env_idx = 1
     label = 7
-    label_idx = labels[np.where(labels == label)[0]]
+    label_idx = np.where(labels == label)[0]
 
     # load profiles
 
