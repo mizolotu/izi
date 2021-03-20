@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     prcs = []
     for p in profiles:
-        if ip in p['fname']:
+        if ip in p['fpath']:
             fpath = select_file(p, label_idx)
             po = replay_pcap(fpath, traffic_generation_ifaces[env_idx])
             prcs.append(po)
