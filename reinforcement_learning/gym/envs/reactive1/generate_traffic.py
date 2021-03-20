@@ -58,7 +58,7 @@ if __name__ == '__main__':
     mlabels = labels[labels > 0]
     env_idx = 1
     label = 7
-    label_idx = labels.__index__(label)
+    label_idx = labels.index(label)
 
     # load profiles
 
