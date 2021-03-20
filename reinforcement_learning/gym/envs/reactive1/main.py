@@ -381,6 +381,8 @@ class AttackMitigationEnv():
 
         for p in self.profiles:
             fpath = select_file(p, self.label)
+            if self.id == 1 and p['fpath'] == 'data/spl/172.31.69.28.csv':
+                print(fpath)
             replay_pcap(fpath, traffic_generation_ifaces[self.id])
 
         self.tstart = time()
