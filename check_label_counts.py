@@ -12,7 +12,10 @@ if __name__ == '__main__':
         fnames = vals[:, 0]
         counts = vals[:, 1:]
         profile_maxs = np.max(counts, axis=0)
-        print(profile_file, profile_maxs)
+        profile_fmaxs = fnames[np.argmax(counts, axis=0)]
+        print(profile_file)
+        for i, (f, m) in enumerate(zip(profile_fmaxs, profile_maxs)):
+            print(i, f, m)
         maxs.append(profile_maxs)
     maxs = np.max(maxs, axis=0)
     for i, m in enumerate(maxs):
