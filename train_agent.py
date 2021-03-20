@@ -39,7 +39,7 @@ if __name__ == '__main__':
     format_strs = os.getenv('', 'stdout,log,csv').split(',')
     logger.configure(os.path.abspath(logdir), format_strs)
 
-    env_fns = [make_env(env_class, env_idx, attack_idx, nsteps) for env_idx, attack_idx in enumerate(attack_indexes)]
+    env_fns = [make_env(env_class, env_idx, attack_idx) for env_idx, attack_idx in enumerate(attack_indexes)]
     env = SubprocVecEnv(env_fns)
 
     try:
