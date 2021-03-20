@@ -59,6 +59,7 @@ if __name__ == '__main__':
     env_idx = 1
     label = 7
     label_idx = labels.index(label)
+    ip = '172.31.69.28'
 
     # load profiles
 
@@ -68,9 +69,10 @@ if __name__ == '__main__':
 
     prcs = []
     for p in profiles:
-        fpath = select_file(p, label_idx)
-        po = replay_pcap(fpath, traffic_generation_ifaces[env_idx])
-        prcs.append(po)
+        if ip in p['fname']:
+            fpath = select_file(p, label_idx)
+            po = replay_pcap(fpath, traffic_generation_ifaces[env_idx])
+            prcs.append(po)
 
     sleep(episode_duration)
 
