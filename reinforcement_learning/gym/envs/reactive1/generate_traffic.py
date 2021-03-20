@@ -48,7 +48,7 @@ def select_file(profile, label):
     return fnames[idx]
 
 def replay_pcap(fpath, iface):
-    p = Popen(['tcpreplay', '-i', iface, '--duration', str(episode_duration), fpath], stdout=DEVNULL, stderr=DEVNULL)
+    p = Popen(['tcpreplay', '-i', iface, '--duration', str(episode_duration), fpath]) #, stdout=DEVNULL, stderr=DEVNULL)
     return p
 
 if __name__ == '__main__':
