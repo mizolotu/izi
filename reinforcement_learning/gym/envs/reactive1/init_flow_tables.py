@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     # env index
 
-    env_idx = 0
+    env_idx = 1
 
     # load data
 
