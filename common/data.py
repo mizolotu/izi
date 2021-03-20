@@ -618,7 +618,7 @@ def count_labels(input, output, labels, labeler):
                 idx = labels.index(label)
                 counts[idx] += 1
                 n += 1
-        freq = counts / (n + 1e-10)
+        freq = counts  # / (n + 1e-10)
         pandas.DataFrame([[input] + freq.tolist()]).to_csv(output, header=False, mode='a', index=False)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
