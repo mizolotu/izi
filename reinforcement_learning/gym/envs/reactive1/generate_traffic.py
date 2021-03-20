@@ -54,10 +54,11 @@ def replay_pcap(fpath, iface):
 if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
-    labels = np.array(meta['labels'])
+    labels = meta['labels']
     env_idx = 1
     label = 7
-    label_idx = np.where(labels == label)[0]
+    label_idx = labels.index(label)
+    print(label_idx)
 
     # load profiles
 
