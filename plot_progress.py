@@ -27,7 +27,7 @@ if __name__ == '__main__':
     r = moving_average(r.reshape(len(r), 1)).reshape(x.shape)
     n = moving_average(n.reshape(len(n), 1)).reshape(x.shape) * 100
     a = moving_average(a.reshape(len(a), 1)).reshape(x.shape) * 100
-    p = moving_average(b.reshape(len(a), 1)).reshape(x.shape) + 0.5
+    p = moving_average(b.reshape(len(a), 1)).reshape(x.shape)
 
     data = [[[x, r]], [[x, n]], [[x, a]], [[x, p]]]
     names = [['Reward'], ['Benign traffic allowed, %'], ['Malicious traffic blocked, %'], ['Precision']]
@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
         # generate scatter
 
-        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 1004800])
+        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 132864])
 
         # save results
 
