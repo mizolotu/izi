@@ -1,10 +1,10 @@
 [Unit]
-Description=ids
+Description=tgu
 After=network.target
 
 [Service]
 Environment=PYTHONPATH=/home/vagrant/.local/lib/python3.6/site-packages
-ExecStart=/usr/bin/python3 /home/vagrant/ids/main.py
+ExecStart=/usr/bin/python3 /home/vagrant/tgu/main.py
 
 [Install]
 WantedBy=multi-user.target
