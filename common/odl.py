@@ -279,7 +279,7 @@ class Odl:
         return pushed_flow
 
     def ip_proto_drop(self, node_id, table_id, priority, ip_dir, ip, proto_name, proto_number, mask=32):
-        flow_id = '{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
+        flow_id = 'iip_{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
         ip_with_mask = '{0}/{1}'.format(ip, mask)
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.ip_direction(ip_dir, ip_with_mask)])

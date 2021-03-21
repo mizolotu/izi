@@ -107,7 +107,7 @@ def block_ip_app(controller, ovs_node, table_id, lower_priority, higher_priority
         _, proto_number = ip_proto(proto_name)
         for ip in ips:
             for ip_dir in directions:
-                flow_id = '{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
+                flow_id = 'iip_{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
                 if not controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                     controller.ip_proto_drop(ovs_node, table_id, lower_priority, ip_dir, ip, proto_name, proto_number)
 
@@ -129,7 +129,7 @@ def unblock_ip_app(controller, ovs_node, table_id, ips, application):
         _, proto_number = ip_proto(proto_name)
         for ip in ips:
             for ip_dir in directions:
-                flow_id = '{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
+                flow_id = 'iip_{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
                 if controller.flow_exists_in_config(ovs_node, table_id, flow_id):
                     controller.delete_config_flow(ovs_node, table_id, flow_id)
                 if controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
