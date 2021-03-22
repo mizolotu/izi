@@ -46,7 +46,7 @@ def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.Accuracy(name='accuracy'), tf.keras.metrics.Precision(name='precision')])
     return model, 'mlp_{0}_{1}'.format(nh, nl)
 
 def identity_block(x, nhidden):  # h = f(x) + x
