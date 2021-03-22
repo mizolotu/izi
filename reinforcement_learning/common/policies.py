@@ -7,7 +7,7 @@ import tensorflow as tf
 from reinforcement_learning.gym.spaces import Discrete
 
 from reinforcement_learning.common.tf_util import batch_to_seq, seq_to_batch
-from reinforcement_learning.common.tf_layers import conv, linear, conv_to_fc, lstm, mlpstack
+from reinforcement_learning.common.tf_layers import conv, linear, conv_to_fc, lstm, mlp
 from reinforcement_learning.common.distributions import make_proba_dist_type, CategoricalProbabilityDistribution, MultiCategoricalProbabilityDistribution, DiagGaussianProbabilityDistribution, BernoulliProbabilityDistribution
 from reinforcement_learning.common.input import observation_input
 
@@ -28,7 +28,7 @@ def nature_cnn(scaled_images, **kwargs):
     return activ(linear(layer_3, 'fc1', n_hidden=512, init_scale=np.sqrt(2)))
 
 
-def mlp_extractor(flat_observations, net_arch, act_fun):
+def mlp_extractor(flat_observations, net_arch, act_fun, batch_norm=True):
     """
     Constructs an MLP that receives observations as an input and outputs a latent representation for the policy and
     a value network. The ``net_arch`` parameter allows to specify the amount and size of the hidden layers and how many
@@ -59,11 +59,18 @@ def mlp_extractor(flat_observations, net_arch, act_fun):
 
     # Iterate through the shared layers and build the shared parts of the network
     for idx, layer in enumerate(net_arch):
+
         if isinstance(layer, int):  # Check that this is a shared layer
+
             layer_size = layer
             latent = act_fun(linear(latent, "shared_fc{}".format(idx), layer_size, init_scale=np.sqrt(2)))
+            if batch_norm:
+                latent = tf.compat.v1.layers.batch_normalization(latent)
+
         else:
+
             assert isinstance(layer, dict), "Error: the net_arch list can only contain ints and dicts"
+
             if 'pi' in layer:
                 assert isinstance(layer['pi'], list), "Error: net_arch[-1]['pi'] must contain a list of integers."
                 policy_only_layers = layer['pi']
@@ -74,16 +81,21 @@ def mlp_extractor(flat_observations, net_arch, act_fun):
             break  # From here on the network splits up in policy and value network
 
     # Build the non-shared part of the network
+
     latent_policy = latent
     latent_value = latent
     for idx, (pi_layer_size, vf_layer_size) in enumerate(zip_longest(policy_only_layers, value_only_layers)):
         if pi_layer_size is not None:
             assert isinstance(pi_layer_size, int), "Error: net_arch[-1]['pi'] must only contain integers."
             latent_policy = act_fun(linear(latent_policy, "pi_fc{}".format(idx), pi_layer_size, init_scale=np.sqrt(2)))
+            if batch_norm:
+                latent_policy = tf.compat.v1.layers.batch_normalization(latent_policy)
 
         if vf_layer_size is not None:
             assert isinstance(vf_layer_size, int), "Error: net_arch[-1]['vf'] must only contain integers."
             latent_value = act_fun(linear(latent_value, "vf_fc{}".format(idx), vf_layer_size, init_scale=np.sqrt(2)))
+            if batch_norm:
+                latent_value = tf.compat.v1.layers.batch_normalization(latent_value)
 
     return latent_policy, latent_value
 
