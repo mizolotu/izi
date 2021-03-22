@@ -88,14 +88,10 @@ def mlp_extractor(flat_observations, net_arch, act_fun, batch_norm=True):
         if pi_layer_size is not None:
             assert isinstance(pi_layer_size, int), "Error: net_arch[-1]['pi'] must only contain integers."
             latent_policy = act_fun(linear(latent_policy, "pi_fc{}".format(idx), pi_layer_size, init_scale=np.sqrt(2)))
-            if batch_norm:
-                latent_policy = tf.compat.v1.layers.batch_normalization(latent_policy)
 
         if vf_layer_size is not None:
             assert isinstance(vf_layer_size, int), "Error: net_arch[-1]['vf'] must only contain integers."
             latent_value = act_fun(linear(latent_value, "vf_fc{}".format(idx), vf_layer_size, init_scale=np.sqrt(2)))
-            if batch_norm:
-                latent_value = tf.compat.v1.layers.batch_normalization(latent_value)
 
     return latent_policy, latent_value
 
