@@ -34,6 +34,7 @@ ids_port = 5000
 ids_params = ['nflows', 'delay']
 n_ids_params = len(ids_params)
 roc_fname = 'roc.csv'
+fsize_min = 100000
 
 # sdn
 
