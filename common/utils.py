@@ -3,6 +3,23 @@ import os.path as osp
 
 from time import sleep
 
+def vagrantfile_provider_config(storage_pool_name=None):
+    libvirt_provider_lines = [
+        "ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'",
+        "Vagrant.configure('2') do | config |",
+        "config.vm.provider: libvirt do | libvirt |",
+    ]
+
+
+
+
+    # libvirt.storage_pool_name = "images-1"
+    libvirt.management_network_name = "default"
+    libvirt.management_network_address = "192.168.122.0/24"
+
+
+end
+
 def find_vms(fname='Vagrantfile'):
     vms = []
     with open(fname, 'r') as vf:

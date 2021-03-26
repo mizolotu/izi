@@ -1,7 +1,12 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Use libvirt (qemu/kvm) to run virtual machine
 ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
 
 Vagrant.configure("2") do |config|
 
+  # Define libvirt storage pool to use
   config.vm.provider :libvirt do |libvirt|
     #libvirt.storage_pool_name = "images-1"
     libvirt.management_network_name = "default"

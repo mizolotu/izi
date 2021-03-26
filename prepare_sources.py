@@ -1,4 +1,4 @@
-import os, pandas, shutil
+import os, pandas, shutil, sys
 import os.path as osp
 import numpy as np
 import tensorflow as tf
@@ -8,6 +8,12 @@ from common.ml import load_meta
 from config import *
 
 if __name__ == '__main__':
+
+    # preparare vagrant file
+
+
+
+    sys.exit(0)
 
     # download controller
 
@@ -56,7 +62,6 @@ if __name__ == '__main__':
 
     # select thresholds
 
-    #label_names = [item for item in os.listdir(r_dir) if osp.isdir(osp.join(r_dir, item))]
     for label_name in non_zero_label_names:
         label_input = osp.join(r_dir, label_name)
         model_results = [osp.join(label_input, item) for item in os.listdir(label_input) if osp.isdir(osp.join(label_input, item))]
