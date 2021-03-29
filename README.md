@@ -41,8 +41,13 @@ sudo apt install libpcap-dev tcpreplay wireshark qemu-kvm libvirt-daemon-system 
 ```bash
 sudo pip install pypcap kaitaistruct numpy pandas sklearn scipy tensorflow tflite-runtime python-vagrant paramiko plotly flask requests cloudpickle opencv-python lxml dicttoxml
 ```
+6. Install tflite runtime:
 
-6. Download orca binaries from https://github.com/plotly/orca/releases, make it executable and copy somewhere on your PATH, e.g.:
+```bash
+sudo pip3 install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
+```
+
+7. Download orca binaries from https://github.com/plotly/orca/releases, make it executable and copy somewhere on your PATH, e.g.:
 
 ```bash
 chmod +x orca-X.Y.Z-x86_64.AppImage
