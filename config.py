@@ -108,5 +108,5 @@ csv_postfix = '.csv'
 
 train_attacks = [3, 7, 8, 9]
 episode_duration = 32
-nsteps = 256
+nsteps = 192
 nepisodes = 100000
