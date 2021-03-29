@@ -42,15 +42,12 @@ sudo apt install libpcap-dev tcpreplay wireshark qemu-kvm libvirt-daemon-system 
 sudo pip install pypcap (pip) kaitaistruct (pip) numpy (pip) pandas (pip) sklearn (pip) scipy (pip) tensorflow (pip) tflite-runtime (pip) python-vagrant (pip) paramiko (pip) plotly (pip) flask (pip) requests (pip) cloudpickle (pip) opencv-python (pip) lxml (pip) dicttoxml (pip)
 ```
 
-6. Download orca binaries from https://github.com/plotly/orca/releases, make it executable and copy somewhere on your PATH:
+6. Download orca binaries from https://github.com/plotly/orca/releases, make it executable and copy somewhere on your PATH, e.g.:
 
 ```bash
 chmod +x orca-X.Y.Z-x86_64.AppImage
 sudo cp /path/to/orca-X.Y.Z-x86_64.AppImage /usr/bin/orca
 ```
-
-
-This list is most likely not full, just follow the instructions, if some package is missing, install it using apt or pip depending on the package.  
 
 ## Prepare ML classifiers
 
