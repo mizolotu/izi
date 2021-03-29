@@ -3,22 +3,46 @@ import os.path as osp
 
 from time import sleep
 
-def vagrantfile_provider_config(storage_pool_name=None):
-    libvirt_provider_lines = [
-        "ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'",
-        "Vagrant.configure('2') do | config |",
-        "config.vm.provider: libvirt do | libvirt |",
-    ]
+def vagrantfile_provider(mgmt_network='192.168.122.0/24', storage_pool_name=None):
+    lines = []
+    lines.append("ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'\n")
+    lines.append("Vagrant.configure('2') do | config |\n\n")
+    lines.append("  config.vm.provider :libvirt do |libvirt|\n")
+    if storage_pool_name is not None:
+        lines.append(f"    libvirt.storage_pool_name = '{storage_pool_name}'\n")
+    lines.append("    libvirt.management_network_name = 'default'\n")
+    lines.append(f"    libvirt.management_network_address = '{mgmt_network}'\n")
+    lines.append("  end\n\n")
+    return lines
 
+def vagrantfile_vms(names, ips, sources, scripts, mounts):
+    assert len(names) == len(ips)
+    assert len(names) == len(scripts)
+    assert len(names) == len(mounts)
+    lines = []
+    for name, ip_list, source_list, script, mount in zip(names, ips, sources, scripts, mounts):
+        lines.append(f"  config.vm.define '{name}', primary: true do |{name}|\n")
+        lines.append(f"    {name}.vm.box = 'generic/ubuntu1804'\n")
+        for ip in ip_list:
+            lines.append(f"    {name}.vm.network :private_network, :ip => '{ip}'\n")
+        for source in source_list:
+            lines.append(f"    {name}.vm.provision 'file', source: '{source[0]}', destination: '{source[1]}'\n")
+        lines.append(f"    {name}.vm.provision :shell, :path => '{script}', privileged: false\n")
+        if mount is not None:
+            lines.append(f"    {name}.vm.synced_folder '{mount[0]}', '{mount[1]}', type: 'nfs', nfs_udp: false\n")
+        lines.append("  end\n\n")
+    return lines
 
+def vagrantfile_end():
+    return ['end']
 
-
-    # libvirt.storage_pool_name = "images-1"
-    libvirt.management_network_name = "default"
-    libvirt.management_network_address = "192.168.122.0/24"
-
-
-end
+def increment_ips(ips):
+    new_ips = []
+    for ip in ips:
+        spl = ip.split('.')
+        spl[-1] = str(int(spl[-1]) + 1)
+        new_ips.append('.'.join(spl))
+    return new_ips
 
 def find_vms(fname='Vagrantfile'):
     vms = []

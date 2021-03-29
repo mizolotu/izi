@@ -1,19 +1,69 @@
-import os, pandas, shutil, sys
+import os, pandas, shutil
 import os.path as osp
 import numpy as np
 import tensorflow as tf
+import argparse as arp
 
-from common.utils import download_controller, clean_dir
+from common.utils import vagrantfile_provider, vagrantfile_vms, vagrantfile_end, increment_ips, download_controller, clean_dir
 from common.ml import load_meta
 from config import *
 
 if __name__ == '__main__':
 
+    # parse args
+
+    parser = arp.ArgumentParser(description='Prepare resources')
+    parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
+    args = parser.parse_args()
+
     # preparare vagrant file
 
+    vms, ips, sources, scripts, mounts = [], [], [], [], []
 
+    # add controller
 
-    sys.exit(0)
+    vms.append('odl')
+    ips.append(ctrl_ips)
+    sources.append(ctrl_sources)
+    scripts.append(ctrl_script)
+    mounts.append(None)
+
+    # add traffic generation vm
+
+    vms.append('tgu')
+    ips.append(tgu_ips)
+    sources.append(tgu_sources)
+    scripts.append(tgu_script)
+    mounts.append(tgu_mount)
+
+    # add ovs vms
+
+    ips_i = ovs_ips
+    for i in range(nenvs):
+        vms.append(f'ovs_{i}')
+        ips.append(ips_i)
+        sources.append(ovs_sources)
+        scripts.append(ovs_script)
+        mounts.append(None)
+        ips_i = increment_ips(ips_i)
+
+    # add ids vms
+
+    ips_i = ids_ips
+    for i in range(nenvs):
+        for j in range(nids):
+            vms.append(f'ids_{i}_{j}')
+            ips.append(ips_i)
+            sources.append(ids_sources)
+            scripts.append(ids_script)
+            mounts.append(None)
+            ips_i = increment_ips(ips_i)
+
+    vagrant_file_lines = vagrantfile_provider(mgmt_network=mgmt_network, storage_pool_name=args.storage)
+    vagrant_file_lines.extend(vagrantfile_vms(vms, ips, sources, scripts, mounts))
+    vagrant_file_lines.extend(vagrantfile_end())
+    with open('Vagrantfile', 'w') as f:
+        f.writelines(vagrant_file_lines)
 
     # download controller
 

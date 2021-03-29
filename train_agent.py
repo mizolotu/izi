@@ -9,6 +9,7 @@ from reinforcement_learning import logger
 from reinforcement_learning.common.callbacks import CheckpointCallback
 from config import *
 from common.ml import load_meta
+from itertools import cycle
 
 def make_env(env_class, *args):
     fn = lambda: env_class(*args)
@@ -28,6 +29,7 @@ if __name__ == '__main__':
             idx = labels.index(a)
             if idx not in attack_indexes:
                 attack_indexes.append(idx)
+    attack_indexes = cycle(attack_indexes)
 
     env_class = AttackMitigationEnv
     algorithm = ppo
@@ -39,7 +41,7 @@ if __name__ == '__main__':
     format_strs = os.getenv('', 'stdout,log,csv').split(',')
     logger.configure(os.path.abspath(logdir), format_strs)
 
-    env_fns = [make_env(env_class, env_idx, attack_idx) for env_idx, attack_idx in enumerate(attack_indexes)]
+    env_fns = [make_env(env_class, env_idx, next(attack_indexes)) for env_idx in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
     try:

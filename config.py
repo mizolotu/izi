@@ -18,9 +18,24 @@ figures_dir = 'figures'
 roc_dir = '{0}/roc'.format(figures_dir)
 progress_dir = '{0}/progress'.format(figures_dir)
 
-# ifaces
+# vagrantfile
 
-traffic_generation_ifaces = ['virbr5', 'virbr6', 'virbr7', 'virbr8']  # change these to the names of the interfaces which have ips 100.0.0.1, 101.0.0.1, etc
+nenvs = 1
+nids = 2
+mgmt_network = '192.168.122.0/24'
+ctrl_ips = ['192.168.254.11']
+ctrl_sources = [['./sources/opendaylight-0.12.3.tar.gz', 'opendaylight-0.12.3.tar.gz'], ['./sources/odl.service', '/home/vagrant/']]
+ctrl_script = 'scripts/odl.sh'
+tgu_ips = ['192.168.254.10', '100.0.0.10']
+tgu_sources = [['./sources/tgu.service', '/home/vagrant/'], ['./sources/tgu', '/home/vagrant/']]
+tgu_script = 'scripts/tgu.sh'
+tgu_mount = ['./data/spl', '/home/vagrant/data/spl']
+ovs_ips = ['192.168.254.20', '100.0.0.20']
+ovs_sources = []
+ovs_script = 'scripts/ovs.sh'
+ids_ips = ['192.168.254.60']
+ids_sources = [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']]
+ids_script = 'scripts/ids.sh'
 
 # ids
 
