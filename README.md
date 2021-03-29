@@ -31,15 +31,24 @@ data
              └── PCAP file
 ```
 
-4. Install (makes sense to use sudo user for pip): 
-  - libpcap-dev (apt), pypcap (pip), kaitaistruct (pip), tcpreplay (apt), wireshark (apt)
-  - numpy (pip), pandas (pip), sklearn (pip), scipy (pip)
-  - tensorflow 2 (pip), tflite-runtime (pip)
-  - libvirt (apt), vagrant (apt), python-vagrant (pip), paramiko (pip)
-  - plotly (pip), orca (manual)
-  - flask (pip), requests (pip)
-  - vagrant-libvirt (vagrant)
-  - cloudpickle (pip), opencv-python (pip), lxml (pip), dicttoxml (pip)
+4. Install necessary apt packages: 
+```bash
+sudo apt install libpcap-dev tcpreplay wireshark qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst virt-manager vagrant
+```
+
+5. Install python packages with sudo user:  
+
+```bash
+sudo pip install pypcap (pip) kaitaistruct (pip) numpy (pip) pandas (pip) sklearn (pip) scipy (pip) tensorflow (pip) tflite-runtime (pip) python-vagrant (pip) paramiko (pip) plotly (pip) flask (pip) requests (pip) cloudpickle (pip) opencv-python (pip) lxml (pip) dicttoxml (pip)
+```
+
+6. Download orca binaries from https://github.com/plotly/orca/releases, make it executable and copy somewhere on your PATH:
+
+```bash
+chmod +x orca-X.Y.Z-x86_64.AppImage
+sudo cp /path/to/orca-X.Y.Z-x86_64.AppImage /usr/bin/orca
+```
+
 
 This list is most likely not full, just follow the instructions, if some package is missing, install it using apt or pip depending on the package.  
 
