@@ -39,7 +39,7 @@ sudo apt install libpcap-dev tcpreplay wireshark qemu-kvm libvirt-daemon-system 
 5. Install python packages with sudo user:  
 
 ```bash
-sudo pip install pypcap (pip) kaitaistruct (pip) numpy (pip) pandas (pip) sklearn (pip) scipy (pip) tensorflow (pip) tflite-runtime (pip) python-vagrant (pip) paramiko (pip) plotly (pip) flask (pip) requests (pip) cloudpickle (pip) opencv-python (pip) lxml (pip) dicttoxml (pip)
+sudo pip install pypcap kaitaistruct numpy pandas sklearn scipy tensorflow tflite-runtime python-vagrant paramiko plotly flask requests cloudpickle opencv-python lxml dicttoxml
 ```
 
 6. Download orca binaries from https://github.com/plotly/orca/releases, make it executable and copy somewhere on your PATH, e.g.:
