@@ -39,33 +39,43 @@ def label_cicids17(timestamp, src_ip, dst_ip, src_port=None, dst_port=None):
     if (src_ip == '18.221.219.4' or dst_ip == '18.221.219.4') and date == '1402':
         label = 1
         description = 'FTP bruteforce'
+
     elif (src_ip == '13.58.98.64' or dst_ip == '13.58.98.64') and date == '1402':
         label = 2
         description = 'SSH bruteforce'
+
     elif (src_ip == '18.219.211.138' or dst_ip == '18.219.211.138') and date == '1502':
         label = 3
         description = 'DoS-GoldenEye'
+
     elif (src_ip == '18.217.165.70' or dst_ip == '18.217.165.70') and date == '1502':
         label = 4
         description = 'DoS-Slowloris'
+
     elif (src_ip == '18.219.193.20' or dst_ip == '18.219.193.20') and date == '1602':
         label = 5
         description = 'DoS-Hulk'
+
     elif (src_ip in loic or dst_ip in loic) and date in ['2002', '2102']:
         label = 6
         description = 'DoS-LOIC/HOIC'
+
     elif (src_ip == '18.218.115.60' or dst_ip == '18.218.115.60') and date in ['2202', '2302']:
         label = 7
         description = 'BruteForce-Web'
+
     elif (src_ip == '13.58.225.34' or dst_ip == '13.58.225.34') and date in ['2802', '0103']:
         label = 8
         description = 'Infiltration'
+
     elif (src_ip == '18.219.211.138' or dst_ip == '18.219.211.138') and date == '0203':
         label = 9
         description = 'Botnet attack'
+
     else:
         label = 0
         description = 'Normal traffic'
+
     return label, description
 
 def decode_tcp_flags_value(value, nflags):
@@ -415,7 +425,7 @@ class Flow():
             self.idl_min  # 64
         ])
 
-def extract_flow_features(input, output, meta_fname, tstep, labeler, intervals=[1,2,4,8,16], stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
+def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals=[1,2,4,8,16], stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
 
     src_ip_idx = 0
     src_port_idx = 1
@@ -608,7 +618,7 @@ def count_labels(input, output, labels, labeler):
                 idx = labels.index(label)
                 counts[idx] += 1
                 n += 1
-        freq = counts / (n + 1e-10)
+        freq = counts  # / (n + 1e-10)
         pandas.DataFrame([[input] + freq.tolist()]).to_csv(output, header=False, mode='a', index=False)
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()

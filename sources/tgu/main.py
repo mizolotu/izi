@@ -10,6 +10,16 @@ app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
+@app.route('/seed', methods=['GET', 'POST'])
+def seed():
+    global seed
+    if request.method == 'POST':
+        data = request.data.decode('utf-8')
+        jdata = json.loads(data)
+        seed = jdata['seed']
+        np.random.seed(seed)
+    return jsonify(seed)
+
 @app.route('/replay', methods=['GET', 'POST'])
 def replay():
     if request.method == 'POST':
@@ -76,5 +86,6 @@ if __name__ == "__main__":
     home_dir = '/home/vagrant'
     data_dir = '{0}/data/spl'.format(home_dir)
     ips, profiles = calculate_probs(data_dir)
+    seed = None
     app.run(host='0.0.0.0')
 

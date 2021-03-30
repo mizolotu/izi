@@ -101,9 +101,9 @@ applications = [
 ip_proto_names = list(set([item[0] for item in applications]))
 directions = ['source', 'destination']
 
-# other
+# sflow
 
-csv_postfix = '.csv'
+sflow_port = 6343
 
 # rl
 
@@ -112,3 +112,7 @@ train_attacks = [3, 7, 8, 9]
 episode_duration = 32
 nsteps = 196
 nepisodes = 100000
+
+# other
+
+csv_postfix = '.csv'
