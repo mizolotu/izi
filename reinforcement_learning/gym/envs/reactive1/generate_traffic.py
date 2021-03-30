@@ -1,8 +1,8 @@
-import os, pandas, requests, json, sys
+import os, pandas, requests, json
 import os.path as osp
 import numpy as np
 
-from subprocess import Popen, DEVNULL
+from subprocess import Popen
 from config import *
 from common.ml import load_meta
 from time import sleep
@@ -52,6 +52,10 @@ def replay_pcap(fpath, iface):
     p = Popen(['tcpreplay', '-i', iface, '--duration', str(episode_duration), fpath]) #, stdout=DEVNULL, stderr=DEVNULL)
     return p
 
+def set_seed(tgu_mgmt_ip, seed):
+    url = 'http://{0}:{1}/seed'.format(tgu_mgmt_ip, ids_port)
+    requests.post(url, json={'seed': seed})
+
 def generate_ip_traffic_on_interface(tgu_mgmt_ip, veth_idx, ip, label_idx, duration):
     url = 'http://{0}:{1}/replay'.format(tgu_mgmt_ip, ids_port)
     requests.post(url, json={'ip': ip, 'idx': veth_idx, 'label': label_idx, 'duration': duration})
@@ -60,8 +64,8 @@ if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
     labels = meta['labels']
-    env_idx = 1
-    label = 7
+    env_idx = 0
+    label = 3
     label_idx = labels.index(label)
     ip = '172.31.69.28'
 

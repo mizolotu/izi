@@ -18,7 +18,7 @@ def make_env(env_class, *args):
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train RL agent.')
-    parser.add_argument('-c', '--checkpoint', help='Checkpoint', default='')
+    parser.add_argument('-c', '--checkpoint', help='Checkpoint', default='rl_model_384_steps.zip')
     args = parser.parse_args()
 
     meta = load_meta(feature_dir)

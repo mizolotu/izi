@@ -8,6 +8,7 @@ log_dir = 'logs'
 vms_fpath = '{0}/vms.json'.format(log_dir)
 tunnels_fpath = '{0}/tunnels.json'.format(log_dir)
 nodes_fpath = '{0}/nodes.json'.format(log_dir)
+actions_fpath = '{0}/actions.csv'.format(log_dir)
 classfier_models_dir = 'models/classifiers'
 classfier_results_dir = '{0}/results'.format(classfier_models_dir)
 ids_sources_dir = 'sources/ids/'
@@ -106,7 +107,8 @@ csv_postfix = '.csv'
 
 # rl
 
+obs_stack_size = 1
 train_attacks = [3, 7, 8, 9]
 episode_duration = 32
-nsteps = 192
+nsteps = 196
 nepisodes = 100000

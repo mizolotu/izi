@@ -15,15 +15,23 @@ from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts
 from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions
-from reinforcement_learning.gym.envs.reactive1.generate_traffic import generate_ip_traffic_on_interface
+from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, generate_ip_traffic_on_interface
 
 class AttackMitigationEnv():
 
-    def __init__(self, env_id, label):
+    def __init__(self, env_id, label, seed=None, policy=None):
 
         # id
 
         self.id = env_id
+
+        # seed
+
+        self.seed = seed
+
+        # debug
+
+        self.debug = False
 
         # load logs
 
@@ -67,6 +75,10 @@ class AttackMitigationEnv():
         assert len(tgu_vms) == 1
         self.tgu_vm = tgu_vms[0]
 
+        # set tgu seed
+
+        set_seed(self.tgu_vm['mgmt'], self.seed)
+
         # controller
 
         controller_vm = [vm for vm in self.vms if vm['role'] == 'sdn']
@@ -91,9 +103,19 @@ class AttackMitigationEnv():
 
         self.label = label
 
+        # obs
+
+        self.stack_size = obs_stack_size
+        self.n_apps = len(applications)
+        obs_shape = (self.stack_size, self.n_apps, (2 * (1 + self.n_ids + 1) + self.n_ids))
+        self.app_counts_stack = deque(maxlen=self.stack_size)
+        self.before_counts_stack = deque(maxlen=self.stack_size)
+        self.after_counts_stack = deque(maxlen=self.stack_size)
+        self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+
         # actions
 
-        self.n_apps = len(applications)
         self.n_mirror_app_actions = self.n_apps * self.n_ids
         self.n_unmirror_app_actions = self.n_apps * self.n_ids
         self.n_mirror_int_actions = self.n_apps * (self.n_ids - 1) * self.n_ids
@@ -104,15 +126,22 @@ class AttackMitigationEnv():
         act_dim = self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + \
                   self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
 
-        # obs
+        # log actions
 
-        self.stack_size = 16
-        obs_shape = (self.stack_size, self.n_apps, (2 * (1 + self.n_ids + 1) + self.n_ids))
-        self.app_counts_stack = deque(maxlen=self.stack_size)
-        self.before_counts_stack = deque(maxlen=self.stack_size)
-        self.after_counts_stack = deque(maxlen=self.stack_size)
-        self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
-        self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        with open(actions_fpath, 'w') as f:
+            for i in range(act_dim):
+                fun, args = self._action_mapper(i)
+                line = f"{i};{fun.__name__};{','.join([str(item) for item in args])}\n"
+                f.write(line)
+
+        # default policy
+
+        if policy is not None:
+            self.default_reset_actions = policy['reset']
+            self.default_step_actions = policy['step']
+        else:
+            self.default_reset_actions = None
+            self.default_step_actions = None
 
         # reward
 
@@ -128,6 +157,8 @@ class AttackMitigationEnv():
 
     def _get_pcounts(self, table):
         flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='packet')
+        if table == 1:
+            print(flows, counts)
         return flows, counts
 
     def _get_bcounts(self, table):
@@ -204,6 +235,7 @@ class AttackMitigationEnv():
                 allowed = np.clip(a, 0, b)
                 if i < self.n_attackers:
                     attack.append(blocked / b)
+                    print(b, a, blocked, allowed)
                 elif i == self.n_attackers:
                     normal.append(allowed / b)
 
@@ -247,7 +279,7 @@ class AttackMitigationEnv():
             ids_name = self.ids_vms[ids_idx]['vm']
             app = applications[app_idx]
             action_fun = mirror_app_to_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], priorities['medium'], app, self.tunnels, 'ovs_{0}'.format(self.id), ids_name)
+            args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], priorities['medium'], app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions:
             action_array = np.zeros(self.n_unmirror_app_actions)
             action_array[i - self.n_mirror_app_actions] = 1
@@ -271,7 +303,7 @@ class AttackMitigationEnv():
             app = applications[app_idx]
             ips = self.intrusion_ips[ids_from][app_idx]
             action_fun = mirror_ip_app_to_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, self.tunnels, 'ovs_{0}'.format(self.id), ids_name)
+            args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions:
             e = np.eye(self.n_ids)
             action_array = np.zeros(self.n_mirror_int_actions)
@@ -296,12 +328,13 @@ class AttackMitigationEnv():
             app = applications[app_idx]
             action_fun = block_ip_app
             args = (self.controller, self.ovs_node, block_table, priorities['higher'], priorities['highest'], ips, app)
-            if len(app) == 2:
-                for ip in ips:
-                    print('Blocking {0}:{1}:{2} in {3}'.format(app[0], ip, app[1], self.id))
-            elif len(app) == 1:
-                for ip in ips:
-                    print('Blocking {0}:{1}:all in {2}'.format(app[0], ip, self.id))
+            if self.debug:
+                if len(app) == 2:
+                    for ip in ips:
+                        print('Blocking {0}:{1}:{2} in {3}'.format(app[0], ip, app[1], self.id))
+                elif len(app) == 1:
+                    for ip in ips:
+                        print('Blocking {0}:{1}:all in {2}'.format(app[0], ip, self.id))
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions:
             action_array = np.zeros(self.n_unblock_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions] = 1
@@ -382,7 +415,13 @@ class AttackMitigationEnv():
             if (tnow - self.tstart) < episode_duration:
                 sleep(episode_duration - (tnow - self.tstart))
 
-        # sample files
+        # default reset actions
+
+        if self.default_reset_actions is not None:
+            for action in self.default_reset_actions:
+                self._take_action(action)
+
+        # generate traffic
 
         for host in self.internal_hosts:
             generate_ip_traffic_on_interface(self.tgu_vm['mgmt'], self.id, host, self.label, episode_duration)
@@ -432,7 +471,11 @@ class AttackMitigationEnv():
 
         # take an action and measure time
 
-        self._take_action(action)
+        if self.default_step_actions is not None:
+            for action in self.default_step_actions:
+                self._take_action(action)
+        else:
+            self._take_action(action)
         tnow = time()
         if (tnow - self.tstep) < self.step_duration:
             sleep(self.step_duration - (tnow - self.tstep))

@@ -5,7 +5,7 @@ from config import *
 from common.utils import ip_proto
 from time import sleep
 
-def mirror_app_to_ids(controller, ovs_node, table_id, lower_priority, higher_priority, application, tunnels, ovs, ids):
+def mirror_app_to_ids(controller, ovs_node, table_id, lower_priority, higher_priority, application, ovs, ids, tunnels):
     tunnel_to_ids = [tunnel['ofport'] for tunnel in tunnels if tunnel['vm'] == ovs and tunnel['remote'] == ids]
     assert len(tunnel_to_ids) == 1
     tunnel_to_ids = tunnel_to_ids[0]
@@ -44,7 +44,7 @@ def unmirror_app_from_ids(controller, ovs_node, table_id, application):
         if controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
             controller.delete_operational_flow(ovs_node, table_id, flow_id)
 
-def mirror_ip_app_to_ids(controller, ovs_node, table_id, lower_priority, higher_priority, ips, application, tunnels, ovs, ids):
+def mirror_ip_app_to_ids(controller, ovs_node, table_id, lower_priority, higher_priority, ips, application, ovs, ids, tunnels):
     tunnel_to_ids = [tunnel['ofport'] for tunnel in tunnels if tunnel['vm'] == ovs and tunnel['remote'] == ids]
     assert len(tunnel_to_ids) == 1
     tunnel_to_ids = tunnel_to_ids[0]
@@ -182,10 +182,10 @@ if __name__ == '__main__':
 
     # action test
 
-    mirror_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['lower'], priorities['medium'], app1, tunnels, ovs_vm['vm'], ids_name)
-    mirror_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['lower'], priorities['medium'], app2, tunnels, ovs_vm['vm'], ids_name)
-    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['higher'], priorities['highest'], remote_ips, app1, tunnels, ovs_vm['vm'], ids_name)
-    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['higher'], priorities['highest'], remote_ips, app2, tunnels, ovs_vm['vm'], ids_name)
+    mirror_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['lower'], priorities['medium'], app1, ovs_vm['vm'], ids_name, tunnels)
+    mirror_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['lower'], priorities['medium'], app2, ovs_vm['vm'], ids_name, tunnels)
+    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['higher'], priorities['highest'], remote_ips, app1, ovs_vm['vm'], ids_name, tunnels)
+    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['higher'], priorities['highest'], remote_ips, app2, ovs_vm['vm'], ids_name, tunnels)
     block_ip_app(controller, ovs_node, block_table, priorities['higher'], priorities['highest'], remote_ips, app1)
     block_ip_app(controller, ovs_node, block_table, priorities['higher'], priorities['highest'], remote_ips, app2)
 

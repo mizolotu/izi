@@ -415,6 +415,24 @@ class PPO2(ActorCriticRLModel):
             callback.on_training_end()
             return self
 
+    def demo(self, ntests=10):
+        assert self.env.num_envs == 1, "You must pass only one environment when using this function"
+        normal_passed = []
+        attack_blocked = []
+        ids_precision = []
+        episode_reward = []
+        for episode in range(ntests):
+            rollout = self.runner._run()
+            obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
+            normal_passed.append(ep_infos[0]['n'])
+            attack_blocked.append(ep_infos[0]['a'])
+            ids_precision.append(ep_infos[0]['b'])
+            episode_reward.append(ep_infos[0]['r'])
+        print(f'Normal traffic passed: {np.mean(normal_passed)}')
+        print(f'Malicious traffic blocked: {np.mean(attack_blocked)}')
+        print(f'IDS precision: {np.mean(ids_precision)}')
+        print(f'Episode reward: {np.mean(episode_reward)}')
+
     def save(self, save_path, cloudpickle=False):
         data = {
             "gamma": self.gamma,
@@ -445,6 +463,7 @@ class PPO2(ActorCriticRLModel):
 
 
 class Runner(AbstractEnvRunner):
+
     def __init__(self, *, env, model, n_steps, gamma, lam):
         """
         A runner to learn the policy of an environment for a model
