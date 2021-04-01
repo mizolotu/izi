@@ -1,4 +1,4 @@
-import json
+import json, requests
 import numpy as np
 
 from common.odl import Odl
@@ -9,6 +9,17 @@ def get_flow_counts(controller, ovs_node, table, count_type='packet'):
     flow_ids, counts = controller.get_flow_statistics(ovs_node, table, count_type)
     counts = np.array([int(item) for item in counts])
     return flow_ids, counts
+
+def add_sflow_agent(sflow_collector_ip, sflow_collector_port, sflow_agent_ip):
+    url = f'http://{sflow_collector_ip}:{sflow_collector_port}/agent'
+    r = requests.post(url, json={'ip': sflow_agent_ip})
+    print(r)
+    print(r.json())
+
+def get_sflow_samples(sflow_collector_ip, sflow_collector_port):
+    url = f'http://{sflow_collector_ip}:{sflow_collector_port}/samples'
+    in_samples, out_samples = requests.get(url, json={'window': sflow_window}).json()
+    return in_samples, out_samples
 
 if __name__ == '__main__':
 

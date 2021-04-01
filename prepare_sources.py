@@ -36,6 +36,14 @@ if __name__ == '__main__':
     scripts.append(tgu_script)
     mounts.append(tgu_mount)
 
+    # add flow collection vm
+
+    vms.append('fcu')
+    ips.append(fcu_ips)
+    sources.append(fcu_sources)
+    scripts.append(fcu_script)
+    mounts.append(None)
+
     # add ovs vms
 
     ips_i = ovs_ips
@@ -64,6 +72,9 @@ if __name__ == '__main__':
     vagrant_file_lines.extend(vagrantfile_end())
     with open('Vagrantfile', 'w') as f:
         f.writelines(vagrant_file_lines)
+
+    import sys
+    sys.exit(0)
 
     # download controller
 

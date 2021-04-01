@@ -21,6 +21,12 @@ def add_default_tgu_flow(vm, idx, br='br'):
     ssh = ssh_connect(mgmt, keyfile)
     ssh_command(ssh, 'sudo ovs-ofctl add-flow {0} \"table=0,in_port=out{1},action=output:t_s_{1}\"'.format(br, idx))
 
+def add_sflow_agent(vm, collector_ip):
+    mgmt = vm['mgmt']
+    keyfile = vm['key']
+    ssh = ssh_connect(mgmt, keyfile)
+    ssh_command(ssh, f'sudo ovs-vsctl -- --id=@sflow create sflow agent=eth1 target="\\\"{collector_ip}:6343\"\\" header=128 polling=1 sampling=1 -- set bridge br sflow=@sflow')
+
 def create_vxlan_tunnel(vm, vxlan, ip, br='br'):
     mgmt = vm['mgmt']
     keyfile = vm['key']

@@ -1,18 +1,15 @@
 import json, requests
-import numpy as np
 
-from common.odl import Odl
 from config import *
-from time import time
 
-def get_vnf_param(ids_ip, param):
-    uri = 'http://{0}:5000/{1}'.format(ids_ip, param)
+def get_vnf_param(ids_ip, ids_port, param):
+    uri = f'http://{ids_ip}:{ids_port}/{param}'
     r = requests.get(uri)
     value = float(r.json()[param])
     return value
 
-def get_intrusions(ids_ip):
-    uri = 'http://{0}:5000/intrusions'.format(ids_ip)
+def get_intrusions(ids_ip, ids_port):
+    uri = f'http://{ids_ip}:{ids_port}/intrusions'
     r = requests.get(uri)
     value = r.json()
     return value

@@ -5,14 +5,21 @@ from config import *
 
 if __name__ == '__main__':
 
+    # load vms
+
     with open(vms_fpath, 'r') as f:
         vms = json.load(f)
 
-    ovs_vms = [vm for vm in vms if vm['vm'].startswith('ovs')]
-    ids_vms = [vm for vm in vms if vm['vm'].startswith('ids')]
-    tgu_vms = [vm for vm in vms if vm['vm'].startswith('tgu')]
+    # retrieve ovs, ids, tgu and fcu
+
+    ovs_vms = [vm for vm in vms if vm['role'] == 'ovs']
+    ids_vms = [vm for vm in vms if vm['role'] == 'ids']
+    tgu_vms = [vm for vm in vms if vm['role'] == 'tgu']
     assert len(tgu_vms) == 1
     tgu_vm = tgu_vms[0]
+    fcu_vms = [vm for vm in vms if vm['role'] == 'fcu']
+    assert len(fcu_vms) == 1
+    fcu_vm = fcu_vms[0]
 
     # obtain node ids
 
@@ -20,9 +27,6 @@ if __name__ == '__main__':
     for n_vm in ovs_vms + ids_vms:
         node_id = get_node_id(n_vm)
         nodes[n_vm['vm']] = node_id
-
-    with open(nodes_fpath, 'w') as f:
-        json.dump(nodes, f)
 
     # delete default flows from all the switches
 
@@ -36,7 +40,7 @@ if __name__ == '__main__':
     for vm in tgu_vms:
         clean_ovs_ports(vm)
 
-    # delete tgu veth pairsz
+    # delete tgu veth pairs
 
     for ovs_vm in ovs_vms:
         spl = ovs_vm['vm'].split('_')
@@ -84,32 +88,25 @@ if __name__ == '__main__':
         ofport = create_vxlan_tunnel(tgu_vm, vxlan, vm['data'])
         tunnels.append({'vm': tgu_vm['vm'], 'remote': vm['vm'], 'ofport': ofport})
 
-    # add default flow
+    # add default tgu flow
 
-    for vm in ovs_vms:
-        ovs_name = vm['vm']
+    for ovs_vm in ovs_vms:
+        ovs_name = ovs_vm['vm']
         spl = ovs_name.split('_')
         env_idx = spl[1]
         add_default_tgu_flow(tgu_vm, env_idx)
+
+    # add sflow agent to each ovs
+
+    for ovs_vm in ovs_vms:
+        add_sflow_agent(ovs_vm, fcu_vm['ip'])
+
+    # save nodes
+
+    with open(nodes_fpath, 'w') as f:
+        json.dump(nodes, f)
 
     # save tunnels
 
     with open(tunnels_fpath, 'w') as f:
         json.dump(tunnels, f)
-
-    # save vms
-
-    for vm in vms:
-        if vm in ids_vms:
-            vm['role'] = 'ids'
-        elif vm in ovs_vms:
-            vm['role'] = 'ovs'
-        elif vm['vm'] == ctrl_name:
-            vm['role'] = 'sdn'
-        elif vm['vm'] == 'tgu':
-            vm['role'] = 'tgu'
-        else:
-            vm['role'] = 'other'
-
-    with open(vms_fpath, 'w') as f:
-        json.dump(vms, f)

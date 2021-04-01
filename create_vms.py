@@ -38,10 +38,27 @@ if __name__ == '__main__':
 
     clean_dir(log_dir, postfix='.json')
 
+    # assign roles
+
+    roles = []
+    for vm in vms:
+        if vm.startswith('ids'):
+            roles.append('ids')
+        elif vm.startswith('ovs'):
+            roles.append('ovs')
+        elif vm.startswith(ctrl_name):
+            roles.append('sdn')
+        elif vm.startswith('tgu'):
+            roles.append('tgu')
+        elif vm.startswith('fcu'):
+            roles.append('fcu')
+        else:
+            roles.append('other')
+
     # save vms with ips and keys
 
     vms_with_ips = []
-    for vm, ip, data_ip, mgmt_ip, key in zip(vms, control_ips, data_ips, mgmt_ips, keyfiles):
-        vms_with_ips.append({'vm': vm, 'ip': ip, 'mgmt': mgmt_ip, 'data': data_ip, 'key': key})
+    for vm, ip, data_ip, mgmt_ip, key, role in zip(vms, control_ips, data_ips, mgmt_ips, keyfiles, roles):
+        vms_with_ips.append({'vm': vm, 'ip': ip, 'mgmt': mgmt_ip, 'data': data_ip, 'key': key, 'role': role})
     with open(vms_fpath, 'w') as f:
         json.dump(vms_with_ips, f)

@@ -31,6 +31,9 @@ tgu_ips = ['192.168.254.10', '100.0.0.10']
 tgu_sources = [['./sources/tgu.service', '/home/vagrant/'], ['./sources/tgu', '/home/vagrant/']]
 tgu_script = 'scripts/tgu.sh'
 tgu_mount = ['./data/spl', '/home/vagrant/data/spl']
+fcu_ips = ['192.168.254.12']
+fcu_sources = [['./sources/fcu.service', '/home/vagrant/'], ['./sources/fcu', '/home/vagrant/']]
+fcu_script = 'scripts/fcu.sh'
 ovs_ips = ['192.168.254.20', '100.0.0.20']
 ovs_sources = []
 ovs_script = 'scripts/ovs.sh'
@@ -46,7 +49,6 @@ patience = 10
 epochs = 1000
 steps_per_epoch = 4000
 fpr_levels = [0.01, 0.0001, 0.000001]
-ids_port = 5000
 ids_params = ['nflows', 'delay']
 n_ids_params = len(ids_params)
 roc_fname = 'roc.csv'
@@ -103,16 +105,19 @@ directions = ['source', 'destination']
 
 # sflow
 
+sflow_ip = '192.168.254.1'
 sflow_port = 6343
+sflow_window = 1
 
 # rl
 
-obs_stack_size = 1
+obs_stack_size = 16
 train_attacks = [3, 7, 8, 9]
 episode_duration = 32
-nsteps = 196
+nsteps = 256
 nepisodes = 100000
 
 # other
 
 csv_postfix = '.csv'
+flask_port = 5000

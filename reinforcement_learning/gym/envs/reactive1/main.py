@@ -13,7 +13,7 @@ from common.utils import ip_proto
 from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts
+from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_sflow_samples
 from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions
 from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, generate_ip_traffic_on_interface
 
@@ -57,8 +57,8 @@ class AttackMitigationEnv():
 
         ovs_vms = [vm for vm in self.vms if vm['role'] == 'ovs' and int(vm['vm'].split('_')[1]) == self.id]
         assert len(ovs_vms) == 1
-        ovs_vm = ovs_vms[0]
-        self.ovs_node = self.nodes[ovs_vm['vm']]
+        self.ovs_vm = ovs_vms[0]
+        self.ovs_node = self.nodes[self.ovs_vm['vm']]
 
         # ids vms
 
@@ -69,15 +69,19 @@ class AttackMitigationEnv():
         for vm in self.ids_vms:
             restart_ids(vm)
 
-        # tgu vms
+        # tgu vm
 
         tgu_vms = [vm for vm in self.vms if vm['vm'].startswith('tgu')]
         assert len(tgu_vms) == 1
         self.tgu_vm = tgu_vms[0]
+        set_seed(self.tgu_vm['mgmt'], flask_port, self.seed)
 
-        # set tgu seed
+        # fcu vm
 
-        set_seed(self.tgu_vm['mgmt'], self.seed)
+        fcu_vms = [vm for vm in self.vms if vm['vm'].startswith('fcu')]
+        assert len(fcu_vms) == 1
+        self.fcu_vm = fcu_vms[0]
+        #add_sflow_agent(self.fcu_vm['ip'], flask_port, self.ovs_vm['ip'])
 
         # controller
 
@@ -155,10 +159,11 @@ class AttackMitigationEnv():
         print('Observation shape: {0}'.format(obs_shape))
         print('Number of actions: {0}'.format(act_dim))
 
+        self.in_samples = 0
+        self.out_samples = 0
+
     def _get_pcounts(self, table):
         flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='packet')
-        if table == 1:
-            print(flows, counts)
         return flows, counts
 
     def _get_bcounts(self, table):
@@ -195,7 +200,7 @@ class AttackMitigationEnv():
 
     def _update_intrusions(self):
         for i in range(self.n_ids):
-            intrusions = get_intrusions(self.ids_vms[i]['ip'])
+            intrusions = get_intrusions(self.ids_vms[i]['ip'], flask_port)
             for intrusion in intrusions:
                 src_ip = intrusion[0]
                 src_port = intrusion[1]
@@ -235,7 +240,6 @@ class AttackMitigationEnv():
                 allowed = np.clip(a, 0, b)
                 if i < self.n_attackers:
                     attack.append(blocked / b)
-                    print(b, a, blocked, allowed)
                 elif i == self.n_attackers:
                     normal.append(allowed / b)
 
@@ -361,7 +365,7 @@ class AttackMitigationEnv():
                 param = 'step'
                 value = int(value) - self.n_models
             action_fun = set_vnf_param
-            args = (ids_ip, param, value)
+            args = (ids_ip, flask_port, param, value)
         else:
             action_fun = lambda *args: None
             args = ()
@@ -390,7 +394,7 @@ class AttackMitigationEnv():
         # reset ids
 
         for i in range(self.n_ids):
-            reset_ids(self.ids_vms[i]['mgmt'])
+            reset_ids(self.ids_vms[i]['mgmt'], flask_port)
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
 
@@ -401,7 +405,7 @@ class AttackMitigationEnv():
         # wait for sdn configuration to be processed
 
         tables = [app_table, reward_tables[0], reward_tables[1]]
-        conditions = [self.n_apps * 2 - 1, len(attackers) * 2 + 1, len(attackers) * 2 + 1]
+        conditions = [self.n_apps * 2, len(attackers) * 2 + 1, len(attackers) * 2 + 1]
         for table, condition in zip(tables, conditions):
             flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
             while len(flows) != condition:
@@ -424,12 +428,15 @@ class AttackMitigationEnv():
         # generate traffic
 
         for host in self.internal_hosts:
-            generate_ip_traffic_on_interface(self.tgu_vm['mgmt'], self.id, host, self.label, episode_duration)
+            generate_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, self.id, host, self.label, episode_duration)
 
         self.tstart = time()
         self.tstep = time()
 
         # calculate obs
+
+        in_samples, out_samples = get_sflow_samples(self.ovs_vm['ip'], flask_port)
+        print(len(in_samples), len(out_samples))
 
         app_pflows, app_pcounts = self._get_pcounts(app_table)
         app_bflows, app_bcounts = self._get_bcounts(app_table)
@@ -481,7 +488,12 @@ class AttackMitigationEnv():
             sleep(self.step_duration - (tnow - self.tstep))
         self.tstep = time()
 
-        # get and process counts
+        # get and process sflow samples
+
+        in_samples, out_samples = get_sflow_samples(self.ovs_vm['ip'], flask_port)
+        self.in_samples += len(in_samples)
+        self.out_samples += len(out_samples)
+        print(self.in_samples, self.out_samples)
 
         app_pflows, app_pcounts = self._get_pcounts(app_table)
         app_bflows, app_bcounts = self._get_bcounts(app_table)
