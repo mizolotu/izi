@@ -142,11 +142,44 @@ class Odl:
             result = False
         return result
 
+    def default_input_output_and_resubmit(self, node_id, table_id, priority, input, output, goto_table):
+        flow_id = 'def'
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.in_port(input), Flow.ethernet_type(2048)])
+        flow.instructions([
+            Flow.go_to_table(goto_table),
+            ['apply-actions', [
+                {'action': [Flow.output_to_port(output)], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0, 1])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
     def default_resubmit(self, node_id, table_id, priority, goto_table):
         flow_id = 'def'
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.ethernet_type(2048)])
         flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def default_output(self, node_id, table_id, priority, output):
+        flow_id = 'def'
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048)])
+        flow.instructions([
+            ['apply-actions', [
+                {'action': [Flow.output_to_port(output)], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0])
         result = self.push_flow(node_id, flow.body)
         if result == 0:
             pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}

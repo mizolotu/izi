@@ -1,19 +1,21 @@
 from common.utils import ssh_connect, ssh_command
 
-def create_veth_pair(vm, idx, br='br'):
+def create_veth_pair(vm, br, other):
     mgmt = vm['mgmt']
     keyfile = vm['key']
     ssh = ssh_connect(mgmt, keyfile)
-    ssh_command(ssh, 'sudo ip link add in{0} type veth peer name out{0}'.format(idx))
-    ssh_command(ssh, 'sudo ovs-vsctl add-port {0} out{1}'.format(br, idx))
-    ssh_command(ssh, 'sudo ip link set dev in{0} up'.format(idx))
-    ssh_command(ssh, 'sudo ip link set dev out{0} up'.format(idx))
+    ssh_command(ssh, f'sudo ip link add {br}_{other} type veth peer name {other}_{br}')
+    ssh_command(ssh, f'sudo ovs-vsctl add-port {br} {br}_{other}')
+    ssh_command(ssh, f'sudo ip link set dev {other}_{br} up')
+    ssh_command(ssh, f'sudo ip link set dev {br}_{other} up')
+    ofport = get_iface_ofport(ssh, f'{br}_{other}')
+    return ofport
 
-def delete_veth_pair(vm, idx):
+def delete_veth_pair(vm, br, other):
     mgmt = vm['mgmt']
     keyfile = vm['key']
     ssh = ssh_connect(mgmt, keyfile)
-    ssh_command(ssh, 'sudo ip link del in{0} type veth peer name out{0}'.format(idx))
+    ssh_command(ssh, f'sudo ip link del {br}_{other} type veth peer name {other}_{br}')
 
 def add_default_tgu_flow(vm, idx, br='br'):
     mgmt = vm['mgmt']

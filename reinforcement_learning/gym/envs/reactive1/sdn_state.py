@@ -1,7 +1,6 @@
 import json, requests
 import numpy as np
 
-from common.odl import Odl
 from config import *
 from time import time
 
@@ -10,15 +9,9 @@ def get_flow_counts(controller, ovs_node, table, count_type='packet'):
     counts = np.array([int(item) for item in counts])
     return flow_ids, counts
 
-def add_sflow_agent(sflow_collector_ip, sflow_collector_port, sflow_agent_ip):
-    url = f'http://{sflow_collector_ip}:{sflow_collector_port}/agent'
-    r = requests.post(url, json={'ip': sflow_agent_ip})
-    print(r)
-    print(r.json())
-
-def get_sflow_samples(sflow_collector_ip, sflow_collector_port):
-    url = f'http://{sflow_collector_ip}:{sflow_collector_port}/samples'
-    in_samples, out_samples = requests.get(url, json={'window': sflow_window}).json()
+def get_flow_samples(flow_collector_ip, flow_collector_port, flow_window):
+    url = f'http://{flow_collector_ip}:{flow_collector_port}/samples'
+    in_samples, out_samples = requests.get(url, json={'window': flow_window}).json()
     return in_samples, out_samples
 
 if __name__ == '__main__':
@@ -35,9 +28,6 @@ if __name__ == '__main__':
     with open(nodes_fpath, 'r') as f:
         nodes = json.load(f)
 
-    with open(tunnels_fpath, 'r') as f:
-        tunnels = json.load(f)
-
     # ovs vm
 
     ovs_vms = [vm for vm in vms if vm['role'] == 'ovs' and int(vm['vm'].split('_')[1]) == env_idx]
@@ -45,30 +35,8 @@ if __name__ == '__main__':
     ovs_vm = ovs_vms[0]
     ovs_node = nodes[ovs_vm['vm']]
 
-    # ids vms
-
-    ids_vms = [vm for vm in vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == env_idx]
-    ids_nodes = [nodes[vm['vm']] for vm in ids_vms]
-    assert (len(ids_nodes) + 4) <= ntables
-
-    # controller
-
-    controller_vm = [vm for vm in vms if vm['role'] == 'sdn']
-    assert len(controller_vm) == 1
-    controller_name = controller_vm[0]['vm']
-    controller_ip = controller_vm[0]['ip']
-
-    if controller_name == 'odl':
-        controller = Odl(controller_ip)
-
     tstart = time()
     print('Observation:')
-    ids, counts = get_flow_counts(controller, ovs_node, app_table)
-    for id, count in zip(ids, counts):
-        print(id, count)
-    print('Reward:')
-    for reward_table in reward_tables:
-        ids, counts = get_flow_counts(controller, ovs_node, reward_table, count_type='byte')
-        for id, count in zip(ids, counts):
-            print(id, count)
+    in_samples, out_samples = get_flow_samples(ovs_vm['mgmt'], flask_port, flow_window)
+    print(len(in_samples), len(out_samples))
     print('Time elapsed: {0}'.format(time() - tstart))

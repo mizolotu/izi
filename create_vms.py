@@ -48,10 +48,6 @@ if __name__ == '__main__':
             roles.append('ovs')
         elif vm.startswith(ctrl_name):
             roles.append('sdn')
-        elif vm.startswith('tgu'):
-            roles.append('tgu')
-        elif vm.startswith('fcu'):
-            roles.append('fcu')
         else:
             roles.append('other')
 

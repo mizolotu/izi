@@ -90,8 +90,13 @@ def replay_pcap(fpath, iface, duration):
 def samples():
     data = request.data.decode('utf-8')
     jdata = json.loads(data)
-    in_vals, out_vals = flow_collector.retrieve_data(jdata['window'])
-    return jsonify(in_vals, out_vals)
+    if jdata['tag'] == 'in':
+        vals = flow_collector.retrieve_data_in(jdata['window'])
+    elif jdata['tag'] == 'out':
+        vals = flow_collector.retrieve_data_out(jdata['window'])
+    else:
+        vals = []
+    return jsonify(vals)
 
 @app.route('/reset')
 def reset():
@@ -127,23 +132,27 @@ class FlowCollector():
                 print(e)
                 pass
 
-    def retrieve_data(self, window):
+    def retrieve_data_in(self, window):
         tnow = datetime.now().timestamp()
         in_samples = []
-        out_samples = []
         in_items = list(self.in_queue)
-        out_items = list(self.out_queue)
         for item in in_items:
             if item[0] > tnow - window:
                 in_samples.append(item[1:])
             else:
                 break
+        return in_samples
+
+    def retrieve_data_out(self, window):
+        tnow = datetime.now().timestamp()
+        out_samples = []
+        out_items = list(self.out_queue)
         for item in out_items:
             if item[0] > tnow - window:
                 out_samples.append(item[1:])
             else:
                 break
-        return in_samples, out_samples
+        return out_samples
 
     def clear_queues(self):
         self.in_queue.clear()

@@ -28,22 +28,6 @@ if __name__ == '__main__':
     scripts.append(ctrl_script)
     mounts.append(None)
 
-    # add traffic generation vm
-
-    vms.append('tgu')
-    ips.append(tgu_ips)
-    sources.append(tgu_sources)
-    scripts.append(tgu_script)
-    mounts.append(tgu_mount)
-
-    # add flow collection vm
-
-    vms.append('fcu')
-    ips.append(fcu_ips)
-    sources.append(fcu_sources)
-    scripts.append(fcu_script)
-    mounts.append(None)
-
     # add ovs vms
 
     ips_i = ovs_ips
@@ -52,7 +36,7 @@ if __name__ == '__main__':
         ips.append(ips_i)
         sources.append(ovs_sources)
         scripts.append(ovs_script)
-        mounts.append(None)
+        mounts.append(ovs_mount)
         ips_i = increment_ips(ips_i)
 
     # add ids vms
@@ -72,9 +56,6 @@ if __name__ == '__main__':
     vagrant_file_lines.extend(vagrantfile_end())
     with open('Vagrantfile', 'w') as f:
         f.writelines(vagrant_file_lines)
-
-    import sys
-    sys.exit(0)
 
     # download controller
 
@@ -142,6 +123,7 @@ if __name__ == '__main__':
         os.mkdir('{0}/common'.format(ids_sources_dir))
     shutil.copy('common/pcap.py', '{0}/common/'.format(ids_sources_dir))
     shutil.copy('common/data.py', '{0}/common/'.format(ids_sources_dir))
+
 
     # copy meta
 

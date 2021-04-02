@@ -1,10 +1,7 @@
-import numpy as np
 import tflite_runtime.interpreter as tflite
-import os.path as osp
-import os, json, logging, pcap
+import logging, pcap
 
-from datetime import datetime
-from common.data import *
+from sources.fcu.common.data import *
 from flask import Flask, request, jsonify
 from threading import Thread
 
@@ -15,7 +12,7 @@ log.setLevel(logging.ERROR)
 @app.route('/reset')
 def restart():
     interceptor.reset()
-    return jsonify('OK')
+    return jsonify('ok')
 
 @app.route('/step', methods=['GET', 'POST'])
 def polling_step():
