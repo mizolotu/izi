@@ -1,7 +1,7 @@
 import tflite_runtime.interpreter as tflite
 import logging, pcap
 
-from sources.fcu.common.data import *
+from common.data import *
 from flask import Flask, request, jsonify
 from threading import Thread
 

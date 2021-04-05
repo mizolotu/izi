@@ -14,6 +14,14 @@ if __name__ == '__main__':
 
     ovs_vms = [vm for vm in vms if vm['role'] == 'ovs']
     ids_vms = [vm for vm in vms if vm['role'] == 'ids']
+    odl_vms = [vm for vm in vms if vm['role'] == 'sdn']
+    assert len(odl_vms) == 1
+    odl_vm = odl_vms[0]
+
+    # connect ovs and ids vms to odl
+
+    for vm in ovs_vms + ids_vms:
+        connect_to_controller(vm, bridge_name, odl_vm['ip'], ctrl_port)
 
     # obtain node ids
 

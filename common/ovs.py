@@ -1,8 +1,14 @@
 from common.utils import ssh_connect, ssh_command
 
-def create_veth_pair(vm, br, other):
-    mgmt = vm['mgmt']
+def connect_to_controller(vm, br, ctrl_ip, ctrl_port):
     keyfile = vm['key']
+    mgmt = vm['mgmt']
+    ssh = ssh_connect(mgmt, keyfile)
+    ssh_command(ssh, f'sudo ovs-vsctl set-controller {br} tcp:{ctrl_ip}:{ctrl_port}')
+
+def create_veth_pair(vm, br, other):
+    keyfile = vm['key']
+    mgmt = vm['mgmt']
     ssh = ssh_connect(mgmt, keyfile)
     ssh_command(ssh, f'sudo ip link add {br}_{other} type veth peer name {other}_{br}')
     ssh_command(ssh, f'sudo ovs-vsctl add-port {br} {br}_{other}')

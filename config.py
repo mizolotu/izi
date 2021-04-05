@@ -53,6 +53,7 @@ fsize_min = 100000
 # sdn
 
 ctrl_name = 'odl'
+ctrl_port = 6653
 in_table = 0
 out_table = 10
 block_table = out_table - 1
@@ -103,7 +104,7 @@ directions = ['source', 'destination']
 obs_stack_size = 16
 train_attacks = [3, 7, 8, 9]
 episode_duration = 32
-nsteps = 256
+nsteps = 128
 nepisodes = 100000
 
 # other
@@ -111,7 +112,7 @@ nepisodes = 100000
 bridge_name = 'br'
 traffic_generation_veth_prefix = 'in'
 obs_bridge_veth_prefix = 'obs'
-reward_bridge_veth_prefix = 'reward'
+reward_bridge_veth_prefix = 'rew'
 csv_postfix = '.csv'
 flask_port = 5000
 flow_window = 1

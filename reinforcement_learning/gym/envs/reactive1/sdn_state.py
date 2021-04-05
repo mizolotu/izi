@@ -2,7 +2,7 @@ import json, requests
 import numpy as np
 
 from config import *
-from time import time
+from time import time, sleep
 
 def get_flow_counts(controller, ovs_node, table, count_type='packet'):
     flow_ids, counts = controller.get_flow_statistics(ovs_node, table, count_type)
@@ -37,6 +37,9 @@ if __name__ == '__main__':
 
     tstart = time()
     print('Observation:')
-    in_samples, out_samples = get_flow_samples(ovs_vm['mgmt'], flask_port, flow_window)
-    print(len(in_samples), len(out_samples))
-    print('Time elapsed: {0}'.format(time() - tstart))
+    while True:
+        in_samples, out_samples = get_flow_samples(ovs_vm['mgmt'], flask_port, flow_window)
+        if len(in_samples) > 0:
+            print(in_samples[0])
+        print('Time elapsed: {0}'.format(time() - tstart))
+        sleep(1)

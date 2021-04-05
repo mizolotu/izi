@@ -406,7 +406,7 @@ class PPO2(ActorCriticRLModel):
                         logger.logkv('ep_reward_mean', safe_mean([ep_info['r'] for ep_info in self.ep_info_buf]))
                         logger.logkv('ep_normal_mean', safe_mean([ep_info['n'] for ep_info in self.ep_info_buf]))
                         logger.logkv('ep_attack_mean', safe_mean([ep_info['a'] for ep_info in self.ep_info_buf]))
-                        logger.logkv('ep_bonus_mean', safe_mean([ep_info['b'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_precision_mean', safe_mean([ep_info['p'] for ep_info in self.ep_info_buf]))
                     logger.logkv('time_elapsed', t_start - t_first_start)
                     for (loss_val, loss_name) in zip(loss_vals, self.loss_names):
                         logger.logkv(loss_name, loss_val)
@@ -426,7 +426,7 @@ class PPO2(ActorCriticRLModel):
             obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
             normal_passed.append(ep_infos[0]['n'])
             attack_blocked.append(ep_infos[0]['a'])
-            ids_precision.append(ep_infos[0]['b'])
+            ids_precision.append(ep_infos[0]['p'])
             episode_reward.append(ep_infos[0]['r'])
         print(f'Normal traffic passed: {np.mean(normal_passed)}')
         print(f'Malicious traffic blocked: {np.mean(attack_blocked)}')
@@ -502,7 +502,7 @@ class Runner(AbstractEnvRunner):
         scores = [[] for _ in range(self.n_envs)]
         normals = [[] for _ in range(self.n_envs)]
         attacks = [[] for _ in range(self.n_envs)]
-        bonuses = [[] for _ in range(self.n_envs)]
+        precisions = [[] for _ in range(self.n_envs)]
         telapsed = 0
         for _ in range(self.n_steps):
             actions, values, self.states, neglogpacs = self.model.step(self.obs, self.states, self.dones)
@@ -522,7 +522,7 @@ class Runner(AbstractEnvRunner):
                 scores[ri].append(infos[ri]['r'])
                 normals[ri].append(infos[ri]['n'])
                 attacks[ri].append(infos[ri]['a'])
-                bonuses[ri].append(infos[ri]['b'])
+                precisions[ri].append(infos[ri]['p'])
 
             self.model.num_timesteps += self.n_envs
 
@@ -537,8 +537,8 @@ class Runner(AbstractEnvRunner):
 
         print('Time step: {0}'.format(telapsed / self.n_steps))
 
-        for s, n, a, b in zip(scores, normals, attacks, bonuses):
-            maybe_ep_info = {'r': np.mean(s), 'n': np.mean(n), 'a': np.mean(a), 'b': np.mean(b)} # info.get('episode')
+        for s, n, a, p in zip(scores, normals, attacks, precisions):
+            maybe_ep_info = {'r': np.mean(s), 'n': np.mean(n), 'a': np.mean(a), 'p': np.mean(p)} # info.get('episode')
             if maybe_ep_info is not None:
                 ep_infos.append(maybe_ep_info)
 

@@ -1,5 +1,10 @@
 sudo apt update -y
-sudo apt install openvswitch-switch -y
+sudo apt install openvswitch-switch tcpreplay libpcap-dev python3-pip -y
 sudo ovs-vsctl add-br br
-sudo ovs-vsctl set-controller br tcp:192.168.254.11:6653
 sudo ovs-ofctl del-flows br
+pip3 install -U pip
+pip3 install -U setuptools
+pip3 install flask numpy pandas kaitaistruct pypcap
+sudo cp ovs.service /etc/systemd/system/
+sudo systemctl enable ovs
+sudo systemctl start ovs

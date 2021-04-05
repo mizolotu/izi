@@ -117,14 +117,18 @@ if __name__ == '__main__':
             with open(osp.join(t_dir, '{0}.thr'.format('_'.join(spl[-2:]))), 'w') as f:
                 f.write(','.join(thrs))
 
-    # copy feature extraction functions
+    # copy feature extraction functions to ids and ovs vms
 
     if not osp.isdir('{0}/common'.format(ids_sources_dir)):
         os.mkdir('{0}/common'.format(ids_sources_dir))
     shutil.copy('common/pcap.py', '{0}/common/'.format(ids_sources_dir))
     shutil.copy('common/data.py', '{0}/common/'.format(ids_sources_dir))
 
+    if not osp.isdir('{0}/common'.format(ovs_sources_dir)):
+        os.mkdir('{0}/common'.format(ovs_sources_dir))
+    shutil.copy('common/pcap.py', '{0}/common/'.format(ovs_sources_dir))
+    shutil.copy('common/data.py', '{0}/common/'.format(ovs_sources_dir))
 
-    # copy meta
+    # copy meta for ids
 
     shutil.copy('{0}/metainfo.json'.format(feature_dir), ids_sources_dir)

@@ -1,4 +1,4 @@
-import json, os, socket
+import json, os
 import os.path as osp
 import numpy as np
 
@@ -13,7 +13,7 @@ from common.utils import ip_proto
 from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_sflow_samples
+from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples
 from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions
 from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, generate_ip_traffic_on_interface
 
@@ -31,7 +31,7 @@ class AttackMitigationEnv():
 
         # debug
 
-        self.debug = False
+        self.debug = True
 
         # load logs
 
@@ -41,8 +41,8 @@ class AttackMitigationEnv():
         with open(nodes_fpath, 'r') as f:
             self.nodes = json.load(f)
 
-        with open(tunnels_fpath, 'r') as f:
-            self.tunnels = json.load(f)
+        with open(ofports_fpath, 'r') as f:
+            self.ofports = json.load(f)
 
         # check ids model weights
 
@@ -59,29 +59,16 @@ class AttackMitigationEnv():
         assert len(ovs_vms) == 1
         self.ovs_vm = ovs_vms[0]
         self.ovs_node = self.nodes[self.ovs_vm['vm']]
+        set_seed(self.ovs_vm['mgmt'], flask_port, self.seed)
 
         # ids vms
 
         self.ids_vms = [vm for vm in self.vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == self.id]
         self.n_ids = len(self.ids_vms)
         self.ids_nodes = [self.nodes[vm['vm']] for vm in self.ids_vms]
-        assert (self.n_ids + 4) <= ntables
+        assert (self.n_ids + 2) <= out_table
         for vm in self.ids_vms:
             restart_ids(vm)
-
-        # tgu vm
-
-        tgu_vms = [vm for vm in self.vms if vm['vm'].startswith('tgu')]
-        assert len(tgu_vms) == 1
-        self.tgu_vm = tgu_vms[0]
-        set_seed(self.tgu_vm['mgmt'], flask_port, self.seed)
-
-        # fcu vm
-
-        fcu_vms = [vm for vm in self.vms if vm['vm'].startswith('fcu')]
-        assert len(fcu_vms) == 1
-        self.fcu_vm = fcu_vms[0]
-        #add_sflow_agent(self.fcu_vm['ip'], flask_port, self.ovs_vm['ip'])
 
         # controller
 
@@ -92,10 +79,12 @@ class AttackMitigationEnv():
         if controller_name == ctrl_name:
             self.controller = Odl(controller_ip)
 
-        # init tables
+        # tables and tunnels
 
         self.internal_hosts = sorted([item.split(csv_postfix)[0] for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith(csv_postfix)])
         clean_ids_tables(self.controller, self.ids_nodes)
+        self.tunnels = [item for item in self.ofports if item['type'] == 'vxlan']
+        self.veths = [item for item in self.ofports if item['type'] == 'veth']
 
         # time
 
@@ -111,10 +100,12 @@ class AttackMitigationEnv():
 
         self.stack_size = obs_stack_size
         self.n_apps = len(applications)
-        obs_shape = (self.stack_size, self.n_apps, (2 * (1 + self.n_ids + 1) + self.n_ids))
+        on_off_frame_shape = (self.n_apps, (self.n_ids + 1) * self.n_ids)
+        self.on_off_frame = np.zeros(on_off_frame_shape)
+        obs_shape = (self.stack_size, self.n_apps, 4 + self.n_ids + on_off_frame_shape[1])
         self.app_counts_stack = deque(maxlen=self.stack_size)
-        self.before_counts_stack = deque(maxlen=self.stack_size)
-        self.after_counts_stack = deque(maxlen=self.stack_size)
+        self.in_samples_by_attacker_stack = deque(maxlen=self.stack_size)
+        self.out_samples_by_attacker_stack = deque(maxlen=self.stack_size)
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
 
@@ -134,8 +125,8 @@ class AttackMitigationEnv():
 
         with open(actions_fpath, 'w') as f:
             for i in range(act_dim):
-                fun, args = self._action_mapper(i)
-                line = f"{i};{fun.__name__};{','.join([str(item) for item in args])}\n"
+                fun, args, idx_val = self._action_mapper(i)
+                line = f"{i};{fun.__name__};{idx_val};{','.join([str(item) for item in args])}\n"
                 f.write(line)
 
         # default policy
@@ -162,40 +153,38 @@ class AttackMitigationEnv():
         self.in_samples = 0
         self.out_samples = 0
 
-    def _get_pcounts(self, table):
-        flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='packet')
-        return flows, counts
-
-    def _get_bcounts(self, table):
-        flows, counts = get_flow_counts(self.controller, self.ovs_node, table, count_type='byte')
-        return flows, counts
-
-    def _process_app_counts(self, flows, counts):
-        x = np.zeros((self.n_apps, 1))
-        for f, c in zip(flows, counts):
-            if f.startswith('ppp'):
-                spl = f.split('_')
-                app = (spl[1], int(spl[3]))
-                idx = applications.index(app)
-                x[idx, 0] += c
-            elif f.startswith('p'):
-                spl = f.split('_')
-                app = (spl[1],)
-                idx = applications.index(app)
-                x[idx, 0] += c
+    def _process_app_samples(self, samples):
+        x = np.zeros((self.n_apps, 2))
+        for id, features, flags in samples:
+            src_port = id[1]
+            dst_port = id[3]
+            if id[4] in [1, 6, 17]:
+                proto, proto_number = ip_proto(id[4])
+                if (proto, src_port) in applications:
+                    idx = applications.index((proto, src_port))
+                    x[idx, 0] += features[0]
+                elif (proto, dst_port) in applications:
+                    idx = applications.index((proto, dst_port))
+                    x[idx, 0] += features[0]
+                elif (proto, ) in applications:
+                    idx = applications.index((proto, ))
+                    x[idx, 0] += features[0]
         return x
 
-    def _process_reward_counts(self, flows, counts):
+    def _process_reward_samples(self, samples):
         x = np.zeros((self.n_attackers + 1, 1))
-        for f, c in zip(flows, counts):
-            if f.startswith('ii'):
-                spl = f.split('_')
-                ip = spl[2]
-                idx = attackers.index(ip)
-                x[idx] += c
-            elif f.startswith('def'):
+        for id, features, flags in samples:
+            src_ip = id[0]
+            dst_ip = id[2]
+            if src_ip in attackers:
+                idx = attackers.index(src_ip)
+                x[idx] += 1
+            elif dst_ip in attackers:
+                idx = attackers.index(dst_ip)
+                x[idx] += 1
+            else:
                 idx = -1
-                x[idx] += c
+                x[idx] += 1
         return x
 
     def _update_intrusions(self):
@@ -206,30 +195,31 @@ class AttackMitigationEnv():
                 src_port = intrusion[1]
                 dst_ip = intrusion[2]
                 dst_port = intrusion[3]
-                proto, proto_number = ip_proto(intrusion[4])
-                if (proto, src_port) in applications:
-                    app_idx = applications.index((proto, src_port))
-                elif (proto, dst_port) in applications:
-                    app_idx = applications.index((proto, dst_port))
-                else:
-                    app_idx = applications.index((proto,))
-                if src_ip not in self.intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
-                    self.intrusion_ips[i][app_idx].append(src_ip)
-                    self.intrusion_numbers[i][app_idx].append(1)
-                elif src_ip in self.intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
-                    idx = self.intrusion_ips[i][app_idx].index(src_ip)
-                    self.intrusion_numbers[i][app_idx][idx] += 1
-                if dst_ip not in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
-                    self.intrusion_ips[i].append(dst_ip)
-                    self.intrusion_numbers[i][app_idx].append(1)
-                elif dst_ip in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
-                    idx = self.intrusion_ips[i][app_idx].index(dst_ip)
-                    self.intrusion_numbers[i][app_idx][idx] += 1
+                if intrusion[4] in [1, 6, 17]:
+                    proto, proto_number = ip_proto(intrusion[4])
+                    if (proto, src_port) in applications:
+                        app_idx = applications.index((proto, src_port))
+                    elif (proto, dst_port) in applications:
+                        app_idx = applications.index((proto, dst_port))
+                    else:
+                        app_idx = applications.index((proto,))
+                    if src_ip not in self.intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
+                        self.intrusion_ips[i][app_idx].append(src_ip)
+                        self.intrusion_numbers[i][app_idx].append(1)
+                    elif src_ip in self.intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
+                        idx = self.intrusion_ips[i][app_idx].index(src_ip)
+                        self.intrusion_numbers[i][app_idx][idx] += 1
+                    if dst_ip not in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
+                        self.intrusion_ips[i].append(dst_ip)
+                        self.intrusion_numbers[i][app_idx].append(1)
+                    elif dst_ip in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
+                        idx = self.intrusion_ips[i][app_idx].index(dst_ip)
+                        self.intrusion_numbers[i][app_idx][idx] += 1
 
     def _get_reward(self):
 
-        before_count_deltas = self.before_counts_stack[-1] - self.before_counts_stack[0]
-        after_count_deltas = self.after_counts_stack[-1] - self.after_counts_stack[0]
+        before_count_deltas = self.in_samples_by_attacker_stack[-1] - self.in_samples_by_attacker_stack[0]
+        after_count_deltas = self.out_samples_by_attacker_stack[-1] - self.out_samples_by_attacker_stack[0]
         normal = []
         attack = []
         for i in range(self.n_attackers + 1):
@@ -265,11 +255,11 @@ class AttackMitigationEnv():
                     else:
                         fp += n
         if (tp + fp) > 0:
-            bonus = tp / (tp + fp)
+            precision = tp / (tp + fp)
         else:
-            bonus = 0
+            precision = 0
 
-        return normal, attack, bonus
+        return normal, attack, precision
 
     def _action_mapper(self, i):
 
@@ -284,6 +274,7 @@ class AttackMitigationEnv():
             app = applications[app_idx]
             action_fun = mirror_app_to_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], priorities['medium'], app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
+            on_off_idx_and_value = (app_idx, ids_idx, 1)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions:
             action_array = np.zeros(self.n_unmirror_app_actions)
             action_array[i - self.n_mirror_app_actions] = 1
@@ -294,33 +285,36 @@ class AttackMitigationEnv():
             app = applications[app_idx]
             action_fun = unmirror_app_from_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_idx], app)
+            on_off_idx_and_value = (app_idx, ids_idx, 0)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions:
             e = np.eye(self.n_ids)
             action_array = np.zeros(self.n_mirror_int_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions] = 1
             action_array = action_array.reshape(self.n_apps, self.n_ids, self.n_ids - 1)
-            app_i, ids_from, ids_to = np.where(action_array == 1)
+            app_i, ids_from, ids_to_ = np.where(action_array == 1)
             ids_from = ids_from[0]
-            ids_to = np.where(e[ids_from] == 0)[0][ids_to[0]]
+            ids_to = np.where(e[ids_from] == 0)[0][ids_to_[0]]
             ids_name = self.ids_vms[ids_to]['vm']
             app_idx = app_i[0]
             app = applications[app_idx]
             ips = self.intrusion_ips[ids_from][app_idx]
             action_fun = mirror_ip_app_to_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
+            on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 1)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions:
             e = np.eye(self.n_ids)
             action_array = np.zeros(self.n_mirror_int_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions] = 1
             action_array = action_array.reshape(self.n_apps, self.n_ids, self.n_ids - 1)
-            app_i, ids_from, ids_to = np.where(action_array == 1)
+            app_i, ids_from, ids_to_ = np.where(action_array == 1)
             ids_from = ids_from[0]
-            ids_to = np.where(e[ids_from] == 0)[0][ids_to[0]]
+            ids_to = np.where(e[ids_from] == 0)[0][ids_to_[0]]
             app_idx = app_i[0]
             app = applications[app_idx]
             ips = self.intrusion_ips[ids_from][app_idx]
             action_fun = unmirror_ip_app_from_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], ips, app)
+            on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 0)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions:
             action_array = np.zeros(self.n_block_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions] = 1
@@ -339,6 +333,7 @@ class AttackMitigationEnv():
                 elif len(app) == 1:
                     for ip in ips:
                         print('Blocking {0}:{1}:all in {2}'.format(app[0], ip, self.id))
+            on_off_idx_and_value = (app_idx, self.n_ids ** 2 + ids_idx, 1)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions:
             action_array = np.zeros(self.n_unblock_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions] = 1
@@ -350,6 +345,7 @@ class AttackMitigationEnv():
             app = applications[app_idx]
             action_fun = unblock_ip_app
             args = (self.controller, self.ovs_node, block_table, ips, app)
+            on_off_idx_and_value = (app_idx, self.n_ids ** 2 + ids_idx, 0)
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions:
             action_array = np.zeros(self.n_ids_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions - self.n_unblock_actions] = 1
@@ -366,14 +362,19 @@ class AttackMitigationEnv():
                 value = int(value) - self.n_models
             action_fun = set_vnf_param
             args = (ids_ip, flask_port, param, value)
+            on_off_idx_and_value = None
         else:
             action_fun = lambda *args: None
             args = ()
-        return action_fun, args
+            on_off_idx_and_value = None
+        return action_fun, args, on_off_idx_and_value
 
     def _take_action(self, i):
-        func, args = self._action_mapper(i)
+        func, args, on_off_idx_and_value = self._action_mapper(i)
         func(*args)
+        if on_off_idx_and_value is not None:
+            app_i, j, val = on_off_idx_and_value
+            self.on_off_frame[app_i, j] = val
 
     def _rearange_counts(self, flows, counts, flows_r):
         counts_r = np.zeros_like(counts)
@@ -400,15 +401,14 @@ class AttackMitigationEnv():
 
         # reset tables
 
-        init_ovs_tables(self.controller, self.ovs_node)
+        init_ovs_tables(self.controller, self.ovs_node, self.veths)
 
         # wait for sdn configuration to be processed
 
-        tables = [app_table, reward_tables[0], reward_tables[1]]
-        conditions = [self.n_apps * 2, len(attackers) * 2 + 1, len(attackers) * 2 + 1]
-        for table, condition in zip(tables, conditions):
+        tables = np.arange(in_table, out_table)
+        for table in tables:
             flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
-            while len(flows) != condition:
+            while len(flows) != 1:
                 sleep(sleep_duration)
                 flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
 
@@ -428,47 +428,42 @@ class AttackMitigationEnv():
         # generate traffic
 
         for host in self.internal_hosts:
-            generate_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, self.id, host, self.label, episode_duration)
+            generate_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration)
 
         self.tstart = time()
         self.tstep = time()
 
         # calculate obs
 
-        in_samples, out_samples = get_sflow_samples(self.ovs_vm['ip'], flask_port)
-        print(len(in_samples), len(out_samples))
-
-        app_pflows, app_pcounts = self._get_pcounts(app_table)
-        app_bflows, app_bcounts = self._get_bcounts(app_table)
-        before_flows, before_counts = self._get_pcounts(reward_tables[0])
-        after_flows, after_counts = self._get_pcounts(reward_tables[1])
-
-        processed_app_pcounts = self._process_app_counts(app_pflows, app_pcounts)
-        processed_app_bcounts = self._process_app_counts(app_bflows, app_bcounts)
-        processed_before_counts = self._process_reward_counts(before_flows, before_counts)
-        processed_after_counts = self._process_reward_counts(after_flows, after_counts)
-
-        frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 2 * (self.n_ids + 1) + self.n_ids))])
+        in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+        in_samples_by_app = self._process_app_samples(in_samples)
+        out_samples_by_app = self._process_app_samples(out_samples)
+        in_samples_by_attacker = self._process_reward_samples(in_samples)
+        out_samples_by_attacker = self._process_reward_samples(out_samples)
+        frame = np.hstack([
+            in_samples_by_app,
+            out_samples_by_app,
+            np.zeros((self.n_apps, self.n_ids)),
+            np.array(self.on_off_frame)
+        ])
         self.app_counts_stack.append(frame)
-        self.before_counts_stack.append(processed_before_counts)
-        self.after_counts_stack.append(processed_after_counts)
+        self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
+        self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
 
         while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
 
-            app_pflows, app_pcounts = self._get_pcounts(app_table)
-            app_bflows, app_bcounts = self._get_bcounts(app_table)
-            before_flows, before_counts = self._get_pcounts(reward_tables[0])
-            after_flows, after_counts = self._get_pcounts(reward_tables[1])
-
-            processed_app_pcounts = self._process_app_counts(app_pflows, app_pcounts)
-            processed_app_bcounts = self._process_app_counts(app_bflows, app_bcounts)
-            processed_before_counts = self._process_reward_counts(before_flows, before_counts)
-            processed_after_counts = self._process_reward_counts(after_flows, after_counts)
-
-            frame = np.hstack([processed_app_pcounts, processed_app_bcounts, np.zeros((self.n_apps, 2 * (self.n_ids + 1) + self.n_ids))])
+            in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+            in_samples_by_app = self._process_app_samples(in_samples)
+            out_samples_by_app = self._process_app_samples(out_samples)
+            frame = np.hstack([
+                in_samples_by_app,
+                out_samples_by_app,
+                np.zeros((self.n_apps, self.n_ids)),
+                np.array(self.on_off_frame)
+            ])
             self.app_counts_stack.append(frame)
-            self.before_counts_stack.append(processed_before_counts)
-            self.after_counts_stack.append(processed_after_counts)
+            self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
+            self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
 
         obs = np.array(self.app_counts_stack)
 
@@ -488,57 +483,36 @@ class AttackMitigationEnv():
             sleep(self.step_duration - (tnow - self.tstep))
         self.tstep = time()
 
-        # get and process sflow samples
+        # obs
 
-        in_samples, out_samples = get_sflow_samples(self.ovs_vm['ip'], flask_port)
-        self.in_samples += len(in_samples)
-        self.out_samples += len(out_samples)
-        print(self.in_samples, self.out_samples)
-
-        app_pflows, app_pcounts = self._get_pcounts(app_table)
-        app_bflows, app_bcounts = self._get_bcounts(app_table)
-        before_flows, before_counts = self._get_pcounts(reward_tables[0])
-        after_flows, after_counts = self._get_pcounts(reward_tables[1])
-
+        in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+        in_samples_by_app = self._process_app_samples(in_samples)
+        out_samples_by_app = self._process_app_samples(out_samples)
         processed_counts = []
-        processed_counts.append(self._process_app_counts(app_pflows, app_pcounts))
-        processed_counts.append(self._process_app_counts(app_bflows, app_bcounts))
-        for i in range(self.n_ids):
-            pflows, pcounts = self._get_pcounts(ids_tables[i])
-            processed_counts.append(self._process_app_counts(pflows, pcounts))
-            bflows, bcounts = self._get_bcounts(ids_tables[i])
-            processed_counts.append(self._process_app_counts(bflows, bcounts))
-        pflows, pcounts = self._get_pcounts(block_table)
-        processed_counts.append(self._process_app_counts(pflows, pcounts))
-        bflows, bcounts = self._get_bcounts(block_table)
-        processed_counts.append(self._process_app_counts(bflows, bcounts))
-
+        processed_counts.append(in_samples_by_app)
+        processed_counts.append(out_samples_by_app)
         nintrusions = np.zeros((self.n_apps, self.n_ids))
         for i in range(self.n_apps):
             for j in range(self.n_ids):
                 nintrusions[i, j] = np.sum(self.intrusion_numbers[j][i])
         processed_counts.append(nintrusions)
+        processed_counts.append(np.array(self.on_off_frame))
         frame = np.hstack(processed_counts)
-
-        processed_before_counts = self._process_reward_counts(before_flows, before_counts)
-        processed_after_counts = self._process_reward_counts(after_flows, after_counts)
-
         self.app_counts_stack.append(frame)
-        self.before_counts_stack.append(processed_before_counts)
-        self.after_counts_stack.append(processed_after_counts)
+        obs = np.array(self.app_counts_stack)
 
-        # get intrusions
+        # intrusions
 
         self._update_intrusions()
 
-        # get obs
+        # reward
 
-        obs = np.array(self.app_counts_stack)
-
-        # get reward
-
-        normal, attack, bonus = self._get_reward()
-        reward = normal + attack + bonus - 1
+        in_samples_by_attacker = self._process_reward_samples(in_samples)
+        out_samples_by_attacker = self._process_reward_samples(out_samples)
+        self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
+        self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
+        normal, attack, precision = self._get_reward()
+        reward = normal + attack + precision - 1
 
         done = False
-        return obs, reward, done, {'r': reward, 'n': normal, 'a': attack, 'b': bonus}
+        return obs, reward, done, {'r': reward, 'n': normal, 'a': attack, 'p': precision}

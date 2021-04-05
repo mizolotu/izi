@@ -133,6 +133,7 @@ def ip_proto(value):
         elif proto_number == 17:
             proto = 'udp'
         else:
+            print(value)
             raise NotImplemented
     else:
         proto = value
@@ -143,6 +144,7 @@ def ip_proto(value):
         elif proto == 'udp':
             proto_number = 17
         else:
+            print(value)
             raise NotImplemented
     return proto, proto_number
 
