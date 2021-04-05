@@ -172,7 +172,7 @@ class AttackMitigationEnv():
         return x
 
     def _process_reward_samples(self, samples):
-        x = np.zeros((self.n_attackers + 1, 1))
+        x = np.zeros(self.n_attackers + 1)
         for id, features, flags in samples:
             src_ip = id[0]
             dst_ip = id[2]
@@ -185,6 +185,8 @@ class AttackMitigationEnv():
             else:
                 idx = -1
                 x[idx] += 1
+            #if idx == 12:
+            #    print(id)
         return x
 
     def _update_intrusions(self):
@@ -218,8 +220,8 @@ class AttackMitigationEnv():
 
     def _get_reward(self):
 
-        before_count_deltas = self.in_samples_by_attacker_stack[-1] - self.in_samples_by_attacker_stack[0]
-        after_count_deltas = self.out_samples_by_attacker_stack[-1] - self.out_samples_by_attacker_stack[0]
+        before_count_deltas = np.mean(np.vstack(self.in_samples_by_attacker_stack), axis=0)
+        after_count_deltas = np.mean(np.vstack(self.out_samples_by_attacker_stack), axis=0)
         normal = []
         attack = []
         for i in range(self.n_attackers + 1):
@@ -506,9 +508,11 @@ class AttackMitigationEnv():
         self._update_intrusions()
 
         # reward
-
+        #print('in:')
         in_samples_by_attacker = self._process_reward_samples(in_samples)
+        #print('out:')
         out_samples_by_attacker = self._process_reward_samples(out_samples)
+        #print(in_samples_by_attacker[12] - out_samples_by_attacker[12], in_samples_by_attacker[12], out_samples_by_attacker[12])
         self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
         self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
         normal, attack, precision = self._get_reward()
