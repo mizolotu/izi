@@ -90,13 +90,8 @@ def replay_pcap(fpath, iface, duration):
 def samples():
     data = request.data.decode('utf-8')
     jdata = json.loads(data)
-    if jdata['tag'] == 'in':
-        vals = flow_collector.retrieve_data_in(jdata['window'])
-    elif jdata['tag'] == 'out':
-        vals = flow_collector.retrieve_data_out(jdata['window'])
-    else:
-        vals = []
-    return jsonify(vals)
+    in_vals, out_vals = flow_collector.retrieve_data(jdata['window'])
+    return jsonify(in_vals, out_vals)
 
 @app.route('/reset')
 def reset():
@@ -107,9 +102,11 @@ def reset():
 
 class FlowCollector():
 
-    def __init__(self, qsize=100000, in_iface='obs_br', out_iface='reward_br'):
+    def __init__(self, qsize=100000, in_iface='obs_br', out_iface='rew_br'):
         self.in_iface = in_iface
         self.out_iface = out_iface
+        self.in_samples = []
+        self.out_samples = []
         self.in_queue = deque(maxlen=qsize)
         self.out_queue = deque(maxlen=qsize)
         self.qsize = qsize
@@ -121,38 +118,51 @@ class FlowCollector():
         out_thr.start()
 
     def _recv(self, iface, dq):
-        sniffer = pcap.pcap(name=iface, timeout_ms=10)
-        while True:
-            ts, raw = next(sniffer)
+        ready = False
+        while not ready:
             try:
-                id, features, flags = read_pkt(raw)
-                if id is not None:
-                    dq.appendleft((ts, id, features, flags))
+                sniffer = pcap.pcap(name=iface, timeout_ms=10)
+                ready = True
+                while True:
+                    ts, raw = next(sniffer)
+                    try:
+                        id, features, flags = read_pkt(raw)
+                        if id is not None:
+                            dq.appendleft((ts, id, features, flags))
+                    except Exception as e:
+                        print(e)
             except Exception as e:
                 print(e)
-                pass
 
-    def retrieve_data_in(self, window):
+
+    def retrieve_data(self, window):
+        in_thr = Thread(target=self._retrieve_data_in, args=(window,), daemon=True)
+        in_thr.start()
+        out_thr = Thread(target=self._retrieve_data_out, args=(window,), daemon=True)
+        out_thr.start()
+        for thr in [in_thr, out_thr]:
+            thr.join()
+        return self.in_samples, self.out_samples
+
+    def _retrieve_data_in(self, window):
         tnow = datetime.now().timestamp()
-        in_samples = []
+        self.in_samples = []
         in_items = list(self.in_queue)
         for item in in_items:
             if item[0] > tnow - window:
-                in_samples.append(item[1:])
+                self.in_samples.append(item[1:])
             else:
                 break
-        return in_samples
 
-    def retrieve_data_out(self, window):
+    def _retrieve_data_out(self, window):
         tnow = datetime.now().timestamp()
-        out_samples = []
+        self.out_samples = []
         out_items = list(self.out_queue)
         for item in out_items:
             if item[0] > tnow - window:
-                out_samples.append(item[1:])
+                self.out_samples.append(item[1:])
             else:
                 break
-        return out_samples
 
     def clear_queues(self):
         self.in_queue.clear()
