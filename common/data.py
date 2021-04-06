@@ -522,8 +522,8 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['
 
         # update meta
 
-        nvectors = np.array([flow_features_.shape[0] for flow_features_ in flow_features])
-        if np.any(nvectors > 0):
+        nvectors = flow_features.shape[0]
+        if nvectors > 0:
             if nfeatures is None:
                 labels = ulabels
                 nfeatures = flow_features.shape[1]
@@ -541,23 +541,21 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['
                 fname_ = output.format(int(l))
                 if not osp.isdir(osp.dirname(fname_)):
                     os.mkdir(osp.dirname(fname_))
-                for nv, values in zip(nvectors, flow_features):
-                    if nv > 0:
-                        ls = values[:, -1]
-                        idx = np.where(ls == l)[0]
-                        if len(idx) > 0:
-                            values_l = values[idx, :]
-                            inds = np.arange(len(values_l))
-                            inds_splitted = [[] for _ in stages]
-                            np.random.shuffle(inds)
-                            val, remaining = np.split(inds, [int(splits[1] * len(inds))])
-                            tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
-                            inds_splitted[0] = tr
-                            inds_splitted[1] = te
-                            inds_splitted[2] = val
-                            for fi, stage in enumerate(stages):
-                                fname = '{0}_{1}_{2}'.format(fname_, tstep, stage)
-                                pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
+                ls = flow_features[:, -1]
+                idx = np.where(ls == l)[0]
+                if len(idx) > 0:
+                    values_l = flow_features[idx, :]
+                    inds = np.arange(len(values_l))
+                    inds_splitted = [[] for _ in stages]
+                    np.random.shuffle(inds)
+                    val, remaining = np.split(inds, [int(splits[1] * len(inds))])
+                    tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
+                    inds_splitted[0] = tr
+                    inds_splitted[1] = te
+                    inds_splitted[2] = val
+                    for fi, stage in enumerate(stages):
+                        fname = '{0}_{1}_{2}'.format(fname_, tstep, stage)
+                        pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
 
             # save meta
 
