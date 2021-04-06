@@ -504,8 +504,9 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['
 
         # lists to arrays
 
-        for i in range(len(flow_features)):
-            flow_features[i] = np.array(flow_features[i])
+        #for i in range(len(flow_features)):
+        #    flow_features[i] = np.array(flow_features[i])
+        flow_features = np.array(flow_features)
 
         # load meta
 
@@ -514,7 +515,6 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['
                 meta = json.load(jf)
                 labels = meta['labels']
                 nfeatures = meta['nfeatures']
-                nsamples = meta['nsamples']
                 xmin = meta['xmin']
                 xmax = meta['xmax']
         except:
@@ -526,16 +526,14 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['
         if np.any(nvectors > 0):
             if nfeatures is None:
                 labels = ulabels
-                nfeatures = flow_features[0].shape[1]
-                nsamples = nvectors.tolist()
-                xmin = np.min(flow_features[0][:, :-1], axis=0)
-                xmax = np.max(flow_features[0][:, :-1], axis=0)
+                nfeatures = flow_features.shape[1]
+                xmin = np.min(flow_features[:, :-1], axis=0)
+                xmax = np.max(flow_features[:, :-1], axis=0)
             else:
-                assert nfeatures == flow_features[0].shape[1]
+                assert nfeatures == flow_features.shape[1]
                 labels = list(set(labels + ulabels))
-                nsamples = [n1 + n2 for n1, n2 in zip(nsamples, nvectors.tolist())]
-                xmin = np.min(np.vstack([xmin, flow_features[0][:, :-1]]), axis=0)
-                xmax = np.max(np.vstack([xmax, flow_features[0][:, :-1]]), axis=0)
+                xmin = np.min(np.vstack([xmin, flow_features[:, :-1]]), axis=0)
+                xmax = np.max(np.vstack([xmax, flow_features[:, :-1]]), axis=0)
 
             # split and save data
 
@@ -564,7 +562,7 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['
             # save meta
 
             with open(meta_fname, 'w') as jf:
-                json.dump({'labels': labels, 'nsamples': nsamples, 'nfeatures': nfeatures, 'xmin': xmin.tolist(), 'xmax': xmax.tolist()}, jf)
+                json.dump({'labels': labels, 'nfeatures': nfeatures, 'xmin': xmin.tolist(), 'xmax': xmax.tolist()}, jf)
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
