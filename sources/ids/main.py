@@ -4,6 +4,7 @@ import logging, pcap
 from common.data import *
 from flask import Flask, request, jsonify
 from threading import Thread
+from collections import deque
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -32,7 +33,7 @@ def model_label():
 
 @app.route('/intrusions')
 def intrusions():
-    vals = interceptor.intrusion_ids
+    vals = interceptor.get_intrusions()
     return jsonify(vals)
 
 @app.route('/nflows')
@@ -44,20 +45,6 @@ def nflows():
 def delay():
     d = interceptor.delay
     return jsonify({'delay': d})
-
-# packet features like in extract features
-
-#timestamp
-#src_ip
-#src_port
-#dst_ip
-#dst_port
-#proto
-#frame_size
-#header_size
-#payload_size
-#window
-# flags as vector [FIN, SYN, RST, PSH, ACK, URG, ECE, CWR]
 
 class Interceptor:
 
@@ -76,12 +63,12 @@ class Interceptor:
     dst_port_idx = 3
     proto_idx = 4
 
-    def __init__(self, iface, main_path, model_idx=0, step_idx=0):
+    def __init__(self, iface, main_path, model_idx=0, step_idx=0, qsize=10000):
 
         self.iface = iface
         self.flows = []
         self.flow_ids = []
-        self.intrusion_ids = []
+        self.intrusion_ids = deque(maxlen=qsize)
 
         self.model_path = osp.join(main_path, 'weights')
         self.model_labels = sorted(list(set([item.split('.tflite')[0].split('_')[1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
@@ -162,7 +149,7 @@ class Interceptor:
                         except:
                             p = 0
                         if p > 0.5:
-                            self.intrusion_ids.append(self.flow_ids[i])
+                            self.intrusion_ids.appendleft(self.flow_ids[i])
                     self.delay = datetime.now().timestamp() - tnow
                     self.nflows = len(self.flow_ids)
 
@@ -177,7 +164,7 @@ class Interceptor:
                         print('Reseting...')
                         self.flow_ids = []
                         self.flows = []
-                        self.intrusion_ids = []
+                        self.intrusion_ids.clear()
                         self.to_be_reset = False
 
         except Exception as e:
@@ -203,6 +190,11 @@ class Interceptor:
         flow_features = self.calculate_flow_features(flow_idx)
         flow_features = (flow_features - self.xmin) / (self.xmax - self.xmin + 1e-10)
         return self.predict(np.array(flow_features, dtype=np.float32).reshape(1,len(flow_features)))
+
+    def get_intrusions(self):
+        intrusions = list(self.intrusion_ids)
+        self.intrusion_ids.clear()
+        return intrusions
 
 if __name__ == "__main__":
 

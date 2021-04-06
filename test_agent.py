@@ -15,9 +15,9 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test agent.')
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
-    parser.add_argument('-p', '--policy', help='Policy', default='8;104')
+    parser.add_argument('-p', '--policy', help='Policy', default='0,1,2,3,4,5,6,7,8,9,10,11,54;24,25,26,27,28,29,30,31,32,33,34,35')
     parser.add_argument('-a', '--attack', help='Attack index', default=0)
-    parser.add_argument('-n', '--ntests', help='Number of tests', default=1)
+    parser.add_argument('-n', '--ntests', help='Number of tests', default=10)
     args = parser.parse_args()
 
     if args.checkpoint is not None and args.policy is not None:

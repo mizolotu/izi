@@ -23,8 +23,8 @@ progress_dir = '{0}/progress'.format(figures_dir)
 
 # vagrantfile
 
-nenvs = 1
-nids = 2
+nenvs = 1  # number of environments
+nids = 1  # number of security middle boxes in an environment
 mgmt_network = '192.168.122.0/24'
 ctrl_ips = ['192.168.254.11']
 ctrl_sources = [['./sources/opendaylight-0.12.3.tar.gz', 'opendaylight-0.12.3.tar.gz'], ['./sources/odl.service', '/home/vagrant/']]
@@ -101,10 +101,11 @@ directions = ['source', 'destination']
 
 # rl
 
-obs_stack_size = 16
+precision_weight = 0.01
+obs_stack_size = 4
 train_attacks = [3, 7, 8, 9]
 episode_duration = 32
-nsteps = 96
+nsteps = 64
 nepisodes = 100000
 
 # other

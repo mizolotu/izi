@@ -58,7 +58,8 @@ def set_seed(tgu_mgmt_ip, tgu_port, seed):
 
 def generate_ip_traffic_on_interface(ovs_ip, ovs_port, ip, label_idx, duration):
     url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
-    requests.post(url, json={'ip': ip, 'label': label_idx, 'duration': duration})
+    r = requests.post(url, json={'ip': ip, 'label': label_idx, 'duration': duration})
+    return r.json()
 
 if __name__ == '__main__':
 

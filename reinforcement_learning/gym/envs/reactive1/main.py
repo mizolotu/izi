@@ -14,7 +14,7 @@ from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids
 from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples
-from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions
+from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions, get_vnf_param
 from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, generate_ip_traffic_on_interface
 
 class AttackMitigationEnv():
@@ -31,7 +31,7 @@ class AttackMitigationEnv():
 
         # debug
 
-        self.debug = True
+        self.debug = False
 
         # load logs
 
@@ -69,6 +69,7 @@ class AttackMitigationEnv():
         assert (self.n_ids + 2) <= out_table
         for vm in self.ids_vms:
             restart_ids(vm)
+        self.delay = [[] for _ in range(self.n_ids)]
 
         # controller
 
@@ -185,11 +186,17 @@ class AttackMitigationEnv():
             else:
                 idx = -1
                 x[idx] += 1
-            #if idx == 12:
-            #    print(id)
         return x
 
+    def _measure_delay(self):
+        for i in range(self.n_ids):
+            self.delay[i].append(get_vnf_param(self.ids_vms[i]['ip'], flask_port, 'delay'))
+
     def _update_intrusions(self):
+
+        intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+
         for i in range(self.n_ids):
             intrusions = get_intrusions(self.ids_vms[i]['ip'], flask_port)
             for intrusion in intrusions:
@@ -205,6 +212,24 @@ class AttackMitigationEnv():
                         app_idx = applications.index((proto, dst_port))
                     else:
                         app_idx = applications.index((proto,))
+
+                    # update recent intrusions
+
+                    if src_ip not in intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
+                        intrusion_ips[i][app_idx].append(src_ip)
+                        intrusion_numbers[i][app_idx].append(1)
+                    elif src_ip in intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
+                        idx = intrusion_ips[i][app_idx].index(src_ip)
+                        intrusion_numbers[i][app_idx][idx] += 1
+                    if dst_ip not in intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
+                        intrusion_ips[i].append(dst_ip)
+                        intrusion_numbers[i][app_idx].append(1)
+                    elif dst_ip in intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
+                        idx = intrusion_ips[i][app_idx].index(dst_ip)
+                        intrusion_numbers[i][app_idx][idx] += 1
+
+                    # update all intrusions
+
                     if src_ip not in self.intrusion_ips[i][app_idx] and src_ip not in self.internal_hosts:
                         self.intrusion_ips[i][app_idx].append(src_ip)
                         self.intrusion_numbers[i][app_idx].append(1)
@@ -218,7 +243,11 @@ class AttackMitigationEnv():
                         idx = self.intrusion_ips[i][app_idx].index(dst_ip)
                         self.intrusion_numbers[i][app_idx][idx] += 1
 
-    def _get_reward(self):
+        return intrusion_ips, intrusion_numbers
+
+    def _get_reward(self, intrusion_ips, intrusion_numbers):
+
+        reward = -1
 
         before_count_deltas = np.mean(np.vstack(self.in_samples_by_attacker_stack), axis=0)
         after_count_deltas = np.mean(np.vstack(self.out_samples_by_attacker_stack), axis=0)
@@ -237,19 +266,23 @@ class AttackMitigationEnv():
 
         if len(normal) > 0:
             normal = np.mean(normal)
+            reward += normal
         else:
-            normal = 1
+            normal = np.nan
+            reward += 1
 
         if len(attack) > 0:
             attack = np.mean(attack)
+            reward += attack
         else:
-            attack = 0
+            attack = np.nan
+            reward += 0
 
         # count intrusions
 
         tp = 0
         fp = 0
-        for intrusion_ips_by_ids, intrusion_numbers_by_ids in zip(self.intrusion_ips, self.intrusion_numbers):
+        for intrusion_ips_by_ids, intrusion_numbers_by_ids in zip(intrusion_ips, intrusion_numbers):
             for intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids in zip(intrusion_ips_by_ids, intrusion_numbers_by_ids):
                 for ip, n in zip(intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids):
                     if ip in attackers:
@@ -258,10 +291,12 @@ class AttackMitigationEnv():
                         fp += n
         if (tp + fp) > 0:
             precision = tp / (tp + fp)
+            reward += precision * precision_weight
         else:
-            precision = 0
+            precision = np.nan
+            reward += 0.5 * precision_weight
 
-        return normal, attack, precision
+        return reward, normal, attack, precision
 
     def _action_mapper(self, i):
 
@@ -400,6 +435,7 @@ class AttackMitigationEnv():
             reset_ids(self.ids_vms[i]['mgmt'], flask_port)
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        self.delay = [[] for _ in range(self.n_ids)]
 
         # reset tables
 
@@ -430,7 +466,7 @@ class AttackMitigationEnv():
         # generate traffic
 
         for host in self.internal_hosts:
-            generate_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration)
+            fpath = generate_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration)
 
         self.tstart = time()
         self.tstep = time()
@@ -505,18 +541,18 @@ class AttackMitigationEnv():
 
         # intrusions
 
-        self._update_intrusions()
+        intrusion_ips, intrusion_numbers = self._update_intrusions()
+        self._measure_delay()
+        if self.debug:
+            print(f'Delays: {[np.mean(item) for item in self.delay]}')
 
         # reward
-        #print('in:')
+
         in_samples_by_attacker = self._process_reward_samples(in_samples)
-        #print('out:')
         out_samples_by_attacker = self._process_reward_samples(out_samples)
-        #print(in_samples_by_attacker[12] - out_samples_by_attacker[12], in_samples_by_attacker[12], out_samples_by_attacker[12])
         self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
         self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
-        normal, attack, precision = self._get_reward()
-        reward = normal + attack + precision - 1
-
+        reward, normal, attack, precision = self._get_reward(intrusion_ips, intrusion_numbers)
         done = False
+
         return obs, reward, done, {'r': reward, 'n': normal, 'a': attack, 'p': precision}

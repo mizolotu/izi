@@ -425,7 +425,7 @@ class Flow():
             self.idl_min  # 64
         ])
 
-def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals=[1,2,4,8,16], stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
+def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
 
     src_ip_idx = 0
     src_port_idx = 1
@@ -433,15 +433,10 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
     dst_port_idx = 3
     proto_idx = 4
 
-    size_idx = 0
-    header_idx = 1
-    payload_idx = 2
-    window_idx = 3
-
-    flow_ids = [[] for _ in intervals]
-    flow_objects = [[] for _ in intervals]
-    flow_labels = [[] for _ in intervals]
-    flow_features = [[] for _ in intervals]
+    flow_ids = []
+    flow_objects = []
+    flow_labels = []
+    flow_features = []
 
     ulabels = []
     tstart = None
@@ -462,30 +457,27 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
 
                 if timestamp > (tstart + seconds):
 
-                    for interval_i, interval in enumerate(intervals):
-                        if (seconds % interval) == 0:
+                    # remove old flows
 
-                            # remove old flows
+                    tmp_ids = []
+                    tmp_objects = []
+                    tmp_labels = []
+                    for i, o, l in zip(flow_ids, flow_objects, flow_labels):
+                        if o.is_active:
+                            tmp_ids.append(i)
+                            tmp_objects.append(o)
+                            tmp_labels.append(l)
+                    flow_ids = list(tmp_ids)
+                    flow_objects = list(tmp_objects)
+                    flow_labels = list(tmp_labels)
 
-                            tmp_ids = []
-                            tmp_objects = []
-                            tmp_labels = []
-                            for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
-                                if o.is_active:
-                                    tmp_ids.append(i)
-                                    tmp_objects.append(o)
-                                    tmp_labels.append(l)
-                            flow_ids[interval_i] = list(tmp_ids)
-                            flow_objects[interval_i] = list(tmp_objects)
-                            flow_labels[interval_i] = list(tmp_labels)
+                    # calculate_features
 
-                            # calculate_features
-
-                            flow_features_t = []
-                            for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
-                                o_features = o.get_features()
-                                flow_features_t.append([*o_features, l])
-                            flow_features[interval_i].extend(flow_features_t)
+                    flow_features_t = []
+                    for i, o, l in zip(flow_ids, flow_objects, flow_labels):
+                        o_features = o.get_features()
+                        flow_features_t.append([*o_features, l])
+                    flow_features.extend(flow_features_t)
 
                     # update time
 
@@ -494,23 +486,21 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
 
                 # add packets
 
-                for interval_i, interval in enumerate(intervals):
-                    if (seconds % interval) == 0:
-                        if id in flow_ids[interval_i]:
-                            direction = 1
-                            idx = flow_ids[interval_i].index(id)
-                            flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
-                        elif reverse_id in flow_ids:
-                            direction = -1
-                            idx = flow_ids[interval_i].index(reverse_id)
-                            flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
-                        else:
-                            label, description = labeler(timestamp, id[src_ip_idx], id[dst_ip_idx], id[src_port_idx], id[dst_port_idx])
-                            flow_ids[interval_i].append(id)
-                            flow_objects[interval_i].append(Flow(timestamp, id, features, flags))
-                            flow_labels[interval_i].append(label)
-                            if label not in ulabels:
-                                ulabels.append(label)
+                if id in flow_ids:
+                    direction = 1
+                    idx = flow_ids.index(id)
+                    flow_objects[idx].append(timestamp, features, flags, direction)
+                elif reverse_id in flow_ids:
+                    direction = -1
+                    idx = flow_ids.index(reverse_id)
+                    flow_objects[idx].append(timestamp, features, flags, direction)
+                else:
+                    label, description = labeler(timestamp, id[src_ip_idx], id[dst_ip_idx], id[src_port_idx], id[dst_port_idx])
+                    flow_ids.append(id)
+                    flow_objects.append(Flow(timestamp, id, features, flags))
+                    flow_labels.append(label)
+                    if label not in ulabels:
+                        ulabels.append(label)
 
         # lists to arrays
 
@@ -553,7 +543,7 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
                 fname_ = output.format(int(l))
                 if not osp.isdir(osp.dirname(fname_)):
                     os.mkdir(osp.dirname(fname_))
-                for nv, values, interval in zip(nvectors, flow_features, intervals):
+                for nv, values in zip(nvectors, flow_features):
                     if nv > 0:
                         ls = values[:, -1]
                         idx = np.where(ls == l)[0]
@@ -568,7 +558,7 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
                             inds_splitted[1] = te
                             inds_splitted[2] = val
                             for fi, stage in enumerate(stages):
-                                fname = '{0}_{1}_{2}'.format(fname_, interval, stage)
+                                fname = '{0}_{1}_{2}'.format(fname_, tstep, stage)
                                 pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
 
             # save meta

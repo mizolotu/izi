@@ -374,8 +374,7 @@ class PPO2(ActorCriticRLModel):
                     for epoch_num in range(self.noptepochs):
                         np.random.shuffle(env_indices)
                         for start in range(0, self.n_envs, envs_per_batch):
-                            timestep = self.num_timesteps // update_fac + ((epoch_num *
-                                                                            self.n_envs + start) // envs_per_batch)
+                            timestep = self.num_timesteps // update_fac + ((epoch_num * self.n_envs + start) // envs_per_batch)
                             end = start + envs_per_batch
                             mb_env_inds = env_indices[start:end]
                             mb_flat_inds = flat_indices[mb_env_inds].ravel()
@@ -538,7 +537,7 @@ class Runner(AbstractEnvRunner):
         print('Time step: {0}'.format(telapsed / self.n_steps))
 
         for s, n, a, p in zip(scores, normals, attacks, precisions):
-            maybe_ep_info = {'r': np.mean(s), 'n': np.mean(n), 'a': np.mean(a), 'p': np.mean(p)} # info.get('episode')
+            maybe_ep_info = {'r': safe_mean(s), 'n': safe_mean(n), 'a': safe_mean(a), 'p': safe_mean(p)}
             if maybe_ep_info is not None:
                 ep_infos.append(maybe_ep_info)
 
@@ -565,19 +564,13 @@ class Runner(AbstractEnvRunner):
             mb_advs[step] = last_gae_lam = delta + self.gamma * self.lam * nextnonterminal * last_gae_lam
         mb_returns = mb_advs + mb_values
 
-        mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward = \
-            map(swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward))
+        mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward = map(
+            swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward)
+        )
 
         return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, mb_states, ep_infos, true_reward
 
 
-# obs, returns, masks, actions, values, neglogpacs, states = runner.run()
 def swap_and_flatten(arr):
-    """
-    swap and then flatten axes 0 and 1
-
-    :param arr: (np.ndarray)
-    :return: (np.ndarray)
-    """
     shape = arr.shape
     return arr.swapaxes(0, 1).reshape(shape[0] * shape[1], *shape[2:])

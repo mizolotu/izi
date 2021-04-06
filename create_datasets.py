@@ -10,6 +10,7 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Generate datasets')
+    parser.add_argument('-s', '--step', help='Time step', default=1, type=float)
     parser.add_argument('-e', '--exclude', help='Exclude days', default='20180220,20180221')
     args = parser.parse_args()
 
@@ -55,4 +56,4 @@ if __name__ == '__main__':
             fsize = Path(input_fname).stat().st_size
             print('Directory: {0}/{1}, file: {2}/{3}, size: {4}, input: {5}'.format(dcount, len(dnames), fcount, len(input_fnames), fsize, input_fname))
             if fsize > fsize_min:
-                extract_flow_features(input_fname, output_fname, meta_fpath, labeler)
+                extract_flow_features(input_fname, output_fname, meta_fpath, labeler, args.step)
