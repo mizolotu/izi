@@ -144,7 +144,7 @@ if __name__ == '__main__':
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
         callbacks=[tf.keras.callbacks.EarlyStopping(
-            monitor='val_precision', #'val_auc',
+            monitor='val_precision',
             verbose=0,
             patience=patience,
             mode='max',
