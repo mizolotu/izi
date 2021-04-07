@@ -39,7 +39,7 @@ sudo apt install libpcap-dev tcpreplay wireshark qemu-kvm libvirt-daemon-system 
 5. Install python packages with sudo user:  
 
 ```bash
-sudo pip install pypcap kaitaistruct numpy pandas sklearn scipy tensorflow tflite-runtime python-vagrant paramiko plotly flask requests cloudpickle opencv-python lxml dicttoxml
+sudo pip3 install pypcap kaitaistruct numpy pandas sklearn scipy tensorflow tflite-runtime python-vagrant paramiko plotly flask requests cloudpickle opencv-python lxml dicttoxml
 ```
 6. Install tflite runtime:
 
