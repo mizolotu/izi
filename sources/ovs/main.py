@@ -1,4 +1,4 @@
-import json, logging, pcap, pandas, os
+import json, logging, pcap, pandas, os, shutil
 import numpy as np
 import os.path as osp
 
@@ -25,20 +25,31 @@ def seed():
         np.random.seed(seed)
     return jsonify(seed)
 
+@app.route('/prepare', methods=['GET', 'POST'])
+def prepare():
+    if request.method == 'POST':
+        data = request.data.decode('utf-8')
+        jdata = json.loads(data)
+        label = jdata['label']
+        ips = jdata['ips']
+        for ip in ips:
+            ipidx = ips.index(ip)
+            profile = profiles[ipidx]
+            fpath = select_file(profile, label)
+            shutil.copy(fpath, episode_raw_dir)
+        modify_pcaps()
+    return jsonify('ok')
+
 @app.route('/replay', methods=['GET', 'POST'])
 def replay():
     if request.method == 'POST':
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
         duration = jdata['duration']
-        label = jdata['label']
-        ip = jdata['ip']
-        iface = 'in_br'
-        ipidx = ips.index(ip)
-        profile = profiles[ipidx]
-        fpath = select_file(profile, label)
-        replay_pcap(fpath, iface, duration)
-    return jsonify(fpath)
+        for pcap_file in os.listdir(episode_mod_dir):
+            pcap_fpath = osp.join(episode_mod_dir, pcap_file)
+            replay_pcap(pcap_fpath, iface, duration)
+    return jsonify('ok')
 
 def calculate_probs(samples_dir, fsize_min=100000):
     profile_files = sorted([item for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith('.csv')])
@@ -85,6 +96,26 @@ def select_file(profile, label):
     probs = profile['probs'][:, label]
     idx = np.random.choice(np.arange(len(fnames)), p = probs)
     return osp.join(home_dir, fnames[idx])
+
+def modify_pcaps():
+
+    # clear mod dir
+
+    for old_file in os.listdir(episode_mod_dir):
+        os.unlink(osp.join(episode_mod_dir, old_file))
+
+    # modify files
+
+    pcap_files = os.listdir(episode_raw_dir)
+    for pcap_file in pcap_files:
+        pcap_fpath = osp.join(episode_raw_dir, pcap_file)
+        if osp.isfile(pcap_fpath):
+            output_fpath = osp.join(episode_mod_dir, pcap_file)
+
+            with open(pcap_fpath, 'rb') as f:
+                lines = f.readlines()
+            with open(output_fpath, 'wb') as f:
+                f.writelines(lines)
 
 def replay_pcap(fpath, iface, duration):
     Popen(['tcpreplay', '-i', iface, '--duration', str(duration), fpath], stdout=DEVNULL, stderr=DEVNULL)
@@ -173,8 +204,17 @@ class FlowCollector():
 
 if __name__ == '__main__':
 
+    iface = 'in_br'
+
     home_dir = '/home/vagrant'
-    data_dir = '{0}/data/spl'.format(home_dir)
+    data_dir = f'{home_dir}/data/spl'
+    episode_raw_dir = f'{home_dir}/episode_raw'
+    episode_mod_dir = f'{home_dir}/episode_mod'
+    if not osp.isdir(episode_raw_dir):
+        os.mkdir(episode_raw_dir)
+    if not osp.isdir(episode_mod_dir):
+        os.mkdir(episode_mod_dir)
+
     ips, profiles = calculate_probs(data_dir)
     seed = None
 

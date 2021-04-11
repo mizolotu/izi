@@ -47,7 +47,6 @@ if __name__ == '__main__':
             fname_list = [fname for fname in fname_list if exclude_pattern not in fname]
         idfs = [osp.join(dname, fname) for fname in fname_list]
         input_fnames = [osp.join(spl_dir, df) for df in idfs]
-        #output_fname_patterns = [osp.join(output_pattern, '{0}_{1}'.format(dname, fname.split('_')[2])) for fname in fname_list]
         output_fname_patterns = [osp.join(output_pattern, dname) for fname in fname_list]
         meta_fpath = osp.join(feature_dir, meta_fname)
         fcount = 0

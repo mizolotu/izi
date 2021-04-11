@@ -56,10 +56,13 @@ def set_seed(tgu_mgmt_ip, tgu_port, seed):
     url = 'http://{0}:{1}/seed'.format(tgu_mgmt_ip, tgu_port)
     requests.post(url, json={'seed': seed})
 
-def generate_ip_traffic_on_interface(ovs_ip, ovs_port, ip, label_idx, duration):
+def prepare_traffic_on_interface(ovs_ip, ovs_port, ips, label_idx, duration):
+    url = 'http://{0}:{1}/prepare'.format(ovs_ip, ovs_port)
+    requests.post(url, json={'ips': ips, 'label': label_idx, 'duration': duration})
+
+def replay_traffic_on_interface(ovs_ip, ovs_port, duration):
     url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
-    r = requests.post(url, json={'ip': ip, 'label': label_idx, 'duration': duration})
-    return r.json()
+    requests.post(url, json={'duration': duration})
 
 if __name__ == '__main__':
 
@@ -68,7 +71,7 @@ if __name__ == '__main__':
     env_idx = 0
     label = 3
     label_idx = labels.index(label)
-    ip = '172.31.69.28'
+    ips = ['172.31.69.25', '172.31.69.28']
 
     with open(vms_fpath, 'r') as f:
         vms = json.load(f)
@@ -76,6 +79,8 @@ if __name__ == '__main__':
     assert len(ovs_vms) == 1
     ovs_vm = ovs_vms[0]
 
-    generate_ip_traffic_on_interface(ovs_vm['mgmt'], flask_port, ip, label_idx, episode_duration)
+    prepare_traffic_on_interface(ovs_vm['mgmt'], flask_port, ips, label_idx, episode_duration)
+    replay_traffic_on_interface(ovs_vm['mgmt'], flask_port, episode_duration)
+
     sleep(episode_duration)
     print('Passed!')
