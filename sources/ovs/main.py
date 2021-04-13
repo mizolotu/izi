@@ -1,4 +1,4 @@
-import json, logging, pcap, pandas, os, shutil
+import json, logging, pcap, pandas, os
 import numpy as np
 import os.path as osp
 
@@ -9,7 +9,6 @@ from threading import Thread
 from flask import Flask, request, jsonify
 from datetime import datetime
 from common.data import read_pkt
-from scapy.all import *
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -25,31 +24,20 @@ def seed():
         np.random.seed(seed)
     return jsonify(seed)
 
-@app.route('/prepare', methods=['GET', 'POST'])
+@app.route('/replay', methods=['GET', 'POST'])
 def prepare():
     if request.method == 'POST':
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
         label = jdata['label']
-        ips = jdata['ips']
-        for ip in ips:
-            ipidx = ips.index(ip)
-            profile = profiles[ipidx]
-            fpath = select_file(profile, label)
-            shutil.copy(fpath, episode_raw_dir)
-        modify_pcaps()
-    return jsonify('ok')
-
-@app.route('/replay', methods=['GET', 'POST'])
-def replay():
-    if request.method == 'POST':
-        data = request.data.decode('utf-8')
-        jdata = json.loads(data)
+        ip = jdata['ip']
         duration = jdata['duration']
-        for pcap_file in os.listdir(episode_mod_dir):
-            pcap_fpath = osp.join(episode_mod_dir, pcap_file)
-            replay_pcap(pcap_fpath, iface, duration)
-    return jsonify('ok')
+        aug = jdata['aug']
+        ipidx = ips.index(ip)
+        profile = profiles[ipidx]
+        fpath = select_file(profile, label, aug)
+        replay_pcap(fpath, iface, duration)
+    return jsonify(fpath)
 
 def calculate_probs(samples_dir, fsize_min=100000):
     profile_files = sorted([item for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith('.csv')])
@@ -91,108 +79,15 @@ def calculate_probs(samples_dir, fsize_min=100000):
 
     return ips, profiles
 
-def select_file(profile, label):
+def select_file(profile, label, aug=True):
     fnames = profile['fnames']
     probs = profile['probs'][:, label]
     idx = np.random.choice(np.arange(len(fnames)), p = probs)
-    return osp.join(home_dir, fnames[idx])
-
-def add_load_to_pkt(pkt):
-    if pkt.haslayer(TCP) and pkt.haslayer(Raw) or pkt.haslayer(UDP) and pkt.haslayer(Raw):
-        load = pkt.load
-        l = len(load)
-        n = np.random.randint(l)
-        pad = Padding()
-        pad.load = '\x00' * n
-        pkt = pkt / pad
-        del pkt[IP].len
-        del pkt[IP].chksum
-        if pkt.haslayer(TCP):
-            del pkt[TCP].chksum
-        elif pkt.haslayer(UDP):
-            del pkt[UDP].chksum
-            del pkt[UDP].len
-        t = pkt.time
-        pkt = Ether(pkt.build())
-        pkt.time = t
-    return pkt
-
-def add_time_to_pkt(last_two_pkts, new_pkt):
-    if new_pkt.haslayer(TCP) or new_pkt.haslayer(UDP) :
-        second_last_pkt = last_two_pkts[0]
-        last_pkt = last_two_pkts[1]
-        if new_pkt.time > second_last_pkt.time:
-            iat = new_pkt.time - second_last_pkt.time
-            dt = np.random.rand() * iat
-            last_pkt.time = second_last_pkt.time + dt
-    return second_last_pkt, last_pkt
-
-def modify_pcaps():
-
-    # clear mod dir
-
-    for old_file in os.listdir(episode_mod_dir):
-        os.unlink(osp.join(episode_mod_dir, old_file))
-
-    # modify files
-
-    pcap_files = os.listdir(episode_raw_dir)
-    for pcap_file in pcap_files:
-        pcap_fpath = osp.join(episode_raw_dir, pcap_file)
-        if osp.isfile(pcap_fpath):
-
-            # output file
-
-            output_fpath = osp.join(episode_mod_dir, pcap_file)
-
-            # read packets, track flows
-
-            pkts = rdpcap(pcap_fpath)
-            flows = []
-            flow_last_two_packets = []
-            mods = []
-            for pkt in pkts:
-                if pkt.haslayer('IP'):
-                    ip = pkt[IP]
-                    src_ip = ip.src
-                    dst_ip = ip.dst
-                    src_port = ip.sport
-                    dst_port = ip.dport
-                    proto = ip.proto
-
-                    # check flows
-
-                    if [src_ip, src_port, dst_ip, dst_port, proto] in flows:
-                        idx = flows.index([src_ip, src_port, dst_ip, dst_port, proto])
-                    elif [dst_ip, dst_port, src_ip, src_port, proto] in flows:
-                        idx = flows.index([dst_ip, dst_port, src_ip, src_port, proto])
-                    else:
-                        flows.append([src_ip, src_port, dst_ip, dst_port, proto])
-                        flow_last_two_packets.append(deque(maxlen=2))
-                        idx = -1
-
-                    # add load
-
-                    pkt = add_load_to_pkt(pkt)
-
-                    # add to deque
-
-                    if len(flow_last_two_packets[idx]) == 2:
-                        pkt0, pkt1 = add_time_to_pkt(flow_last_two_packets[idx], pkt)
-                        flow_last_two_packets[idx].append(pkt0)
-                        flow_last_two_packets[idx].append(pkt1)
-                        mods.append(flow_last_two_packets[idx][0])
-                    flow_last_two_packets[idx].append(pkt)
-
-            # add the rest of the packets
-
-            for item_list in flow_last_two_packets:
-                for item in item_list:
-                    mods.append(item)
-
-            # save in the output fpath
-
-            wrpcap(output_fpath, mods)
+    if aug and osp.isfile(osp.join(home_dir, f'{fnames[idx]}_aug')):
+        fpath = osp.join(home_dir, f'{fnames[idx]}_aug')
+    else:
+        fpath = osp.join(home_dir, fnames[idx])
+    return fpath
 
 def replay_pcap(fpath, iface, duration):
     Popen(['tcpreplay', '-i', iface, '--duration', str(duration), fpath], stdout=DEVNULL, stderr=DEVNULL)

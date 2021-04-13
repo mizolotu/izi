@@ -64,6 +64,10 @@ def replay_traffic_on_interface(ovs_ip, ovs_port, duration):
     url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
     requests.post(url, json={'duration': duration})
 
+def replay_ip_traffic_on_interface(ovs_ip, ovs_port, ip, label_idx, duration, aug=True):
+    url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
+    requests.post(url, json={'ip': ip, 'label': label_idx, 'duration': duration, 'aug': aug})
+
 if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
@@ -79,8 +83,8 @@ if __name__ == '__main__':
     assert len(ovs_vms) == 1
     ovs_vm = ovs_vms[0]
 
-    prepare_traffic_on_interface(ovs_vm['mgmt'], flask_port, ips, label_idx, episode_duration)
-    replay_traffic_on_interface(ovs_vm['mgmt'], flask_port, episode_duration)
+    for ip in ips:
+        replay_ip_traffic_on_interface(ovs_vm['mgmt'], flask_port, ip, label_idx, episode_duration, False)
 
     sleep(episode_duration)
     print('Passed!')

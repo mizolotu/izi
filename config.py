@@ -115,5 +115,6 @@ traffic_generation_veth_prefix = 'in'
 obs_bridge_veth_prefix = 'obs'
 reward_bridge_veth_prefix = 'rew'
 csv_postfix = '.csv'
+aug_postfix = '_aug'
 flask_port = 5000
 flow_window = 1
