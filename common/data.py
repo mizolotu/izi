@@ -616,7 +616,7 @@ def count_labels(input, output, labels, labeler):
 
 def add_load_to_pkt(pkt, alpha):
     if pkt.haslayer(Raw):
-        load = pkt.load
+        load = pkt[Raw].load
         l = len(load)
         n = np.random.randint(alpha * l)
         pad = Padding()
