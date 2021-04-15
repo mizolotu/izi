@@ -431,8 +431,6 @@ class AttackMitigationEnv():
 
         # reset ids
 
-        print('resetting ids')
-
         for i in range(self.n_ids):
             reset_ids(self.ids_vms[i]['mgmt'], flask_port)
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
@@ -440,8 +438,6 @@ class AttackMitigationEnv():
         self.delay = [[] for _ in range(self.n_ids)]
 
         # reset tables
-
-        print('resetting tables')
 
         init_ovs_tables(self.controller, self.ovs_node, self.veths)
 
@@ -468,8 +464,6 @@ class AttackMitigationEnv():
                 self._take_action(action)
 
         # generate traffic
-
-        print('generetaing traffic')
 
         for host in self.internal_hosts:
             fpath = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration)

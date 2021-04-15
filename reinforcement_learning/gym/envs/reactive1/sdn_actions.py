@@ -17,6 +17,8 @@ def mirror_app_to_ids(controller, ovs_node, table_id, lower_priority, higher_pri
             flow_id = 'ppp_{0}_{1}_{2}'.format(proto_name, port_dir, port)
             if not controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                 controller.app_output_and_resubmit(ovs_node, table_id, higher_priority, proto_name, proto_number, port_dir, port, tunnel_to_ids, table_id + 1)
+            else:
+                break
     elif len(application) == 1:
         proto_name = application[0]
         _, proto_number = ip_proto(proto_name)
@@ -35,6 +37,8 @@ def unmirror_app_from_ids(controller, ovs_node, table_id, application):
                 controller.delete_config_flow(ovs_node, table_id, flow_id)
             if controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                 controller.delete_operational_flow(ovs_node, table_id, flow_id)
+            else:
+                break
     elif len(application) == 1:
         proto_name = application[0]
         _, proto_number = ip_proto(proto_name)
@@ -53,19 +57,31 @@ def mirror_ip_app_to_ids(controller, ovs_node, table_id, lower_priority, higher_
         _, proto_number = ip_proto(proto_name)
         port = application[1]
         for ip in ips:
+            does_flow_exist = False
             for ip_dir in directions:
                 for port_dir in directions:
                     flow_id = 'iippp_{0}_{1}_{2}_{3}_{4}'.format(ip_dir, ip, proto_name, port_dir, port)
                     if not controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                         controller.ip_app_output_and_resubmit(ovs_node, table_id, higher_priority, ip_dir, ip, proto_name, proto_number, port_dir, port, tunnel_to_ids, table_id + 1)
+                    else:
+                        does_flow_exist = True
+                        break
+                if does_flow_exist:
+                    break
     elif len(application) == 1:
         proto_name = application[0]
         _, proto_number = ip_proto(proto_name)
         for ip in ips:
+            does_flow_exist = False
             for ip_dir in directions:
                 flow_id = 'iip_{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
                 if not controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                     controller.ip_proto_output_and_resubmit(ovs_node, table_id, lower_priority, ip_dir, ip, proto_name, proto_number, tunnel_to_ids, table_id + 1)
+                else:
+                    does_flow_exist = True
+                    break
+                if does_flow_exist:
+                    break
 
 def unmirror_ip_app_from_ids(controller, ovs_node, table_id, ips, application):
     if len(application) == 2:
@@ -73,6 +89,7 @@ def unmirror_ip_app_from_ids(controller, ovs_node, table_id, ips, application):
         _, proto_number = ip_proto(proto_name)
         port = application[1]
         for ip in ips:
+            does_flow_exist = False
             for ip_dir in directions:
                 for port_dir in directions:
                     flow_id = 'iippp_{0}_{1}_{2}_{3}_{4}'.format(ip_dir, ip, proto_name, port_dir, port)
@@ -80,6 +97,11 @@ def unmirror_ip_app_from_ids(controller, ovs_node, table_id, ips, application):
                         controller.delete_config_flow(ovs_node, table_id, flow_id)
                     if controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                         controller.delete_operational_flow(ovs_node, table_id, flow_id)
+                    else:
+                        does_flow_exist = True
+                        break
+                if does_flow_exist == True:
+                    break
     elif len(application) == 1:
         proto_name = application[0]
         _, proto_number = ip_proto(proto_name)
@@ -90,6 +112,8 @@ def unmirror_ip_app_from_ids(controller, ovs_node, table_id, ips, application):
                     controller.delete_config_flow(ovs_node, table_id, flow_id)
                 if controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                     controller.delete_operational_flow(ovs_node, table_id, flow_id)
+                else:
+                    break
 
 def block_ip_app(controller, ovs_node, table_id, lower_priority, higher_priority, ips, application):
     if len(application) == 2:
@@ -97,19 +121,33 @@ def block_ip_app(controller, ovs_node, table_id, lower_priority, higher_priority
         _, proto_number = ip_proto(proto_name)
         port = application[1]
         for ip in ips:
+            does_flow_exist = False
             for ip_dir in directions:
                 for port_dir in directions:
                     flow_id = 'iippp_{0}_{1}_{2}_{3}_{4}'.format(ip_dir, ip, proto_name, port_dir, port)
                     if not controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                         controller.ip_app_drop(ovs_node, table_id, higher_priority, ip_dir, ip, proto_name, proto_number, port_dir, port)
+                    else:
+                        does_flow_exist = True
+                    if does_flow_exist:
+                        break
+                if does_flow_exist:
+                    break
     elif len(application) == 1:
         proto_name = application[0]
         _, proto_number = ip_proto(proto_name)
         for ip in ips:
+            does_flow_exist = False
             for ip_dir in directions:
                 flow_id = 'iip_{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
                 if not controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                     controller.ip_proto_drop(ovs_node, table_id, lower_priority, ip_dir, ip, proto_name, proto_number)
+                else:
+                    does_flow_exist = True
+                if does_flow_exist:
+                    break
+            if does_flow_exist:
+                break
 
 def unblock_ip_app(controller, ovs_node, table_id, ips, application):
     if len(application) == 2:
@@ -117,6 +155,7 @@ def unblock_ip_app(controller, ovs_node, table_id, ips, application):
         _, proto_number = ip_proto(proto_name)
         port = application[1]
         for ip in ips:
+            does_flow_exist = False
             for ip_dir in directions:
                 for port_dir in directions:
                     flow_id = 'iippp_{0}_{1}_{2}_{3}_{4}'.format(ip_dir, ip, proto_name, port_dir, port)
@@ -124,6 +163,11 @@ def unblock_ip_app(controller, ovs_node, table_id, ips, application):
                         controller.delete_config_flow(ovs_node, table_id, flow_id)
                     if controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                         controller.delete_operational_flow(ovs_node, table_id, flow_id)
+                    else:
+                        does_flow_exist = True
+                        break
+                if does_flow_exist == True:
+                    break
     elif len(application) == 1:
         proto_name = application[0]
         _, proto_number = ip_proto(proto_name)
@@ -134,6 +178,8 @@ def unblock_ip_app(controller, ovs_node, table_id, ips, application):
                     controller.delete_config_flow(ovs_node, table_id, flow_id)
                 if controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
                     controller.delete_operational_flow(ovs_node, table_id, flow_id)
+                else:
+                    break
 
 if __name__ == '__main__':
 
