@@ -15,7 +15,7 @@ from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples
 from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions, get_vnf_param
-from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, prepare_traffic_on_interface
+from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, replay_ip_traffic_on_interface
 
 class AttackMitigationEnv():
 
@@ -465,7 +465,9 @@ class AttackMitigationEnv():
 
         # generate traffic
 
-        prepare_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, self.internal_hosts, self.label, episode_duration)
+        for host in self.internal_hosts:
+            fpath = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration)
+            print(fpath)
 
         self.tstart = time()
         self.tstep = time()

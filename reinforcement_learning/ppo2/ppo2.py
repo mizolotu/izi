@@ -427,6 +427,7 @@ class PPO2(ActorCriticRLModel):
             attack_blocked.append(ep_infos[0]['a'])
             ids_precision.append(ep_infos[0]['p'])
             episode_reward.append(ep_infos[0]['r'])
+            print(ep_infos[0])
         print(f'Normal traffic passed: {np.mean(normal_passed)}')
         print(f'Malicious traffic blocked: {np.mean(attack_blocked)}')
         print(f'IDS precision: {np.mean(ids_precision)}')
