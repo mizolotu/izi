@@ -423,6 +423,8 @@ class AttackMitigationEnv():
 
     def reset(self, sleep_duration=1):
 
+        print('resetting')
+
         # end of the episode
 
         tnow = time()
@@ -467,7 +469,6 @@ class AttackMitigationEnv():
 
         for host in self.internal_hosts:
             fpath = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration)
-            print(fpath)
 
         self.tstart = time()
         self.tstep = time()
@@ -511,12 +512,13 @@ class AttackMitigationEnv():
     def step(self, action):
 
         # take an action and measure time
-
+        t0 = time()
         if self.default_step_actions is not None:
             for action in self.default_step_actions:
                 self._take_action(action)
         else:
             self._take_action(action)
+        print('take action', time() - t0)
         tnow = time()
         if (tnow - self.tstep) < self.step_duration:
             sleep(self.step_duration - (tnow - self.tstep))
@@ -524,7 +526,9 @@ class AttackMitigationEnv():
 
         # obs
 
+        t0 = time()
         in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+        print('get obs', time() - t0)
         in_samples_by_app = self._process_app_samples(in_samples)
         out_samples_by_app = self._process_app_samples(out_samples)
         processed_counts = []
