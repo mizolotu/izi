@@ -9,6 +9,7 @@ from common.odl import Odl
 from collections import deque
 from common.ids import restart_ids
 from common.utils import ip_proto
+from threading import Thread
 
 from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
@@ -122,6 +123,12 @@ class AttackMitigationEnv():
         self.n_ids_actions = (self.n_models + self.n_steps) * self.n_ids
         act_dim = self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + \
                   self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
+        self.actions_queue = deque()
+
+        # start acting
+
+        actor = Thread(target=self._act, daemon=True)
+        actor.start()
 
         # log actions
 
@@ -154,6 +161,11 @@ class AttackMitigationEnv():
 
         self.in_samples = 0
         self.out_samples = 0
+
+    def _act(self):
+        while True:
+            func, args = self.actions_queue.pop()
+            func(*args)
 
     def _process_app_samples(self, samples):
         x = np.zeros((self.n_apps, 2))
@@ -429,7 +441,7 @@ class AttackMitigationEnv():
 
     def _take_action(self, i):
         func, args, on_off_idx_and_value = self._action_mapper(i)
-        func(*args)
+        self.actions_queue.appendleft((func, args))
         if on_off_idx_and_value is not None:
             app_i, j, val = on_off_idx_and_value
             self.on_off_frame[app_i, j] = val
