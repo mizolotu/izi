@@ -164,8 +164,9 @@ class AttackMitigationEnv():
 
     def _act(self):
         while True:
-            func, args = self.actions_queue.pop()
-            func(*args)
+            if len(self.actions_queue) > 0:
+                func, args = self.actions_queue.pop()
+                func(*args)
 
     def _process_app_samples(self, samples):
         x = np.zeros((self.n_apps, 2))
