@@ -537,7 +537,8 @@ class AttackMitigationEnv():
                 self._take_action(action)
         else:
             self._take_action(action)
-        print('take action', time() - t0)
+        if self.debug:
+            print('take action', time() - t0)
         tnow = time()
         if (tnow - self.tstep) < self.step_duration:
             sleep(self.step_duration - (tnow - self.tstep))
@@ -547,7 +548,8 @@ class AttackMitigationEnv():
 
         t0 = time()
         in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-        print('get obs', time() - t0)
+        if self.debug:
+            print('get obs', time() - t0)
         in_samples_by_app = self._process_app_samples(in_samples)
         out_samples_by_app = self._process_app_samples(out_samples)
         processed_counts = []
