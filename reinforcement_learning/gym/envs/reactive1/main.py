@@ -108,6 +108,7 @@ class AttackMitigationEnv():
         self.in_samples_by_attacker_stack = deque(maxlen=self.stack_size)
         self.out_samples_by_attacker_stack = deque(maxlen=self.stack_size)
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
+        self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
 
         # actions
@@ -334,7 +335,12 @@ class AttackMitigationEnv():
             ids_name = self.ids_vms[ids_to]['vm']
             app_idx = app_i[0]
             app = applications[app_idx]
-            ips = self.intrusion_ips[ids_from][app_idx]
+            ips_to_mirror = self.intrusion_ips[ids_from][app_idx]
+            ips = []
+            for ip in ips_to_mirror:
+                if ip not in self.ips_to_check_or_block[ids_to][app_idx]:
+                    ips.append(ip)
+                    self.ips_to_check_or_block[ids_to][app_idx].append(ip)
             action_fun = mirror_ip_app_to_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
             on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 1)
@@ -348,7 +354,12 @@ class AttackMitigationEnv():
             ids_to = np.where(e[ids_from] == 0)[0][ids_to_[0]]
             app_idx = app_i[0]
             app = applications[app_idx]
-            ips = self.intrusion_ips[ids_from][app_idx]
+            ips_to_unmirror = self.intrusion_ips[ids_from][app_idx]
+            ips = []
+            for ip in ips_to_unmirror:
+                if ip in self.ips_to_check_or_block[ids_to][app_idx]:
+                    ips.append(ip)
+                    self.ips_to_check_or_block[ids_to][app_idx].remove(ip)
             action_fun = unmirror_ip_app_from_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], ips, app)
             on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 0)
@@ -359,7 +370,13 @@ class AttackMitigationEnv():
             app_i, ids_i = np.where(action_array == 1)
             app_idx = app_i[0]
             ids_idx = ids_i[0]
-            ips = self.intrusion_ips[ids_idx][app_idx]
+            ips_to_block = self.intrusion_ips[ids_idx][app_idx]
+            ips = []
+            for ip in ips_to_block:
+                if ip not in self.ips_to_check_or_block[self.n_ids][app_idx]:
+                    ips.append(ip)
+                    self.ips_to_check_or_block[self.n_ids][app_idx].append(ip)
+            print('ips to block:', len(ips))
             app = applications[app_idx]
             action_fun = block_ip_app
             args = (self.controller, self.ovs_node, block_table, priorities['higher'], priorities['highest'], ips, app)
@@ -378,7 +395,12 @@ class AttackMitigationEnv():
             app_i, ids_i = np.where(action_array == 1)
             app_idx = app_i[0]
             ids_idx = ids_i[0]
-            ips = self.intrusion_ips[ids_idx][app_idx]
+            ips_to_unblock = self.intrusion_ips[ids_idx][app_idx]
+            ips = []
+            for ip in ips_to_unblock:
+                if ip in self.ips_to_check_or_block[self.n_ids][app_idx]:
+                    ips.append(ip)
+                    self.ips_to_check_or_block[self.n_ids][app_idx].remove(ip)
             app = applications[app_idx]
             action_fun = unblock_ip_app
             args = (self.controller, self.ovs_node, block_table, ips, app)
