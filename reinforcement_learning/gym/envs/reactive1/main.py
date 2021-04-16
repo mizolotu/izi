@@ -376,7 +376,6 @@ class AttackMitigationEnv():
                 if ip not in self.ips_to_check_or_block[self.n_ids][app_idx]:
                     ips.append(ip)
                     self.ips_to_check_or_block[self.n_ids][app_idx].append(ip)
-            print('ips to block:', len(ips))
             app = applications[app_idx]
             action_fun = block_ip_app
             args = (self.controller, self.ovs_node, block_table, priorities['higher'], priorities['highest'], ips, app)
