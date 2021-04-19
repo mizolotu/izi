@@ -20,11 +20,15 @@ from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed,
 
 class AttackMitigationEnv():
 
-    def __init__(self, env_id, label, seed=None, policy=None):
+    def __init__(self, env_id, label, aug, seed=None, policy=None):
 
         # id
 
         self.id = env_id
+
+        # augment the data
+
+        self.aug = aug
 
         # seed
 
@@ -500,7 +504,7 @@ class AttackMitigationEnv():
         # generate traffic
 
         for host in self.internal_hosts:
-            fpath = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration)
+            _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration, aug=self.aug)
 
         self.tstart = time()
         self.tstep = time()
