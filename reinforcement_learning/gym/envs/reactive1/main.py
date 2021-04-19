@@ -474,6 +474,7 @@ class AttackMitigationEnv():
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.delay = [[] for _ in range(self.n_ids)]
+        self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
 
         # reset tables
 

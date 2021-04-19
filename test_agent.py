@@ -19,6 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--attack', help='Attack index', default=0)
     parser.add_argument('-n', '--ntests', help='Number of tests', default=10, type=int)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
+    parser.add_argument('-s', '--seed', help='Seed', default=0, type=int)
     args = parser.parse_args()
 
     if args.checkpoint is not None and args.policy is not None:
@@ -33,11 +34,11 @@ if __name__ == '__main__':
     algorithm = ppo
     modeldir = '{0}/{1}/{2}'.format(rl_models_dir, env_class.__name__, algorithm.__name__)
     policy = MlpPolicy
-    seed = 0
+
 
     try:
         model = algorithm.load('{0}/{1}'.format(modeldir, args.checkpoint))
-        env_fns = [make_env(env_class, 0, int(args.attack), args.augment, seed)]
+        env_fns = [make_env(env_class, 0, int(args.attack), args.augment, args.seed)]
         env = SubprocVecEnv(env_fns)
         model.set_env(env)
         print('Model has been loaded from {0}!'.format(args.checkpoint))
@@ -46,7 +47,7 @@ if __name__ == '__main__':
         assert len(spl) == 2
         default_policy = {'reset': [int(item) for item in spl[0].split(',')], 'step': [int(item) for item in spl[1].split(',')]}
         print(default_policy)
-        env_fns = [make_env(env_class, 0, int(args.attack), args.augment, seed, default_policy)]
+        env_fns = [make_env(env_class, 0, int(args.attack), args.augment, args.seed, default_policy)]
         env = SubprocVecEnv(env_fns)
         model = algorithm(policy, env, n_steps=nsteps, verbose=1)
         print('Could not load the model, using the default policy specified!')
