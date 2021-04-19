@@ -18,6 +18,7 @@ def make_env(env_class, *args):
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train RL agent.')
+    parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
     parser.add_argument('-c', '--checkpoint', help='Checkpoint', default='rl_model_384_steps.zip')
     args = parser.parse_args()
 
@@ -41,7 +42,7 @@ if __name__ == '__main__':
     format_strs = os.getenv('', 'stdout,log,csv').split(',')
     logger.configure(os.path.abspath(logdir), format_strs)
 
-    env_fns = [make_env(env_class, env_idx, next(attack_indexes)) for env_idx in range(nenvs)]
+    env_fns = [make_env(env_class, env_idx, next(attack_indexes), args.augment) for env_idx in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
     try:
