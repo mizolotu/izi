@@ -39,7 +39,6 @@ ids_script = 'scripts/ids.sh'
 
 # ids
 
-seed = 0
 batch_size = 1024  # batch size will actually be double that
 patience = 10
 epochs = 1000

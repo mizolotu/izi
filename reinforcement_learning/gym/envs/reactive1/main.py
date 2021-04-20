@@ -476,17 +476,15 @@ class AttackMitigationEnv():
         self.delay = [[] for _ in range(self.n_ids)]
         self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
 
-        # reset tables
+        # reset tables and wait for sdn configuration to be processed
 
         init_ovs_tables(self.controller, self.ovs_node, self.veths)
-
-        # wait for sdn configuration to be processed
-
         tables = np.arange(in_table, out_table)
         for table in tables:
             flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
             while len(flows) != 1:
                 sleep(sleep_duration)
+                init_ovs_tables(self.controller, self.ovs_node, self.veths)
                 flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
 
         # set time
