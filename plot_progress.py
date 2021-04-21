@@ -22,7 +22,7 @@ if __name__ == '__main__':
     r = p['ep_reward_mean'].values
     n = p['ep_normal_mean'].values
     a = p['ep_attack_mean'].values
-    b = p['ep_bonus_mean'].values
+    b = p['ep_precision_mean'].values
     x = p['total_timesteps'].values
     r = moving_average(r.reshape(len(r), 1)).reshape(x.shape)
     n = moving_average(n.reshape(len(n), 1)).reshape(x.shape) * 100
@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
         # generate scatter
 
-        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 164864])
+        traces, layout = generate_line_scatter(n, d, c, 'Time steps', y, show_legend=True, xrange=[0, 83000])
 
         # save results
 
