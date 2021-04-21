@@ -89,8 +89,8 @@ class AttackMitigationEnv():
 
         self.internal_hosts = sorted([item.split(csv_postfix)[0] for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith(csv_postfix)])
         clean_ids_tables(self.controller, self.ids_nodes)
-        self.tunnels = [item for item in self.ofports if item['type'] == 'vxlan']
-        self.veths = [item for item in self.ofports if item['type'] == 'veth']
+        self.tunnels = [item for item in self.ofports if item['type'] == 'vxlan' and int(item['vm'].split('_')[1]) == self.id]
+        self.veths = [item for item in self.ofports if item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
 
         # time
 

@@ -43,7 +43,6 @@ def init_ovs_tables(controller, ovs_node, ovs_veths):
 
     # default action flows
 
-    print(ovs_veths)
     in_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == traffic_generation_veth_prefix]
     assert len(in_ofports) == 1
     in_ofport = in_ofports[0]
