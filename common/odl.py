@@ -105,7 +105,16 @@ class Odl:
         flow_ids = nodes_root.xpath(self.xpath['flows_in_table_on_node'], node_id=node_id, table_id=table_id, namespaces=self.ns)
         return flow_ids
 
-    def delete_table(self, node_id, table_id):
+    def delete_operational_table(self, node_id, table_id):
+        url = self.op + '/node/' + node_id + '/table/' + table_id
+        r = requests.delete(url=url, headers=self.headers, auth=self.auth)
+        if int(r.status_code) >= 200 and int(r.status_code) < 300:
+            code = 0
+        else:
+            code = 1
+        return code
+
+    def delete_config_table(self, node_id, table_id):
         url = self.cfg + '/node/' + node_id + '/table/' + table_id
         r = requests.delete(url=url, headers=self.headers, auth=self.auth)
         if int(r.status_code) >= 200 and int(r.status_code) < 300:

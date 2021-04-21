@@ -6,16 +6,17 @@ from config import *
 
 def clean_ids_tables(controller, ids_nodes):
 
-    # delete op flows if there are any
+    # delete op flows and tables if there are any
 
     for node in ids_nodes:
         tables = controller.find_operational_tables(node)
         for table in tables:
+            controller.delete_operational_table(node, table)
             flows = controller.find_operational_flows(node, table)
             for flow in flows:
                 controller.delete_operational_flow(node, table, flow)
 
-    # delete cfg flows if there are any
+    # delete cfg flows and tables if there are any
 
     for node in ids_nodes:
         tables = controller.find_config_tables(node)
