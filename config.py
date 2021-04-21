@@ -24,7 +24,7 @@ progress_dir = '{0}/progress'.format(figures_dir)
 # vagrantfile
 
 nenvs = 1  # number of environments
-nids = 1  # number of security middle boxes in an environment
+nidss = 1  # number of security middle boxes in an environment
 mgmt_network = '192.168.122.0/24'
 ctrl_ips = ['192.168.254.11']
 ctrl_sources = [['./sources/opendaylight-0.12.3.tar.gz', 'opendaylight-0.12.3.tar.gz'], ['./sources/odl.service', '/home/vagrant/']]

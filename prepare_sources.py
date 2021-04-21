@@ -13,8 +13,17 @@ if __name__ == '__main__':
     # parse args
 
     parser = arp.ArgumentParser(description='Prepare resources')
+    parser.add_argument('-n', '--nenvs', help='Number of environments')
+    parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment')
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
     args = parser.parse_args()
+
+    # update nenvs and nidss
+
+    if args.nenvs is not None:
+        nenvs = args.nenvs
+    if args.nidss is not None:
+        nidss = args.nidss
 
     # preparare vagrant file
 
@@ -43,7 +52,7 @@ if __name__ == '__main__':
 
     ips_i = ids_ips
     for i in range(nenvs):
-        for j in range(nids):
+        for j in range(nidss):
             vms.append(f'ids_{i}_{j}')
             ips.append(ips_i)
             sources.append(ids_sources)
