@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train RL agent.')
     parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
-    parser.add_argument('-c', '--checkpoint', help='Checkpoint', default='rl_model_384_steps.zip')
+    parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     args = parser.parse_args()
 
     meta = load_meta(feature_dir)
