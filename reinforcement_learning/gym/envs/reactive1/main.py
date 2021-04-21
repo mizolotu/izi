@@ -461,6 +461,8 @@ class AttackMitigationEnv():
 
     def reset(self, sleep_duration=1):
 
+        print('reseting')
+
         # end of the episode
 
         tnow = time()
@@ -541,6 +543,8 @@ class AttackMitigationEnv():
             self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
 
         obs = np.array(self.app_counts_stack)
+
+        print('reset complete')
 
         return obs
 
