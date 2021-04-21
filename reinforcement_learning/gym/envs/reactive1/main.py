@@ -459,7 +459,7 @@ class AttackMitigationEnv():
                 counts_r[i] = counts[idx]
         return counts_r
 
-    def reset(self, sleep_duration=1):
+    def reset(self, sleep_duration=3):
 
         # end of the episode
 
@@ -479,13 +479,21 @@ class AttackMitigationEnv():
         # reset tables and wait for sdn configuration to be processed
 
         init_ovs_tables(self.controller, self.ovs_node, self.veths)
+        sleep(sleep_duration)
         tables = np.arange(in_table, out_table)
-        for table in tables:
-            flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
-            while len(flows) != 1:
-                sleep(sleep_duration)
-                init_ovs_tables(self.controller, self.ovs_node, self.veths)
+        ready = False
+        while not ready:
+            count = 0
+            for table in tables:
                 flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
+                if len(flows) == 1:
+                    count += 1
+                else:
+                    init_ovs_tables(self.controller, self.ovs_node, self.veths)
+                    sleep(sleep_duration)
+                    break
+            if count == len(tables):
+                ready = True
 
         # set time
 
