@@ -1,7 +1,6 @@
 import json
 
 from common.odl import Odl
-from common.utils import ip_proto
 from config import *
 
 def clean_ids_tables(controller, ids_nodes):
@@ -11,10 +10,10 @@ def clean_ids_tables(controller, ids_nodes):
     for node in ids_nodes:
         tables = controller.find_operational_tables(node)
         for table in tables:
-            controller.delete_operational_table(node, table)
             flows = controller.find_operational_flows(node, table)
             for flow in flows:
                 controller.delete_operational_flow(node, table, flow)
+            controller.delete_operational_table(node, table)
 
     # delete cfg flows and tables if there are any
 
@@ -24,6 +23,7 @@ def clean_ids_tables(controller, ids_nodes):
             flows = controller.find_config_flows(node, table)
             for flow in flows:
                 controller.delete_config_flow(node, table, flow)
+            controller.delete_config_table(node, table)
 
 def init_ovs_tables(controller, ovs_node, ovs_veths):
 
