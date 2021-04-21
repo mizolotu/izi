@@ -39,7 +39,7 @@ sudo apt install libpcap-dev tcpreplay wireshark qemu-kvm libvirt-daemon-system 
 5. Install python packages with sudo user:  
 
 ```bash
-sudo pip install pypcap kaitaistruct numpy pandas sklearn scipy tensorflow tflite-runtime python-vagrant paramiko plotly flask requests cloudpickle opencv-python lxml dicttoxml
+sudo pip3 install pypcap kaitaistruct numpy pandas sklearn scipy tensorflow python-vagrant paramiko plotly psutil flask requests cloudpickle opencv-python lxml dicttoxml scapy
 ```
 6. Install tflite runtime:
 
@@ -62,10 +62,10 @@ sudo cp /path/to/orca-X.Y.Z-x86_64.AppImage /usr/bin/orca
 python3 split_data.py 
 ```
 
-2. Create datasets:
+2. Create datasets using different sampling interval, e.g. 0.5, 1, 2, etc:
 
 ```bash
-python3 create_datasets.py
+python3 create_datasets.py -s <sampling interval>
 ```
 
 This may take some time, depending on the amount of the data and your computational power.
@@ -76,7 +76,7 @@ This may take some time, depending on the amount of the data and your computatio
 python3 train_classifiers.py -a <attack label> -s <sampling interval>
 ```
 
-For correct attack labels, check parameter ```labels``` in file ```data/features/metainfo.json```. You should train at least one classifier for each attack label. Sampling interval is one of the following values: 1, 2, 4, 8 or 16. You can also change type of the model, its number of layers and number of neurons in each layer. You can implement more model types, e.g. anomaly detection models, models with attention and recurrent layers, etc.
+For correct attack labels, check parameter ```labels``` in file ```data/features/metainfo.json```. You should train at least one classifier for each attack label. Sampling interval is one of the values you used for dataset generation. You can also change type of the model, its number of layers and number of neurons in each layer. You can implement more model types, e.g. anomaly detection models, models with attention and recurrent layers, etc.
 
 4. You can plot results with
 
@@ -94,13 +94,15 @@ ROC curves will be saved in ```figures/roc``` directory.
 
 ## Create environment
 
-1. Download SDN controller and convert tensorflow models into tflite format:
+1. If needed, modify values ```nenvs``` (number of environments) and ```nids``` (number of security middle boxes in an environment) in file ```config.py```. Minimum values are correspondingly 1 and 1, maximum depend on the amount of computational and memory resources you have. 
+
+2. Prepare all resources needed for the environment:
 
 ```bash
 python3 prepare_sources.py
 ```
 
-2. Create VMs (this will not generate any output, so if there is an error, you will never know): 
+3. Create VMs (this will not generate any output, so if there is an error, you will never know): 
 
 ```bash
 sudo python3 create_vms.py
@@ -113,42 +115,50 @@ sudo vagrant up <vm name>
 This will provide more debug information. VM names can be found in ```Vagrantfile```: odl, ovs_0, etc. Once all VMs are created, you still have to run:
 
 ```bash
-sudo python3 create_vms.py
+sudo python3 create_vms.py -p False
 ```
 
 to collect necessary information about VM ips, keys, etc. VM provision will be omitted. 
 
-3. Connect VMs with VXLAN tunnels: 
+4. Create veth pairs and connect VMs with VXLAN tunnels: 
 
 ```bash
-sudo python3 connect_switches.py
+sudo python3 connect_vms.py
 ```
 
-4. Calculate probabilities for sampling certain traffic files depending on the attack scenario:
+5. Calculate probabilities for sampling certain traffic files depending on the attack scenario:
 
 ```bash
-python3 calculate_probabilities.py
+python3 calculate_frequencies.py
 ```
 
 ## Train and evaluate RL-agent
 
-1. Find parameter ```traffic_generation_ifaces``` in ```config.py``` and modify the interface names to the ones corresponding to your setup. For example, you can find the interface name corresponding to IP address 100.0.0.1 as follows:
-
-```bash
-ip a | grep 100.0.0.1 
-```
-
-Those IP addresses can be calculated by taking IP address of the second interface of a switch from ```Vagrantfile``` and substituting the last number with ```1```, e.g. since ovs_0's IP address is 100.0.0.2, the traffic generation interface would be 100.0.0.1, etc. You can write a script to get those addresses automatically.
-
-2. Start training an RL agent:
+1. Start training an RL agent:
 
 ```bash
 sudo python3 train_agent.py
 ```
+
 or continue training the agent for a saved checkpoint:
+
 ```bash
 sudo python3 train_agent.py -c <path_to_checkpoint_file>
 ```
+
+2. Evaluate the policy trained with RL:
+
+```bash
+sudo python3 test_agent.py -c <path_to_checkpoint_file>
+```
+
+or some manually defined policy:
+
+```bash
+sudo python3 test_agent.py -p <manual_policy>
+```
+
+An example of such manual policy in the environment with only one IDS is to mirror all the traffic to the IDS and block all traffic sources that generate alerts: 0,1,2,3,4,5,6,7,8,9,10,11,54;24,25,26,27,28,29,30,31,32,33,34,35.
 
 3. Plot the results:
 
