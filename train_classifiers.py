@@ -18,7 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
     parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
     parser.add_argument('-a', '--attack', help='Attack label', default=0, type=int)
-    parser.add_argument('-s', '--step', help='Polling step', default='1')
+    parser.add_argument('-s', '--step', help='Polling step', default='1.0')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
 
     args = parser.parse_args()
