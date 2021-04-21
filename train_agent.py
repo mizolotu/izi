@@ -18,9 +18,13 @@ def make_env(env_class, *args):
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train RL agent.')
+    parser.add_argument('-n', '--nenvs', help='Number of environments', type=int)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     args = parser.parse_args()
+
+    if args.nenvs is not None:
+        nenvs = args.nenvs
 
     meta = load_meta(feature_dir)
     labels = sorted(meta['labels'])
@@ -41,6 +45,8 @@ if __name__ == '__main__':
     logdir = '{0}/{1}/{2}'.format(rl_results_dir, env_class.__name__, algorithm.__name__)
     format_strs = os.getenv('', 'stdout,log,csv').split(',')
     logger.configure(os.path.abspath(logdir), format_strs)
+
+    # create environments
 
     env_fns = [make_env(env_class, env_idx, next(attack_indexes), args.augment) for env_idx in range(nenvs)]
     env = SubprocVecEnv(env_fns)
