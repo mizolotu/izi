@@ -36,7 +36,7 @@ class AttackMitigationEnv():
 
         # debug
 
-        self.debug = False
+        self.debug = True
 
         # load logs
 
