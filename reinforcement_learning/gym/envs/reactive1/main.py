@@ -555,6 +555,7 @@ class AttackMitigationEnv():
     def step(self, action):
 
         # take an action and measure time
+
         t0 = time()
         if self.default_step_actions is not None:
             for action in self.default_step_actions:
@@ -566,6 +567,8 @@ class AttackMitigationEnv():
         tnow = time()
         if (tnow - self.tstep) < self.step_duration:
             sleep(self.step_duration - (tnow - self.tstep))
+            if self.debug:
+                print(f'Sleeping for {self.step_duration - (tnow - self.tstep)} seconds')
         self.tstep = time()
 
         # obs
