@@ -4,8 +4,9 @@ from reinforcement_learning import gym
 import numpy as np
 import tensorflow as tf
 
-from reinforcement_learning import logger
+from threading import Thread
 
+from reinforcement_learning import logger
 from reinforcement_learning.common import explained_variance, ActorCriticRLModel, tf_util, SetVerbosity, TensorboardWriter
 from reinforcement_learning.common.runners import AbstractEnvRunner
 from reinforcement_learning.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
@@ -478,7 +479,145 @@ class Runner(AbstractEnvRunner):
         self.lam = lam
         self.gamma = gamma
 
+    def _run_one(self, env_idx):
+
+        tstart = time.time()
+
+        for _ in range(self.n_steps):
+
+            # step model
+
+            actions, values, self.states, neglogpacs = self.model.step(self.obs[env_idx:env_idx + 1], self.states, self.dones[env_idx:env_idx + 1])
+
+            # save results
+
+            self.mb_obs[env_idx].append(self.obs.copy()[env_idx])
+            self.mb_actions[env_idx].append(actions[0])
+            self.mb_values[env_idx].append(values[0])
+            self.mb_neglogpacs[env_idx].append(neglogpacs[0])
+            self.mb_dones[env_idx].append(self.dones[env_idx])
+
+            # Clip the actions to avoid out of bound error
+
+            clipped_actions = actions
+            if isinstance(self.env.action_space, gym.spaces.Box):
+                clipped_actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
+
+            tnow = time()
+
+            self.obs[env_idx], rewards, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
+
+            self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
+
+            self.model.num_timesteps += 1
+
+            if self.callback is not None:
+
+                # Abort training early
+
+                self.callback.update_locals(locals())
+                if self.callback.on_step() is False:
+                    self.continue_training = False
+
+                    # Return dummy values
+
+                    return [None] * 9
+
+            self.mb_rewards[env_idx].append(rewards)
+
+        print(f'Step time in {env_idx}: {(time.time() - tstart) / self.n_steps}')
+
     def _run(self):
+        """
+        Run a learning step of the model
+
+        :return:
+            - observations: (np.ndarray) the observations
+            - rewards: (np.ndarray) the rewards
+            - masks: (numpy bool) whether an episode is over or not
+            - actions: (np.ndarray) the actions
+            - values: (np.ndarray) the value function output
+            - negative log probabilities: (np.ndarray)
+            - states: (np.ndarray) the internal states of the recurrent policies
+            - infos: (dict) the extra information of the model
+        """
+        # mb stands for minibatch
+
+        self.mb_obs = [[] for _ in range(self.n_envs)]
+        self.mb_actions = [[] for _ in range(self.n_envs)]
+        self.mb_values = [[] for _ in range(self.n_envs)]
+        self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
+        self.mb_dones = [[] for _ in range(self.n_envs)]
+        self.mb_rewards = [[] for _ in range(self.n_envs)]
+
+        ep_infos = []
+
+        self.obs[:] = self.env.reset()
+
+        # run steps in different threads
+
+        threads = []
+        for env_idx in range(self.n_envs):
+            th = Thread(target=self._run_one, args=(env_idx,))
+            th.start()
+            threads.append(th)
+        for th in threads:
+            th.join()
+
+        # combine data gathered into batches
+
+        mb_obs = [np.vstack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_actions = [np.vstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_scores = [np.vstack([self.scores[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_states = self.states
+        self.dones = np.array(self.dones)
+
+        for scores_in_env in mb_scores:
+            maybe_ep_info = {
+                'r': np.mean(scores_in_env[:, 0]),
+                'n': np.mean(scores_in_env[:, 1]),
+                'a': np.mean(scores_in_env[:, 2]),
+                'p': np.mean(scores_in_env[:, 3])
+            }
+            ep_infos.append(maybe_ep_info)
+
+        # batch of steps to batch of rollouts
+
+        mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
+        mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
+        mb_actions = np.asarray(mb_actions)
+        mb_values = np.asarray(mb_values, dtype=np.float32)
+        mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
+        mb_dones = np.asarray(mb_dones, dtype=np.bool)
+        last_values = self.model.value(self.obs, self.states, self.dones)
+
+        # discount/bootstrap off value fn
+
+        mb_advs = np.zeros_like(mb_rewards)
+        true_reward = np.copy(mb_rewards)
+        last_gae_lam = 0
+        for step in reversed(range(self.n_steps)):
+            if step == self.n_steps - 1:
+                nextnonterminal = 1.0 - self.dones
+                nextvalues = last_values
+            else:
+                nextnonterminal = 1.0 - mb_dones[step + 1]
+                nextvalues = mb_values[step + 1]
+            delta = mb_rewards[step] + self.gamma * nextvalues * nextnonterminal - mb_values[step]
+            mb_advs[step] = last_gae_lam = delta + self.gamma * self.lam * nextnonterminal * last_gae_lam
+        mb_returns = mb_advs + mb_values
+
+        mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward = map(
+            swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward)
+        )
+
+        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, mb_states, ep_infos, true_reward
+
+    def _run_(self):
         """
         Run a learning step of the model
 
