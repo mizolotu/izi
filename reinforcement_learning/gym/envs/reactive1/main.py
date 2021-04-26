@@ -64,7 +64,6 @@ class AttackMitigationEnv():
         ovs_vms = [vm for vm in self.vms if vm['role'] == 'ovs' and int(vm['vm'].split('_')[1]) == self.id]
         assert len(ovs_vms) == 1
         self.ovs_vm = ovs_vms[0]
-        print(self.id, self.ovs_vm)
         self.ovs_node = self.nodes[self.ovs_vm['vm']]
         set_seed(self.ovs_vm['mgmt'], flask_port, self.seed)
 
@@ -463,7 +462,7 @@ class AttackMitigationEnv():
 
     def reset(self, sleep_duration=3):
 
-        print(f'Max obs time: {self.max_obs_time}')
+        print(f'Max obs time in {self.id}: {self.max_obs_time}')
 
         # end of the episode
 
