@@ -580,7 +580,7 @@ class AttackMitigationEnv():
         if self.debug:
             print('take action', time() - t0)
         tnow = time()
-        if (tnow - self.tsstart) < self.step_duration * self.step_count:
+        if (tnow - self.tstart) < self.step_duration * self.step_count:
             sleep(self.step_duration * self.step_count - (tnow - self.tstart))
             if self.debug:
                 print(f'Sleeping for {self.step_duration - (tnow - self.tstep)} seconds')
