@@ -27,11 +27,12 @@ if __name__ == '__main__':
 
     # preparare vagrant file
 
-    vms, ips, sources, scripts, mounts = [], [], [], [], []
+    vms, cpus, ips, sources, scripts, mounts = [], [], [], [], [], []
 
     # add controller
 
     vms.append('odl')
+    cpus.append(ctrl_cpus)
     ips.append(ctrl_ips)
     sources.append(ctrl_sources)
     scripts.append(ctrl_script)
@@ -42,6 +43,7 @@ if __name__ == '__main__':
     ips_i = ovs_ips
     for i in range(nenvs):
         vms.append(f'ovs_{i}')
+        cpus.append(ovs_cpus)
         ips.append(ips_i)
         sources.append(ovs_sources)
         scripts.append(ovs_script)
@@ -54,6 +56,7 @@ if __name__ == '__main__':
     for i in range(nenvs):
         for j in range(nidss):
             vms.append(f'ids_{i}_{j}')
+            cpus.append(ids_cpus)
             ips.append(ips_i)
             sources.append(ids_sources)
             scripts.append(ids_script)
@@ -61,7 +64,7 @@ if __name__ == '__main__':
             ips_i = increment_ips(ips_i)
 
     vagrant_file_lines = vagrantfile_provider(mgmt_network=mgmt_network, storage_pool_name=args.storage)
-    vagrant_file_lines.extend(vagrantfile_vms(vms, ips, sources, scripts, mounts))
+    vagrant_file_lines.extend(vagrantfile_vms(vms, cpus, ips, sources, scripts, mounts))
     vagrant_file_lines.extend(vagrantfile_end())
     with open('Vagrantfile', 'w') as f:
         f.writelines(vagrant_file_lines)

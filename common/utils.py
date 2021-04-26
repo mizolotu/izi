@@ -15,14 +15,18 @@ def vagrantfile_provider(mgmt_network='192.168.122.0/24', storage_pool_name=None
     lines.append("  end\n\n")
     return lines
 
-def vagrantfile_vms(names, ips, sources, scripts, mounts):
+def vagrantfile_vms(names, cpus, ips, sources, scripts, mounts):
+    assert len(names) == len(cpus)
     assert len(names) == len(ips)
     assert len(names) == len(scripts)
     assert len(names) == len(mounts)
     lines = []
-    for name, ip_list, source_list, script, mount in zip(names, ips, sources, scripts, mounts):
+    for name, ncpus, ip_list, source_list, script, mount in zip(names, cpus, ips, sources, scripts, mounts):
         lines.append(f"  config.vm.define '{name}', primary: true do |{name}|\n")
         lines.append(f"    {name}.vm.box = 'generic/ubuntu1804'\n")
+        lines.append(f"    {name}.vm.provider: libvirt do |v|\n")
+        lines.append(f"      v.cpus = {ncpus}\n")
+        lines.append("    end\n")
         for ip in ip_list:
             lines.append(f"    {name}.vm.network :private_network, :ip => '{ip}'\n")
         for source in source_list:
