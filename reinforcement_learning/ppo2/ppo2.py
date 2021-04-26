@@ -587,10 +587,10 @@ class Runner(AbstractEnvRunner):
 
         for scores_in_env in mb_scores:
             maybe_ep_info = {
-                'r': np.mean(scores_in_env[:, 0]),
-                'n': np.mean(scores_in_env[:, 1]),
-                'a': np.mean(scores_in_env[:, 2]),
-                'p': np.mean(scores_in_env[:, 3])
+                'r': safe_mean(scores_in_env[:, 0]),
+                'n': safe_mean(scores_in_env[:, 1]),
+                'a': safe_mean(scores_in_env[:, 2]),
+                'p': safe_mean(scores_in_env[:, 3])
             }
             ep_infos.append(maybe_ep_info)
 
