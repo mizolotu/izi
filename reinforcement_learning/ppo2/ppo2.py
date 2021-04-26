@@ -479,6 +479,14 @@ class Runner(AbstractEnvRunner):
         self.lam = lam
         self.gamma = gamma
 
+        self.mb_obs = [[] for _ in range(self.n_envs)]
+        self.mb_actions = [[] for _ in range(self.n_envs)]
+        self.mb_values = [[] for _ in range(self.n_envs)]
+        self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
+        self.mb_dones = [[] for _ in range(self.n_envs)]
+        self.mb_rewards = [[] for _ in range(self.n_envs)]
+        self.scores = [[] for _ in range(self.n_envs)]
+
     def _run_one(self, env_idx):
 
         tstart = time.time()
@@ -549,6 +557,7 @@ class Runner(AbstractEnvRunner):
         self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
         self.mb_dones = [[] for _ in range(self.n_envs)]
         self.mb_rewards = [[] for _ in range(self.n_envs)]
+        self.scores = [[] for _ in range(self.n_envs)]
 
         ep_infos = []
 
