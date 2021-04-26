@@ -14,6 +14,16 @@ def get_flow_samples(flow_collector_ip, flow_collector_port, flow_window):
     in_samples, out_samples = requests.get(url, json={'window': flow_window}).json()
     return in_samples, out_samples
 
+def reset_flow_collector(ovs_ip, ovs_port, sleep_interval=0.1):
+    uri = f'http://{ovs_ip}:{ovs_port}/reset'
+    ready = False
+    while not ready:
+        try:
+            requests.get(uri)
+            ready = True
+        except:
+            sleep(sleep_interval)
+
 if __name__ == '__main__':
 
     # params

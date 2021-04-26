@@ -14,7 +14,7 @@ from threading import Thread
 from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples
+from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples, reset_flow_collector
 from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions, get_vnf_param
 from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, replay_ip_traffic_on_interface
 
@@ -469,6 +469,10 @@ class AttackMitigationEnv():
         tnow = time()
         if self.tstart is not None:
             print('Episode duration: {0}'.format(tnow - self.tstart))
+
+        # reset flow collector
+
+        reset_flow_collector(self.ovs_vm['mgmt'], flask_port)
 
         # reset ids
 
