@@ -74,6 +74,7 @@ class SubprocVecEnv(VecEnv):
 
     def __init__(self, env_fns, start_method=None):
         self.waiting = False
+        self.waiting_one = [False for _ in env_fns]
         self.closed = False
         n_envs = len(env_fns)
 
