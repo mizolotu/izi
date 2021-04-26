@@ -599,6 +599,7 @@ class Runner(AbstractEnvRunner):
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
         mb_actions = np.asarray(mb_actions)
+        print(mb_actions)
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
         mb_dones = np.asarray(mb_dones, dtype=np.bool)
@@ -623,6 +624,16 @@ class Runner(AbstractEnvRunner):
         mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward = map(
             swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward)
         )
+
+        # reset data
+
+        self.mb_obs = [[] for _ in range(self.n_envs)]
+        self.mb_actions = [[] for _ in range(self.n_envs)]
+        self.mb_values = [[] for _ in range(self.n_envs)]
+        self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
+        self.mb_dones = [[] for _ in range(self.n_envs)]
+        self.mb_rewards = [[] for _ in range(self.n_envs)]
+        self.scores = [[] for _ in range(self.n_envs)]
 
         return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, mb_states, ep_infos, true_reward
 
