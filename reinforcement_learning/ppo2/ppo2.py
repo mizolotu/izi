@@ -501,6 +501,7 @@ class Runner(AbstractEnvRunner):
 
             self.mb_obs[env_idx].append(self.obs.copy()[env_idx])
             self.mb_actions[env_idx].append(actions[0])
+            print(self.mb_actions)
             self.mb_values[env_idx].append(values[0])
             self.mb_neglogpacs[env_idx].append(neglogpacs[0])
             self.mb_dones[env_idx].append(self.dones[env_idx])
