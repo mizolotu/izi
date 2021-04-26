@@ -485,6 +485,8 @@ class Runner(AbstractEnvRunner):
 
         for _ in range(self.n_steps):
 
+            print(_)
+
             # step model
 
             actions, values, self.states, neglogpacs = self.model.step(self.obs[env_idx:env_idx + 1], self.states, self.dones[env_idx:env_idx + 1])
