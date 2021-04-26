@@ -36,7 +36,8 @@ class AttackMitigationEnv():
 
         # debug
 
-        self.debug = True
+        self.debug = False
+        self.max_obs_time = 0
 
         # load logs
 
@@ -462,6 +463,8 @@ class AttackMitigationEnv():
 
     def reset(self, sleep_duration=3):
 
+        print(f'Max obs time: {self.max_obs_time}')
+
         # end of the episode
 
         tnow = time()
@@ -578,6 +581,8 @@ class AttackMitigationEnv():
         in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
         if self.debug:
             print('get obs', time() - t0)
+        if time() - t0 > self.max_obs_time:
+            self.max_obs_time = time() - t0
         in_samples_by_app = self._process_app_samples(in_samples)
         out_samples_by_app = self._process_app_samples(out_samples)
         processed_counts = []
