@@ -110,6 +110,20 @@ class SubprocVecEnv(VecEnv):
         obs, rews, dones, infos = zip(*results)
         return _flatten_obs(obs, self.observation_space), np.stack(rews), np.stack(dones), infos
 
+    def step_one(self, env_idx, action):
+        self.step_async_one(env_idx, action[0])
+        return self.step_wait_one(env_idx)
+
+    def step_async_one(self, env_idx, action):
+        self.remotes[env_idx].send(('step', action))
+        self.waiting_one[env_idx] = True
+
+    def step_wait_one(self, env_idx):
+        results = self.remotes[env_idx].recv()
+        self.waiting_one[env_idx] = False
+        obs, rew, done, info = results
+        return _flatten_obs([obs], self.observation_space)[0], rew, done, info
+
     def seed(self, seed=None):
         for idx, remote in enumerate(self.remotes):
             remote.send(('seed', seed + idx))
