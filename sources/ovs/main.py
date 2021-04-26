@@ -125,7 +125,7 @@ class FlowCollector():
         ready = False
         while not ready:
             try:
-                sniffer = pcap.pcap(name=iface, timeout_ms=10)
+                sniffer = pcap.pcap(name=iface)
                 ready = True
                 while True:
                     ts, raw = next(sniffer)

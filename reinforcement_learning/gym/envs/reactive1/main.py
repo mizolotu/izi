@@ -470,6 +470,10 @@ class AttackMitigationEnv():
         if self.tstart is not None:
             print('Episode duration: {0}'.format(tnow - self.tstart))
 
+        # step count
+
+        self.step_count = 0
+
         # reset flow collector
 
         reset_flow_collector(self.ovs_vm['mgmt'], flask_port)
@@ -561,6 +565,10 @@ class AttackMitigationEnv():
 
     def step(self, action):
 
+        # step count
+
+        self.step_count += 1
+
         # take an action and measure time
 
         t0 = time()
@@ -572,8 +580,8 @@ class AttackMitigationEnv():
         if self.debug:
             print('take action', time() - t0)
         tnow = time()
-        if (tnow - self.tstep) < self.step_duration:
-            sleep(self.step_duration - (tnow - self.tstep))
+        if (tnow - self.tsstart) < self.step_duration * self.step_count:
+            sleep(self.step_duration * self.step_count - (tnow - self.tstart))
             if self.debug:
                 print(f'Sleeping for {self.step_duration - (tnow - self.tstep)} seconds')
         self.tstep = time()
