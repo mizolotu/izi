@@ -6,6 +6,8 @@ from datetime import datetime
 from socket import inet_ntop, AF_INET
 from kaitaistruct import KaitaiStream, BytesIO
 from common.pcap import EthernetFrame
+from scapy.all import rdpcap, wrpcap, Ether, IP, TCP, UDP, Raw, Padding
+from collections import deque
 
 def find_data_files(dir):
     data_files = []
@@ -611,3 +613,69 @@ def count_labels(input, output, labels, labeler):
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(e, fname, exc_tb.tb_lineno)
     return counts
+
+def add_load_to_pkt(pkt, alpha):
+    if pkt.haslayer(Raw):
+        load = pkt[Raw].load
+        l = len(load)
+        n = np.random.randint(alpha * l)
+        pad = Padding()
+        pad.load = '\x00' * n
+        pkt = pkt/pad
+        del pkt[IP].len
+        del pkt[IP].chksum
+        if pkt.haslayer(TCP):
+            del pkt[TCP].chksum
+        elif pkt.haslayer(UDP):
+            del pkt[UDP].chksum
+            del pkt[UDP].len
+        t = pkt.time
+        pkt = Ether(pkt.build())
+        pkt.time = t
+    return pkt
+
+def add_time_to_pkt(last_two_pkts, new_pkt):
+    if new_pkt.haslayer(TCP) or new_pkt.haslayer(UDP):
+        second_last_pkt = last_two_pkts[0]
+        last_pkt = last_two_pkts[1]
+        if new_pkt.time > second_last_pkt.time:
+            iat = new_pkt.time - second_last_pkt.time
+            dt = np.random.rand() * iat
+            last_pkt.time = second_last_pkt.time + dt
+    return second_last_pkt, last_pkt
+
+def augment_pcap_file(input_fpath, output_fpath, alpha=1):
+    pkts = rdpcap(input_fpath)
+    flows = []
+    flow_last_two_packets = []
+    mods = []
+    for pkt in pkts:
+        if pkt.haslayer(IP):
+            if pkt.haslayer(TCP) or pkt.haslayer(UDP):
+                ip = pkt[IP]
+                src_ip = ip.src
+                dst_ip = ip.dst
+                src_port = ip.sport
+                dst_port = ip.dport
+                proto = ip.proto
+                if [src_ip, src_port, dst_ip, dst_port, proto] in flows:
+                    idx = flows.index([src_ip, src_port, dst_ip, dst_port, proto])
+                elif [dst_ip, dst_port, src_ip, src_port, proto] in flows:
+                    idx = flows.index([dst_ip, dst_port, src_ip, src_port, proto])
+                else:
+                    flows.append([src_ip, src_port, dst_ip, dst_port, proto])
+                    flow_last_two_packets.append(deque(maxlen=2))
+                    idx = -1
+                pkt = add_load_to_pkt(pkt, alpha)
+                if len(flow_last_two_packets[idx]) == 2:
+                    pkt0, pkt1 = add_time_to_pkt(flow_last_two_packets[idx], pkt)
+                    flow_last_two_packets[idx].append(pkt0)
+                    flow_last_two_packets[idx].append(pkt1)
+                    mods.append(flow_last_two_packets[idx][0])
+                flow_last_two_packets[idx].append(pkt)
+            else:
+                mods.append(pkt)
+    for item_list in flow_last_two_packets:
+        for item in item_list:
+            mods.append(item)
+    wrpcap(output_fpath, mods)

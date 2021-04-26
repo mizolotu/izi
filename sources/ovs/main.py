@@ -101,9 +101,7 @@ def samples():
 
 @app.route('/reset')
 def reset():
-    data = request.data.decode('utf-8')
-    jdata = json.loads(data)
-    flow_collector.clear_queues(jdata['ip'])
+    flow_collector.clear_queues()
     return jsonify('ok')
 
 class FlowCollector():
