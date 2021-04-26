@@ -575,8 +575,6 @@ class Runner(AbstractEnvRunner):
 
         # combine data gathered into batches
 
-        print(self.mb_obs[0][0])
-
         mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_actions = [np.vstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
