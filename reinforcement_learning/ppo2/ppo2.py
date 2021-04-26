@@ -496,7 +496,6 @@ class Runner(AbstractEnvRunner):
             # step model
 
             actions, values, self.states, neglogpacs = self.model.step(self.obs[env_idx:env_idx + 1], self.states, self.dones[env_idx:env_idx + 1])
-            print(actions)
 
             # save results
 
@@ -579,6 +578,8 @@ class Runner(AbstractEnvRunner):
         mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_actions = [np.vstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        print(self.mb_actions[0][0])
+        print(mb_actions)
         mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
