@@ -501,7 +501,6 @@ class Runner(AbstractEnvRunner):
 
             self.mb_obs[env_idx].append(self.obs.copy()[env_idx])
             self.mb_actions[env_idx].append(actions[0])
-            print(self.mb_actions)
             self.mb_values[env_idx].append(values[0])
             self.mb_neglogpacs[env_idx].append(neglogpacs[0])
             self.mb_dones[env_idx].append(self.dones[env_idx])
@@ -578,7 +577,7 @@ class Runner(AbstractEnvRunner):
 
         mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_actions = [np.vstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         print(self.mb_actions[0][0])
         print(mb_actions)
         mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
