@@ -24,7 +24,7 @@ def vagrantfile_vms(names, cpus, ips, sources, scripts, mounts):
     for name, ncpus, ip_list, source_list, script, mount in zip(names, cpus, ips, sources, scripts, mounts):
         lines.append(f"  config.vm.define '{name}', primary: true do |{name}|\n")
         lines.append(f"    {name}.vm.box = 'generic/ubuntu1804'\n")
-        lines.append(f"    {name}.vm.provider: libvirt do |v|\n")
+        lines.append(f"    {name}.vm.provider :libvirt do |v|\n")
         lines.append(f"      v.cpus = {ncpus}\n")
         lines.append("    end\n")
         for ip in ip_list:
