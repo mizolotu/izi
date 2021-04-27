@@ -331,6 +331,7 @@ class AttackMitigationEnv():
             action_fun = mirror_app_to_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], priorities['medium'], app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
             on_off_idx_and_value = (app_idx, ids_idx, 1)
+            queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions:
             action_array = np.zeros(self.n_unmirror_app_actions)
             action_array[i - self.n_mirror_app_actions] = 1
@@ -342,6 +343,7 @@ class AttackMitigationEnv():
             action_fun = unmirror_app_from_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_idx], app)
             on_off_idx_and_value = (app_idx, ids_idx, 0)
+            queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions:
             e = np.eye(self.n_ids)
             action_array = np.zeros(self.n_mirror_int_actions)
@@ -362,6 +364,7 @@ class AttackMitigationEnv():
             action_fun = mirror_ip_app_to_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
             on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 1)
+            queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions:
             e = np.eye(self.n_ids)
             action_array = np.zeros(self.n_mirror_int_actions)
@@ -381,6 +384,7 @@ class AttackMitigationEnv():
             action_fun = unmirror_ip_app_from_ids
             args = (self.controller, self.ovs_node, ids_tables[ids_to], ips, app)
             on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 0)
+            queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions:
             action_array = np.zeros(self.n_block_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions] = 1
@@ -405,6 +409,7 @@ class AttackMitigationEnv():
                     for ip in ips:
                         print('Blocking {0}:{1}:all in {2}'.format(app[0], ip, self.id))
             on_off_idx_and_value = (app_idx, self.n_ids ** 2 + ids_idx, 1)
+            queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions:
             action_array = np.zeros(self.n_unblock_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions] = 1
@@ -422,6 +427,7 @@ class AttackMitigationEnv():
             action_fun = unblock_ip_app
             args = (self.controller, self.ovs_node, block_table, ips, app)
             on_off_idx_and_value = (app_idx, self.n_ids ** 2 + ids_idx, 0)
+            queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions:
             action_array = np.zeros(self.n_ids_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions - self.n_unblock_actions] = 1
@@ -439,15 +445,20 @@ class AttackMitigationEnv():
             action_fun = set_vnf_param
             args = (ids_ip, flask_port, param, value)
             on_off_idx_and_value = None
+            queue_the_action = False
         else:
             action_fun = lambda *args: None
             args = ()
             on_off_idx_and_value = None
-        return action_fun, args, on_off_idx_and_value
+            queue_the_action = False
+        return action_fun, args, on_off_idx_and_value, queue_the_action
 
     def _take_action(self, i):
-        func, args, on_off_idx_and_value = self._action_mapper(i)
-        self.actions_queue.appendleft((func, args))
+        func, args, on_off_idx_and_value, queue_the_action = self._action_mapper(i)
+        if queue_the_action:
+            self.actions_queue.appendleft((func, args))
+        else:
+            func(*args)
         if on_off_idx_and_value is not None:
             app_i, j, val = on_off_idx_and_value
             self.on_off_frame[app_i, j] = val
