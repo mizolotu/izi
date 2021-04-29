@@ -8,13 +8,13 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, classification_mapper, load_meta
+from common.ml import set_seeds, load_batches, anomaly_detection_mapper, load_meta
 from config import *
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='mlp')
+    parser.add_argument('-m', '--model', help='Model', default='ae')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
     parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
     parser.add_argument('-a', '--attack', help='Attack label, 0 corresponds to all data', default=0, type=int)
@@ -67,17 +67,19 @@ if __name__ == '__main__':
                 osp.join(feature_dir, '0'),
                 osp.join(feature_dir, str(int(label))),
             ]
+        else:
+            fpaths_label[label] = [osp.join(feature_dir, str(int(label))) for label in labels]
 
     # create output directories
 
-    if not osp.isdir(classfier_models_dir):
-        os.mkdir(classfier_models_dir)
+    if not osp.isdir(anomaly_detector_models_dir):
+        os.mkdir(anomaly_detector_models_dir)
 
-    models_path = osp.join(classfier_models_dir, 'checkpoints')
+    models_path = osp.join(anomaly_detector_models_dir, 'checkpoints')
     if not osp.isdir(models_path):
         os.mkdir(models_path)
 
-    results_path = osp.join(classfier_models_dir, 'results')
+    results_path = osp.join(anomaly_detector_models_dir, 'results')
     if not osp.isdir(results_path):
         os.mkdir(results_path)
 
@@ -91,13 +93,11 @@ if __name__ == '__main__':
     # input fpath
 
     fpaths_star = {}
-    for stage in ['train', 'validate']:
-        fpaths_star[stage] = [osp.join(fpath, '*_{0}_{1}'.format(args.step, stage)) for fpath in fpaths]
-
+    fpaths_star['train'] = [osp.join(fpaths[0], '*_{0}_{1}'.format(args.step, 'train'))]
+    fpaths_star['validate'] = [osp.join(fpath, '*_{0}_{1}'.format(args.step, 'validate')) for fpath in fpaths]
     fpaths_star['test'] = {}
     for label in labels:
-        if label > 0:
-            fpaths_star['test'][label] = [osp.join(fpath, '*_{0}_test'.format(args.step)) for fpath in fpaths_label[label]]
+        fpaths_star['test'][label] = [osp.join(fpath, f'*_{args.step}_test') for fpath in fpaths_label[label]]
 
     # meta
 
@@ -107,36 +107,44 @@ if __name__ == '__main__':
 
     # mappers
 
-    cl_mapper = lambda x,y: classification_mapper(x, y, xmin=xmin, xmax=xmax)
+    ad_mapper = lambda x, y: anomaly_detection_mapper(x, y, xmin=xmin, xmax=xmax)
 
     batches = {}
-    for stage in ['train', 'validate', 'test']:
-        if stage == 'test':
-            batches['test'] = {}
-            for label in labels:
-                if label > 0:
-                    batches_ = [load_batches(fp, batch_size, nfeatures).map(cl_mapper) for fp in fpaths_star[stage][label]]
-                    batches[stage][label] = tf.data.experimental.sample_from_datasets([batches_[0], batches_[1]], [0.5, 0.5]).unbatch().shuffle(batch_size * 2).batch(batch_size)
-                    if num_batches[stage] is not None:
-                        batches[stage][label] = batches[stage][label].take(num_batches[stage])
-        else:
-            batches_ = [load_batches(fp, bs, nfeatures).map(cl_mapper) for fp, bs in zip(fpaths_star[stage], batch_sizes)]
-            batches[stage] = tf.data.experimental.sample_from_datasets(batches_, [0.5] + [0.5 / (len(labels) - 1) for _ in labels[1:]]).unbatch().shuffle(batch_size * 2).batch(batch_size)
-            if num_batches[stage] is not None:
-                batches[stage] = batches[stage].take(num_batches[stage])
+
+    batches_ = [load_batches(fp, bs, nfeatures).map(ad_mapper) for fp, bs in zip(fpaths_star['train'], batch_sizes)]
+    batches['train'] = tf.data.experimental.sample_from_datasets(batches_, [1.0]).unbatch().shuffle(batch_size * 2).batch(batch_size)
+    if num_batches['train'] is not None:
+        batches['train'] = batches['train'].take(num_batches['train'])
+
+    batches_ = [load_batches(fp, bs, nfeatures).map(ad_mapper) for fp, bs in zip(fpaths_star['validate'], batch_sizes)]
+    batches['validate'] = tf.data.experimental.sample_from_datasets(batches_, [0.5] + [0.5 / (len(labels) - 1) for _ in labels[1:]]).unbatch().shuffle(batch_size * 2).batch(batch_size)
+    if num_batches['validate'] is not None:
+        batches['validate'] = batches['validate'].take(num_batches['validate'])
+
+    batches['test'] = {}
+    for label in labels:
+        if label > 0:
+            batches_ = [load_batches(fp, batch_size, nfeatures).map(ad_mapper) for fp in fpaths_star['test'][label]]
+            batches['test'][label] = tf.data.experimental.sample_from_datasets([batches_[0], batches_[1]], [0.5, 0.5]).unbatch().shuffle(batch_size * 2).batch(batch_size)
+            if num_batches['test'] is not None:
+                batches['test'][label] = batches['test'][label].take(num_batches['test'])
 
     model_type = getattr(models, args.model)
     model, model_name = model_type(nfeatures, args.layers, args.neurons)
     print('Training {0}'.format(model_name))
     model.summary()
 
-    # create model and results directories
+    # create model checkpoint directories
 
-    m_path = osp.join(models_path, '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
+    m_path = osp.join(models_path, f'{model_name}_{args.step}')
     if not osp.isdir(m_path):
         os.mkdir(m_path)
 
     # fit the model
+
+    for x, y in batches['train']:
+        print(x.shape, y.shape)
+        break
 
     model.fit(
         batches['train'],
@@ -144,7 +152,7 @@ if __name__ == '__main__':
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
         callbacks=[tf.keras.callbacks.EarlyStopping(
-            monitor='val_precision',
+            monitor='val_pre',
             verbose=0,
             patience=patience,
             mode='max',
@@ -152,7 +160,19 @@ if __name__ == '__main__':
         )]
     )
 
+    errors = []
+    testy = []
+    for x, y in batches['validate']:
+        reconstructions = model.predict(x)
+        errors = np.concatenate([errors, np.linalg.norm(reconstructions - y[:, :-1], axis=1)])
+        testy = np.concatenate([testy, y[:, -1]])
+
+    thr = np.mean(errors) + 3 * np.std(errors)
+    print(thr)
+
     model.save(m_path)
+    with open(osp.join(m_path, 'error.thr'), 'w') as f:
+        f.write(str(thr))
 
     # predict and calculate inference statistics
 
@@ -161,16 +181,15 @@ if __name__ == '__main__':
             t_test = 0
             probs = []
             testy = []
-            categorical = []
             for x, y in batches['test'][label]:
+                y_labels = np.clip(y[:, -1], 0, 1)
                 t_now = time()
-                predictions = model.predict(x)
-                probs = np.hstack([probs, predictions[:, 0]])
-                testy = np.hstack([testy, y])
+                reconstructions = model.predict(x)
+                probs = np.hstack([probs, np.linalg.norm(reconstructions - x, axis=1)])
+                testy = np.hstack([testy, y_labels])
                 t_test += (time() - t_now)
-                predictions_labeled = np.zeros_like(y)
-                predictions_labeled[np.where(predictions[:, 0] > 0.5)[0]] = 1
-                categorical = np.hstack([categorical, predictions_labeled])
+                predictions_labeled = np.zeros_like(y_labels)
+                predictions_labeled[np.where(np.linalg.norm(reconstructions - x, axis=1) > thr)[0]] = 1
 
             sk_auc = roc_auc_score(testy, probs)
             ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
@@ -183,7 +202,7 @@ if __name__ == '__main__':
 
             results = [str(sk_auc)]
 
-            r_path = osp.join(foutput[label], '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
+            r_path = osp.join(foutput[label], f'{model_name}_{args.step}')
             if not osp.isdir(r_path):
                 os.mkdir(r_path)
             stats_path = osp.join(r_path, 'stats.csv')
