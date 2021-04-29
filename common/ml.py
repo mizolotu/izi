@@ -133,7 +133,8 @@ class ReconstructionAuc(tf.keras.metrics.AUC):
         y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
         label_true = tf.clip_by_value(label_true, 0, 1)
         reconstruction_error = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
-        super(ReconstructionAuc, self).update_state(label_true, reconstruction_error, sample_weight)
+        probs = tf.nn.softmax(reconstruction_error)
+        super(ReconstructionAuc, self).update_state(label_true, probs, sample_weight)
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
 
@@ -175,6 +176,7 @@ def ae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    hidden = tf.keras.layers.Dense(nfeatures - 1, activation='relu')(hidden)
     for _ in range(nl):
         hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
         if dropout is not None:
@@ -195,18 +197,18 @@ class Sampling(tf.keras.layers.Layer):
 
 class Encoder(tf.keras.layers.Layer):
 
-    def __init__(self, nl, nh, dropout, batchnorm, name='encoder', **kwargs):
+    def __init__(self, nfeatures, nl, nh, dropout, batchnorm, name='encoder', **kwargs):
         super(Encoder, self).__init__(name=name, **kwargs)
         self.layers = []
         if batchnorm:
             norm = tf.keras.layers.BatchNormalization()
             self.layers.append(norm)
-        for i in range(nl - 1):
+        for i in range(nl):
             self.layers.append(tf.keras.layers.Dense(nh, activation='relu'))
             if dropout is not None:
                 self.layers.append(tf.keras.layers.Dropout(dropout))
-        self.dense_mean = tf.keras.layers.Dense(nh)
-        self.dense_log_var = tf.keras.layers.Dense(nh)
+        self.dense_mean = tf.keras.layers.Dense(nfeatures - 1)
+        self.dense_log_var = tf.keras.layers.Dense(nfeatures - 1)
         self.sampling = Sampling()
 
     def call(self, inputs):
@@ -223,7 +225,7 @@ class Decoder(tf.keras.layers.Layer):
     def __init__(self, nfeatures, nl, nh, dropout, name='decoder', **kwargs):
         super(Decoder, self).__init__(name=name, **kwargs)
         self.layers = []
-        for i in range(nl - 1):
+        for i in range(nl):
             self.layers.append(tf.keras.layers.Dense(nh, activation='relu'))
             if dropout is not None:
                 self.layers.append(tf.keras.layers.Dropout(dropout))
@@ -239,7 +241,7 @@ class VariationalAutoEncoder(tf.keras.Model):
 
     def __init__(self, nfeatures,  nl, nh, dropout, batchnorm, name='autoencoder', **kwargs):
         super(VariationalAutoEncoder, self).__init__(name=name, **kwargs)
-        self.encoder = Encoder(nl, nh, dropout, batchnorm)
+        self.encoder = Encoder(nfeatures, nl, nh, dropout, batchnorm)
         self.decoder = Decoder(nfeatures, nl, nh, dropout)
         self.total_loss_tracker = tf.keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = tf.keras.metrics.Mean(name="reconstruction_loss")
