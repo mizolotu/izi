@@ -245,6 +245,7 @@ class VariationalAutoEncoder(tf.keras.Model):
         self.reconstruction_loss_tracker = tf.keras.metrics.Mean(name="reconstruction_loss")
         self.kl_loss_tracker = tf.keras.metrics.Mean(name="kl_loss")
         self.precision = ReconstructionPrecision(name='pre')
+        self.auc = ReconstructionAuc(name='auc')
 
     def call(self, inputs):
         z_mean, z_log_var, z = self.encoder(inputs)
@@ -257,7 +258,8 @@ class VariationalAutoEncoder(tf.keras.Model):
             self.total_loss_tracker,
             self.reconstruction_loss_tracker,
             self.kl_loss_tracker,
-            self.precision
+            self.precision,
+            self.auc
         ]
 
     def train_step(self, data):
@@ -276,14 +278,13 @@ class VariationalAutoEncoder(tf.keras.Model):
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
         self.precision.update_state(outputs, inputs)
+        self.auc.update_state(outputs, inputs)
         return {
             "loss": self.total_loss_tracker.result(),
-            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
-            "kl_loss": self.kl_loss_tracker.result(),
         }
 
 def vae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
     model = VariationalAutoEncoder(nfeatures, nl, nh, dropout, batchnorm)
     model.build((None, nfeatures - 1))
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=ReconstructionPrecision(name='pre'))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'vae_{0}_{1}'.format(nl, nh)
