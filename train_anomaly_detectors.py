@@ -67,8 +67,6 @@ if __name__ == '__main__':
                 osp.join(feature_dir, '0'),
                 osp.join(feature_dir, str(int(label))),
             ]
-        else:
-            fpaths_label[label] = [osp.join(feature_dir, str(int(label))) for label in labels]
 
     # create output directories
 
@@ -97,7 +95,8 @@ if __name__ == '__main__':
     fpaths_star['validate'] = [osp.join(fpath, '*_{0}_{1}'.format(args.step, 'validate')) for fpath in fpaths]
     fpaths_star['test'] = {}
     for label in labels:
-        fpaths_star['test'][label] = [osp.join(fpath, f'*_{args.step}_test') for fpath in fpaths_label[label]]
+        if label > 0:
+            fpaths_star['test'][label] = [osp.join(fpath, f'*_{args.step}_test') for fpath in fpaths_label[label]]
 
     # meta
 
@@ -142,10 +141,6 @@ if __name__ == '__main__':
 
     # fit the model
 
-    for x, y in batches['train']:
-        print(x.shape, y.shape)
-        break
-
     model.fit(
         batches['train'],
         validation_data=batches['validate'],
@@ -168,8 +163,6 @@ if __name__ == '__main__':
         testy = np.concatenate([testy, y[:, -1]])
 
     thr = np.mean(errors) + 3 * np.std(errors)
-    print(thr)
-
     model.save(m_path)
     with open(osp.join(m_path, 'error.thr'), 'w') as f:
         f.write(str(thr))
