@@ -122,7 +122,7 @@ def att(nfeatures, nb, nh, dropout=0.5, batchnorm=True, lr=5e-5):
 def ae_reconstruction_loss(y_true, y_pred):
     y_true, _ = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
     squared_difference = tf.square(y_true - y_pred)
-    return tf.reduce_mean(squared_difference, axis=-1)
+    return tf.math.sqrt(tf.reduce_sum(squared_difference, axis=-1))
 
 class ReconstructionAuc(tf.keras.metrics.AUC):
 
@@ -132,7 +132,7 @@ class ReconstructionAuc(tf.keras.metrics.AUC):
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
         label_true = tf.clip_by_value(label_true, 0, 1)
-        reconstruction_error = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
+        reconstruction_error = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
         super(ReconstructionAuc, self).update_state(label_true, reconstruction_error, sample_weight)
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
@@ -181,5 +181,109 @@ def ae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=ReconstructionPrecision(name='pre')) #, metrics=[tf.keras.metrics.MeanSquaredError(name='mse')])
+        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=ReconstructionPrecision(name='pre'))
     return model, 'ae_{0}_{1}'.format(nl, nh)
+
+class Sampling(tf.keras.layers.Layer):
+
+    def call(self, inputs):
+        z_mean, z_log_var = inputs
+        batch = tf.shape(z_mean)[0]
+        dim = tf.shape(z_mean)[1]
+        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
+        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+
+class Encoder(tf.keras.layers.Layer):
+
+    def __init__(self, nl, nh, dropout, batchnorm, name='encoder', **kwargs):
+        super(Encoder, self).__init__(name=name, **kwargs)
+        self.layers = []
+        if batchnorm:
+            norm = tf.keras.layers.BatchNormalization()
+            self.layers.append(norm)
+        for i in range(nl - 1):
+            self.layers.append(tf.keras.layers.Dense(nh, activation='relu'))
+            if dropout is not None:
+                self.layers.append(tf.keras.layers.Dropout(dropout))
+        self.dense_mean = tf.keras.layers.Dense(nh)
+        self.dense_log_var = tf.keras.layers.Dense(nh)
+        self.sampling = Sampling()
+
+    def call(self, inputs):
+        x = inputs
+        for layer in self.layers:
+            x = layer(x)
+        z_mean = self.dense_mean(x)
+        z_log_var = self.dense_log_var(x)
+        z = self.sampling((z_mean, z_log_var))
+        return z_mean, z_log_var, z
+
+class Decoder(tf.keras.layers.Layer):
+
+    def __init__(self, nfeatures, nl, nh, dropout, name='decoder', **kwargs):
+        super(Decoder, self).__init__(name=name, **kwargs)
+        self.layers = []
+        for i in range(nl - 1):
+            self.layers.append(tf.keras.layers.Dense(nh, activation='relu'))
+            if dropout is not None:
+                self.layers.append(tf.keras.layers.Dropout(dropout))
+        self.dense_output = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')
+
+    def call(self, inputs):
+        x = inputs
+        for layer in self.layers:
+            x = layer(x)
+        return self.dense_output(x)
+
+class VariationalAutoEncoder(tf.keras.Model):
+
+    def __init__(self, nfeatures,  nl, nh, dropout, batchnorm, name='autoencoder', **kwargs):
+        super(VariationalAutoEncoder, self).__init__(name=name, **kwargs)
+        self.encoder = Encoder(nl, nh, dropout, batchnorm)
+        self.decoder = Decoder(nfeatures, nl, nh, dropout)
+        self.total_loss_tracker = tf.keras.metrics.Mean(name="total_loss")
+        self.reconstruction_loss_tracker = tf.keras.metrics.Mean(name="reconstruction_loss")
+        self.kl_loss_tracker = tf.keras.metrics.Mean(name="kl_loss")
+        self.precision = ReconstructionPrecision(name='pre')
+
+    def call(self, inputs):
+        z_mean, z_log_var, z = self.encoder(inputs)
+        reconstruction = self.decoder(z)
+        return reconstruction
+
+    @property
+    def metrics(self):
+        return [
+            self.total_loss_tracker,
+            self.reconstruction_loss_tracker,
+            self.kl_loss_tracker,
+            self.precision
+        ]
+
+    def train_step(self, data):
+        inputs, outputs = data
+        with tf.GradientTape() as tape:
+            z_mean, z_log_var, z = self.encoder(inputs)
+            reconstruction = self.decoder(z)
+            y_true, _ = tf.split(outputs, [reconstruction.shape[1], 1], axis=1)
+            reconstruction_loss = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - reconstruction), axis=-1))
+            kl_loss = - 0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
+            kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+            total_loss = reconstruction_loss + kl_loss
+        grads = tape.gradient(total_loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.total_loss_tracker.update_state(total_loss)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
+        self.precision.update_state(outputs, inputs)
+        return {
+            "loss": self.total_loss_tracker.result(),
+            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+        }
+
+def vae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
+    model = VariationalAutoEncoder(nfeatures, nl, nh, dropout, batchnorm)
+    model.build((None, nfeatures - 1))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=ReconstructionPrecision(name='pre'))
+    return model, 'vae_{0}_{1}'.format(nl, nh)

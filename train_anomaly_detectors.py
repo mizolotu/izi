@@ -14,7 +14,7 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='ae')
+    parser.add_argument('-m', '--model', help='Model', default='vae')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
     parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
     parser.add_argument('-a', '--attack', help='Attack label, 0 corresponds to all data', default=0, type=int)
