@@ -38,10 +38,9 @@ if __name__ == '__main__':
 
     # exclude file names
 
+    exclude_patterns = [aug_postfix]
     if ',' in args.exclude:
-        exclude_patterns = args.exclude.split(',')
-    else:
-        exclude_patterns = []
+        exclude_patterns += args.exclude.split(',')
 
     # process data
 

@@ -16,7 +16,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-m', '--model', help='Model', default='vae')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
-    parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
+    parser.add_argument('-n', '--neurons', help='Number of neurons', default=320, type=int)
     parser.add_argument('-a', '--attack', help='Attack label, 0 corresponds to all data', default=0, type=int)
     parser.add_argument('-s', '--step', help='Polling step', default='1.0')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
@@ -135,13 +135,11 @@ if __name__ == '__main__':
 
     # create model checkpoint directories
 
-    m_path = osp.join(models_path, f'{model_name}_{args.step}')
+    m_path = osp.join(models_path, f'{model_name}_{args.step}_{args.attack}')
     if not osp.isdir(m_path):
         os.mkdir(m_path)
 
     # fit the model
-
-    print(type(batches['validate']))
 
     model.fit(
         batches['train'],
@@ -197,7 +195,7 @@ if __name__ == '__main__':
 
             results = [str(sk_auc)]
 
-            r_path = osp.join(foutput[label], f'{model_name}_{args.step}')
+            r_path = osp.join(foutput[label], f'{model_name}_{args.step}_{args.attack}')
             if not osp.isdir(r_path):
                 os.mkdir(r_path)
             stats_path = osp.join(r_path, 'stats.csv')
