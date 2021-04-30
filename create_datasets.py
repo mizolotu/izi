@@ -3,16 +3,21 @@ import os.path as osp
 import os
 
 from common.data import find_data_files, extract_flow_features
-from common.data import label_cicids17 as labeler  # move this to args TO DO
+from common import data
 from pathlib import Path
 from config import *
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Generate datasets')
+    parser.add_argument('-l', '--labeler', help='Labeler', default='label_cicids17')
     parser.add_argument('-s', '--step', help='Time step', default=1, type=float)
     parser.add_argument('-e', '--exclude', help='Exclude days', default='20180220,20180221')
     args = parser.parse_args()
+
+    # import labeler
+
+    labeler = getattr(data, args.labeler)
 
     # create output directory if needed
 

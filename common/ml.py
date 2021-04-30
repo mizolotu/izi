@@ -133,7 +133,7 @@ class ReconstructionAuc(tf.keras.metrics.AUC):
         y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
         label_true = tf.clip_by_value(label_true, 0, 1)
         reconstruction_error = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
-        probs = tf.nn.softmax(reconstruction_error)
+        probs = reconstruction_error / (tf.reduce_sum(reconstruction_error) + 1)
         super(ReconstructionAuc, self).update_state(label_true, probs, sample_weight)
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
@@ -269,7 +269,7 @@ class VariationalAutoEncoder(tf.keras.Model):
         with tf.GradientTape() as tape:
             z_mean, z_log_var, z = self.encoder(inputs)
             reconstruction = self.decoder(z)
-            y_true, _ = tf.split(outputs, [reconstruction.shape[1], 1], axis=1)
+            y_true, _ = tf.split(outputs, [reconstruction.shape[1], 1], axis=-1)
             reconstruction_loss = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - reconstruction), axis=-1))
             kl_loss = - 0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
@@ -283,6 +283,8 @@ class VariationalAutoEncoder(tf.keras.Model):
         self.auc.update_state(outputs, inputs)
         return {
             "loss": self.total_loss_tracker.result(),
+            'pre': self.precision.result(),
+            'auc': self.auc.result()
         }
 
 def vae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):

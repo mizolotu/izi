@@ -141,6 +141,8 @@ if __name__ == '__main__':
 
     # fit the model
 
+    print(type(batches['validate']))
+
     model.fit(
         batches['train'],
         validation_data=batches['validate'],

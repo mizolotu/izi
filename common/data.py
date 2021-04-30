@@ -23,6 +23,26 @@ def find_data_files(dir):
                     data_files[-1].append(f)
     return data_dirs, data_files
 
+def label_cicids17_short(timestamp, src_ip, dst_ip, src_port=None, dst_port=None):
+    timestamp = datetime.fromtimestamp(timestamp)
+    date = timestamp.strftime('%d%m')
+    if (src_ip == '18.219.211.138' or dst_ip == '18.219.211.138' or src_ip == '18.217.165.70' or dst_ip == '18.217.165.70') and date == '1502':
+        label = 1
+        description = 'App-DoS'
+    elif (src_ip == '18.218.115.60' or dst_ip == '18.218.115.60') and date in ['2202', '2302']:
+        label = 2
+        description = 'BruteForce-Web'
+    elif (src_ip == '13.58.225.34' or dst_ip == '13.58.225.34') and date in ['2802', '0103']:
+        label = 3
+        description = 'Infiltration'
+    elif (src_ip == '18.219.211.138' or dst_ip == '18.219.211.138') and date == '0203':
+        label = 4
+        description = 'Botnet attack'
+    else:
+        label = 0
+        description = 'Normal traffic'
+    return label, description
+
 def label_cicids17(timestamp, src_ip, dst_ip, src_port=None, dst_port=None):
     timestamp = datetime.fromtimestamp(timestamp)
     date = timestamp.strftime('%d%m')
