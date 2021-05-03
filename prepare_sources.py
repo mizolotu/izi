@@ -15,6 +15,8 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Prepare resources')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int)
     parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int)
+    parser.add_argument('-a', '--nadss', help='Number of ADS boxes in each environment', type=int)
+    parser.add_argument('-e', '--exclude', help='Model labels to avoid, for experiment purposes')
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
     args = parser.parse_args()
 
@@ -22,46 +24,35 @@ if __name__ == '__main__':
 
     if args.nenvs is not None:
         nenvs = args.nenvs
+    else:
+        nenvs = env_vms['ovs']['n']
     if args.nidss is not None:
         nidss = args.nidss
+    else:
+        nidss = env_vms['ids']['n']
+    if args.nadss is not None:
+        nadss = args.nadss
+    else:
+        nadss = env_vms['ads']['n']
 
     # preparare vagrant file
 
     vms, cpus, ips, sources, scripts, mounts = [], [], [], [], [], []
 
-    # add controller
-
-    vms.append('odl')
-    cpus.append(ctrl_cpus)
-    ips.append(ctrl_ips)
-    sources.append(ctrl_sources)
-    scripts.append(ctrl_script)
-    mounts.append(None)
-
-    # add ovs vms
-
-    ips_i = ovs_ips
-    for i in range(nenvs):
-        vms.append(f'ovs_{i}')
-        cpus.append(ovs_cpus)
-        ips.append(ips_i)
-        sources.append(ovs_sources)
-        scripts.append(ovs_script)
-        mounts.append(ovs_mount)
-        ips_i = increment_ips(ips_i)
-
-    # add ids vms
-
-    ips_i = ids_ips
-    for i in range(nenvs):
-        for j in range(nidss):
-            vms.append(f'ids_{i}_{j}')
-            cpus.append(ids_cpus)
-            ips.append(ips_i)
-            sources.append(ids_sources)
-            scripts.append(ids_script)
-            mounts.append(None)
-            ips_i = increment_ips(ips_i)
+    for key in env_vms.keys():
+        vm_ips = env_vms[key]['ips']
+        for i in range(nenvs):
+            for j in range(env_vms[key]['n']):
+                vm_name = f'{key}_{i}_{j}'
+                vms.append(vm_name)
+                cpus.append(env_vms[key]['cpus'])
+                ips.append(vm_ips)
+                sources.append(env_vms[key]['sources'])
+                scripts.append(env_vms[key]['script'])
+                mounts.append(env_vms[key]['mount'])
+                vm_ips = increment_ips(vm_ips)
+            if env_vms[key]['unique']:
+                break
 
     vagrant_file_lines = vagrantfile_provider(mgmt_network=mgmt_network, storage_pool_name=args.storage)
     vagrant_file_lines.extend(vagrantfile_vms(vms, cpus, ips, sources, scripts, mounts))
@@ -75,14 +66,14 @@ if __name__ == '__main__':
 
     # input directories
 
-    m_dir = osp.join(classfier_models_dir, 'checkpoints')
-    r_dir = osp.join(classfier_models_dir, 'results')
+    cl_m_dir = osp.join(classfier_models_dir, 'checkpoints')
+    ad_m_dir = osp.join(anomaly_detector_models_dir, 'checkpoints')
 
     # output directories
 
     if not osp.isdir(ids_sources_dir):
         os.mkdir(ids_sources_dir)
-    w_dir = osp.join(ids_sources_dir, 'weights')
+    cl_w_dir = osp.join(ids_sources_dir, 'weights')
     if not osp.isdir(w_dir):
         os.mkdir(w_dir)
     t_dir = osp.join(ids_sources_dir, 'thresholds')
@@ -98,7 +89,6 @@ if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
     label_names = [str(item) for item in sorted(meta['labels'])]
-    non_zero_label_names = [str(item) for item in sorted(meta['labels']) if item > 0]
 
     # compile models
 
@@ -114,33 +104,15 @@ if __name__ == '__main__':
             tflite_model = converter.convert()
             open(output_name, "wb").write(tflite_model)
 
-    # select thresholds
+    # copy feature extraction functions to ids, ads and ovs vms
 
-    for label_name in non_zero_label_names:
-        label_input = osp.join(r_dir, label_name)
-        model_results = [osp.join(label_input, item) for item in os.listdir(label_input) if osp.isdir(osp.join(label_input, item))]
-        for model_result in model_results:
-            roc = pandas.read_csv(osp.join(model_result, 'roc.csv'), delimiter=' ', header=None).values
-            thrs = []
-            for fpr_level in fpr_levels:
-                idx = np.where(roc[:, 0] <= fpr_level)[0][-1]
-                thrs.append(str(roc[idx, 2]))
-            spl = model_result.split('_')
-            with open(osp.join(t_dir, '{0}.thr'.format('_'.join(spl[-2:]))), 'w') as f:
-                f.write(','.join(thrs))
+    for dir in [ids_sources_dir, ads_sources_dir, ovs_sources_dir]:
+        if not osp.isdir('{0}/common'.format(dir)):
+            os.mkdir('{0}/common'.format(dir))
+        shutil.copy('common/pcap.py', '{0}/common/'.format(dir))
+        shutil.copy('common/data.py', '{0}/common/'.format(dir))
 
-    # copy feature extraction functions to ids and ovs vms
-
-    if not osp.isdir('{0}/common'.format(ids_sources_dir)):
-        os.mkdir('{0}/common'.format(ids_sources_dir))
-    shutil.copy('common/pcap.py', '{0}/common/'.format(ids_sources_dir))
-    shutil.copy('common/data.py', '{0}/common/'.format(ids_sources_dir))
-
-    if not osp.isdir('{0}/common'.format(ovs_sources_dir)):
-        os.mkdir('{0}/common'.format(ovs_sources_dir))
-    shutil.copy('common/pcap.py', '{0}/common/'.format(ovs_sources_dir))
-    shutil.copy('common/data.py', '{0}/common/'.format(ovs_sources_dir))
-
-    # copy meta for ids
+    # copy meta for ids and ads
 
     shutil.copy('{0}/metainfo.json'.format(feature_dir), ids_sources_dir)
+    shutil.copy('{0}/metainfo.json'.format(feature_dir), ads_sources_dir)

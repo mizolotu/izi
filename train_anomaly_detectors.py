@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--model', help='Model', default='vae')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
     parser.add_argument('-n', '--neurons', help='Number of neurons', default=320, type=int)
-    parser.add_argument('-a', '--attack', help='Attack label, 0 corresponds to all data', default=0, type=int)
+    parser.add_argument('-a', '--attack', help='Attack labels, 0 corresponds to all data', default='0')
     parser.add_argument('-s', '--step', help='Polling step', default='1.0')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
 
@@ -49,17 +49,24 @@ if __name__ == '__main__':
 
     meta = load_meta(feature_dir)
     labels = sorted(meta['labels'])
-    if args.attack in labels and args.attack > 0:
-        labels = [0, args.attack]
-        print('Training to detect attack {0}'.format(args.attack))
+
+    if ',' in args.attack:
+        attacks = [int(item) for item in args.attack.split(',') if item != '0']
+    elif args.attack == '0':
+        attacks = list(labels[1:])
+    else:
+        attacks = [int(args.attack)]
+    train_labels = [0] + [label for label in labels if label in attacks]
+
+    print(f'Training using attack labels {train_labels}')
 
     # batch_sizes
 
-    batch_sizes = [batch_size] + [int(1.0 / (len(labels) - 1) * batch_size) for _ in labels[1:]]
+    batch_sizes = [batch_size] + [int(1.0 / (len(train_labels) - 1) * batch_size) for _ in train_labels[1:]]
 
     # fpath
 
-    fpaths = [osp.join(feature_dir, str(int(label))) for label in labels]
+    fpaths = [osp.join(feature_dir, str(int(label))) for label in train_labels]
     fpaths_label = {}
     for label in labels:
         if label > 0:
@@ -116,7 +123,7 @@ if __name__ == '__main__':
         batches['train'] = batches['train'].take(num_batches['train'])
 
     batches_ = [load_batches(fp, bs, nfeatures).map(ad_mapper) for fp, bs in zip(fpaths_star['validate'], batch_sizes)]
-    batches['validate'] = tf.data.experimental.sample_from_datasets(batches_, [0.5] + [0.5 / (len(labels) - 1) for _ in labels[1:]]).unbatch().shuffle(batch_size * 2).batch(batch_size)
+    batches['validate'] = tf.data.experimental.sample_from_datasets(batches_, [0.5] + [0.5 / (len(train_labels) - 1) for _ in train_labels[1:]]).unbatch().shuffle(batch_size * 2).batch(batch_size)
     if num_batches['validate'] is not None:
         batches['validate'] = batches['validate'].take(num_batches['validate'])
 
@@ -164,8 +171,6 @@ if __name__ == '__main__':
 
     thr = np.mean(errors) + 3 * np.std(errors)
     model.save(m_path)
-    with open(osp.join(m_path, 'error.thr'), 'w') as f:
-        f.write(str(thr))
 
     # predict and calculate inference statistics
 
@@ -184,6 +189,7 @@ if __name__ == '__main__':
                 predictions_labeled = np.zeros_like(y_labels)
                 predictions_labeled[np.where(np.linalg.norm(reconstructions - x, axis=1) > thr)[0]] = 1
 
+            probs = probs / (np.sum(probs) + 1e-10)
             sk_auc = roc_auc_score(testy, probs)
             ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
             roc = np.zeros((ns_fpr.shape[0], 3))

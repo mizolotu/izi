@@ -6,6 +6,8 @@ from datetime import datetime
 from socket import inet_ntop, AF_INET
 from kaitaistruct import KaitaiStream, BytesIO
 from common.pcap import EthernetFrame
+from scapy.all import rdpcap, wrpcap, Ether, IP, TCP, UDP, Raw, Padding
+from collections import deque
 
 def find_data_files(dir):
     data_files = []
@@ -425,7 +427,7 @@ class Flow():
             self.idl_min  # 64
         ])
 
-def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals=[1,2,4,8,16], stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
+def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
 
     src_ip_idx = 0
     src_port_idx = 1
@@ -433,15 +435,10 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
     dst_port_idx = 3
     proto_idx = 4
 
-    size_idx = 0
-    header_idx = 1
-    payload_idx = 2
-    window_idx = 3
-
-    flow_ids = [[] for _ in intervals]
-    flow_objects = [[] for _ in intervals]
-    flow_labels = [[] for _ in intervals]
-    flow_features = [[] for _ in intervals]
+    flow_ids = []
+    flow_objects = []
+    flow_labels = []
+    flow_features = []
 
     ulabels = []
     tstart = None
@@ -462,30 +459,27 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
 
                 if timestamp > (tstart + seconds):
 
-                    for interval_i, interval in enumerate(intervals):
-                        if (seconds % interval) == 0:
+                    # remove old flows
 
-                            # remove old flows
+                    tmp_ids = []
+                    tmp_objects = []
+                    tmp_labels = []
+                    for i, o, l in zip(flow_ids, flow_objects, flow_labels):
+                        if o.is_active:
+                            tmp_ids.append(i)
+                            tmp_objects.append(o)
+                            tmp_labels.append(l)
+                    flow_ids = list(tmp_ids)
+                    flow_objects = list(tmp_objects)
+                    flow_labels = list(tmp_labels)
 
-                            tmp_ids = []
-                            tmp_objects = []
-                            tmp_labels = []
-                            for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
-                                if o.is_active:
-                                    tmp_ids.append(i)
-                                    tmp_objects.append(o)
-                                    tmp_labels.append(l)
-                            flow_ids[interval_i] = list(tmp_ids)
-                            flow_objects[interval_i] = list(tmp_objects)
-                            flow_labels[interval_i] = list(tmp_labels)
+                    # calculate_features
 
-                            # calculate_features
-
-                            flow_features_t = []
-                            for i, o, l in zip(flow_ids[interval_i], flow_objects[interval_i], flow_labels[interval_i]):
-                                o_features = o.get_features()
-                                flow_features_t.append([*o_features, l])
-                            flow_features[interval_i].extend(flow_features_t)
+                    flow_features_t = []
+                    for i, o, l in zip(flow_ids, flow_objects, flow_labels):
+                        o_features = o.get_features()
+                        flow_features_t.append([*o_features, l])
+                    flow_features.extend(flow_features_t)
 
                     # update time
 
@@ -494,28 +488,27 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
 
                 # add packets
 
-                for interval_i, interval in enumerate(intervals):
-                    if (seconds % interval) == 0:
-                        if id in flow_ids[interval_i]:
-                            direction = 1
-                            idx = flow_ids[interval_i].index(id)
-                            flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
-                        elif reverse_id in flow_ids:
-                            direction = -1
-                            idx = flow_ids[interval_i].index(reverse_id)
-                            flow_objects[interval_i][idx].append(timestamp, features, flags, direction)
-                        else:
-                            label, description = labeler(timestamp, id[src_ip_idx], id[dst_ip_idx], id[src_port_idx], id[dst_port_idx])
-                            flow_ids[interval_i].append(id)
-                            flow_objects[interval_i].append(Flow(timestamp, id, features, flags))
-                            flow_labels[interval_i].append(label)
-                            if label not in ulabels:
-                                ulabels.append(label)
+                if id in flow_ids:
+                    direction = 1
+                    idx = flow_ids.index(id)
+                    flow_objects[idx].append(timestamp, features, flags, direction)
+                elif reverse_id in flow_ids:
+                    direction = -1
+                    idx = flow_ids.index(reverse_id)
+                    flow_objects[idx].append(timestamp, features, flags, direction)
+                else:
+                    label, description = labeler(timestamp, id[src_ip_idx], id[dst_ip_idx], id[src_port_idx], id[dst_port_idx])
+                    flow_ids.append(id)
+                    flow_objects.append(Flow(timestamp, id, features, flags))
+                    flow_labels.append(label)
+                    if label not in ulabels:
+                        ulabels.append(label)
 
         # lists to arrays
 
-        for i in range(len(flow_features)):
-            flow_features[i] = np.array(flow_features[i])
+        #for i in range(len(flow_features)):
+        #    flow_features[i] = np.array(flow_features[i])
+        flow_features = np.array(flow_features)
 
         # load meta
 
@@ -524,7 +517,6 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
                 meta = json.load(jf)
                 labels = meta['labels']
                 nfeatures = meta['nfeatures']
-                nsamples = meta['nsamples']
                 xmin = meta['xmin']
                 xmax = meta['xmax']
         except:
@@ -532,20 +524,18 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
 
         # update meta
 
-        nvectors = np.array([flow_features_.shape[0] for flow_features_ in flow_features])
-        if np.any(nvectors > 0):
+        nvectors = flow_features.shape[0]
+        if nvectors > 0:
             if nfeatures is None:
                 labels = ulabels
-                nfeatures = flow_features[0].shape[1]
-                nsamples = nvectors.tolist()
-                xmin = np.min(flow_features[0][:, :-1], axis=0)
-                xmax = np.max(flow_features[0][:, :-1], axis=0)
+                nfeatures = flow_features.shape[1]
+                xmin = np.min(flow_features[:, :-1], axis=0)
+                xmax = np.max(flow_features[:, :-1], axis=0)
             else:
-                assert nfeatures == flow_features[0].shape[1]
+                assert nfeatures == flow_features.shape[1]
                 labels = list(set(labels + ulabels))
-                nsamples = [n1 + n2 for n1, n2 in zip(nsamples, nvectors.tolist())]
-                xmin = np.min(np.vstack([xmin, flow_features[0][:, :-1]]), axis=0)
-                xmax = np.max(np.vstack([xmax, flow_features[0][:, :-1]]), axis=0)
+                xmin = np.min(np.vstack([xmin, flow_features[:, :-1]]), axis=0)
+                xmax = np.max(np.vstack([xmax, flow_features[:, :-1]]), axis=0)
 
             # split and save data
 
@@ -553,28 +543,26 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, intervals
                 fname_ = output.format(int(l))
                 if not osp.isdir(osp.dirname(fname_)):
                     os.mkdir(osp.dirname(fname_))
-                for nv, values, interval in zip(nvectors, flow_features, intervals):
-                    if nv > 0:
-                        ls = values[:, -1]
-                        idx = np.where(ls == l)[0]
-                        if len(idx) > 0:
-                            values_l = values[idx, :]
-                            inds = np.arange(len(values_l))
-                            inds_splitted = [[] for _ in stages]
-                            np.random.shuffle(inds)
-                            val, remaining = np.split(inds, [int(splits[1] * len(inds))])
-                            tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
-                            inds_splitted[0] = tr
-                            inds_splitted[1] = te
-                            inds_splitted[2] = val
-                            for fi, stage in enumerate(stages):
-                                fname = '{0}_{1}_{2}'.format(fname_, interval, stage)
-                                pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
+                ls = flow_features[:, -1]
+                idx = np.where(ls == l)[0]
+                if len(idx) > 0:
+                    values_l = flow_features[idx, :]
+                    inds = np.arange(len(values_l))
+                    inds_splitted = [[] for _ in stages]
+                    np.random.shuffle(inds)
+                    val, remaining = np.split(inds, [int(splits[1] * len(inds))])
+                    tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
+                    inds_splitted[0] = tr
+                    inds_splitted[1] = te
+                    inds_splitted[2] = val
+                    for fi, stage in enumerate(stages):
+                        fname = '{0}_{1}_{2}'.format(fname_, tstep, stage)
+                        pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
 
             # save meta
 
             with open(meta_fname, 'w') as jf:
-                json.dump({'labels': labels, 'nsamples': nsamples, 'nfeatures': nfeatures, 'xmin': xmin.tolist(), 'xmax': xmax.tolist()}, jf)
+                json.dump({'labels': labels, 'nfeatures': nfeatures, 'xmin': xmin.tolist(), 'xmax': xmax.tolist()}, jf)
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -625,3 +613,69 @@ def count_labels(input, output, labels, labeler):
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(e, fname, exc_tb.tb_lineno)
     return counts
+
+def add_load_to_pkt(pkt, alpha):
+    if pkt.haslayer(Raw):
+        load = pkt[Raw].load
+        l = len(load)
+        n = np.random.randint(alpha * l)
+        pad = Padding()
+        pad.load = '\x00' * n
+        pkt = pkt/pad
+        del pkt[IP].len
+        del pkt[IP].chksum
+        if pkt.haslayer(TCP):
+            del pkt[TCP].chksum
+        elif pkt.haslayer(UDP):
+            del pkt[UDP].chksum
+            del pkt[UDP].len
+        t = pkt.time
+        pkt = Ether(pkt.build())
+        pkt.time = t
+    return pkt
+
+def add_time_to_pkt(last_two_pkts, new_pkt):
+    if new_pkt.haslayer(TCP) or new_pkt.haslayer(UDP):
+        second_last_pkt = last_two_pkts[0]
+        last_pkt = last_two_pkts[1]
+        if new_pkt.time > second_last_pkt.time:
+            iat = new_pkt.time - second_last_pkt.time
+            dt = np.random.rand() * iat
+            last_pkt.time = second_last_pkt.time + dt
+    return second_last_pkt, last_pkt
+
+def augment_pcap_file(input_fpath, output_fpath, alpha=1):
+    pkts = rdpcap(input_fpath)
+    flows = []
+    flow_last_two_packets = []
+    mods = []
+    for pkt in pkts:
+        if pkt.haslayer(IP):
+            if pkt.haslayer(TCP) or pkt.haslayer(UDP):
+                ip = pkt[IP]
+                src_ip = ip.src
+                dst_ip = ip.dst
+                src_port = ip.sport
+                dst_port = ip.dport
+                proto = ip.proto
+                if [src_ip, src_port, dst_ip, dst_port, proto] in flows:
+                    idx = flows.index([src_ip, src_port, dst_ip, dst_port, proto])
+                elif [dst_ip, dst_port, src_ip, src_port, proto] in flows:
+                    idx = flows.index([dst_ip, dst_port, src_ip, src_port, proto])
+                else:
+                    flows.append([src_ip, src_port, dst_ip, dst_port, proto])
+                    flow_last_two_packets.append(deque(maxlen=2))
+                    idx = -1
+                pkt = add_load_to_pkt(pkt, alpha)
+                if len(flow_last_two_packets[idx]) == 2:
+                    pkt0, pkt1 = add_time_to_pkt(flow_last_two_packets[idx], pkt)
+                    flow_last_two_packets[idx].append(pkt0)
+                    flow_last_two_packets[idx].append(pkt1)
+                    mods.append(flow_last_two_packets[idx][0])
+                flow_last_two_packets[idx].append(pkt)
+            else:
+                mods.append(pkt)
+    for item_list in flow_last_two_packets:
+        for item in item_list:
+            mods.append(item)
+    wrpcap(output_fpath, mods)
