@@ -56,7 +56,9 @@ if __name__ == '__main__':
         attacks = list(labels[1:])
     else:
         attacks = [int(args.attack)]
+    attacks = sorted(attacks)
     train_labels = [0] + [label for label in labels if label in attacks]
+    attack_labels_str = [str(item) for item in train_labels if item > 0]
 
     print(f'Training using attack labels {train_labels}')
 
@@ -92,8 +94,10 @@ if __name__ == '__main__':
     for label in labels:
         if label > 0:
             foutput[label] = osp.join(results_path, str(int(label)))
-            if not osp.isdir(foutput[label]):
-                os.mkdir(foutput[label])
+        else:
+            foutput[label] = osp.join(results_path, ','.join(attack_labels_str))
+        if not osp.isdir(foutput[label]):
+            os.mkdir(foutput[label])
 
     # input fpath
 
@@ -105,6 +109,8 @@ if __name__ == '__main__':
     for label in labels:
         if label > 0:
             fpaths_star['test'][label] = [osp.join(fpath, '*_{0}_test'.format(args.step)) for fpath in fpaths_label[label]]
+        else:
+            fpaths_star['test'][label] = [osp.join(fpath, f'*_{args.step}_test') for fpath in fpaths]
 
     # meta
 
@@ -126,6 +132,13 @@ if __name__ == '__main__':
                     batches[stage][label] = tf.data.experimental.sample_from_datasets([batches_[0], batches_[1]], [0.5, 0.5]).unbatch().shuffle(batch_size * 2).batch(batch_size)
                     if num_batches[stage] is not None:
                         batches[stage][label] = batches[stage][label].take(num_batches[stage])
+                else:
+                    batches_ = [load_batches(fp, batch_size, nfeatures).map(cl_mapper) for fp in fpaths_star['test'][label]]
+                    batches['test'][label] = tf.data.experimental.sample_from_datasets(batches_,
+                                                                                       [0.5] + [0.5 / (len(train_labels) - 1) for _ in train_labels[1:]]).unbatch().shuffle(
+                        batch_size * 2).batch(batch_size)
+                    if num_batches['test'] is not None:
+                        batches['test'][label] = batches['test'][label].take(num_batches['test'])
         else:
             batches_ = [load_batches(fp, bs, nfeatures).map(cl_mapper) for fp, bs in zip(fpaths_star[stage], batch_sizes)]
             batches[stage] = tf.data.experimental.sample_from_datasets(batches_, [0.5] + [0.5 / (len(train_labels) - 1) for _ in train_labels[1:]]).unbatch().shuffle(batch_size * 2).batch(batch_size)
@@ -163,38 +176,37 @@ if __name__ == '__main__':
 
     # predict and calculate inference statistics
 
-    for label in labels:
-        if label > 0:
-            t_test = 0
-            probs = []
-            testy = []
-            categorical = []
-            for x, y in batches['test'][label]:
-                t_now = time()
-                predictions = model.predict(x)
-                probs = np.hstack([probs, predictions[:, 0]])
-                testy = np.hstack([testy, y])
-                t_test += (time() - t_now)
-                predictions_labeled = np.zeros_like(y)
-                predictions_labeled[np.where(predictions[:, 0] > 0.5)[0]] = 1
-                categorical = np.hstack([categorical, predictions_labeled])
+    for label in train_labels:
+        t_test = 0
+        probs = []
+        testy = []
+        categorical = []
+        for x, y in batches['test'][label]:
+            t_now = time()
+            predictions = model.predict(x)
+            probs = np.hstack([probs, predictions[:, 0]])
+            testy = np.hstack([testy, y])
+            t_test += (time() - t_now)
+            predictions_labeled = np.zeros_like(y)
+            predictions_labeled[np.where(predictions[:, 0] > 0.5)[0]] = 1
+            categorical = np.hstack([categorical, predictions_labeled])
 
-            sk_auc = roc_auc_score(testy, probs)
-            ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
-            roc = np.zeros((ns_fpr.shape[0], 3))
-            roc[:, 0] = ns_fpr
-            roc[:, 1] = ns_tpr
-            roc[:, 2] = ns_thr
+        sk_auc = roc_auc_score(testy, probs)
+        ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
+        roc = np.zeros((ns_fpr.shape[0], 3))
+        roc[:, 0] = ns_fpr
+        roc[:, 1] = ns_tpr
+        roc[:, 2] = ns_thr
 
-            # save the results
+        # save the results
 
-            results = [str(sk_auc)]
+        results = [str(sk_auc)]
 
-            r_path = osp.join(foutput[label], '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
-            if not osp.isdir(r_path):
-                os.mkdir(r_path)
-            stats_path = osp.join(r_path, 'stats.csv')
-            roc_path = osp.join(r_path, 'roc.csv')
-            with open(stats_path, 'w') as f:
-                f.write(','.join(results))
-            np.savetxt(roc_path, roc)
+        r_path = osp.join(foutput[label], '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
+        if not osp.isdir(r_path):
+            os.mkdir(r_path)
+        stats_path = osp.join(r_path, 'stats.csv')
+        roc_path = osp.join(r_path, 'roc.csv')
+        with open(stats_path, 'w') as f:
+            f.write(','.join(results))
+        np.savetxt(roc_path, roc)
