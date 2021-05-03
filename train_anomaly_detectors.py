@@ -189,7 +189,6 @@ if __name__ == '__main__':
                 predictions_labeled = np.zeros_like(y_labels)
                 predictions_labeled[np.where(np.linalg.norm(reconstructions - x, axis=1) > thr)[0]] = 1
 
-            probs = probs / (np.sum(probs) + 1e-10)
             sk_auc = roc_auc_score(testy, probs)
             ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
             roc = np.zeros((ns_fpr.shape[0], 3))
