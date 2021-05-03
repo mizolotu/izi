@@ -290,7 +290,7 @@ class VariationalAutoEncoder(tf.keras.Model):
         return [
             self.total_loss_tracker,
             self.precision,
-            self.auc
+            self.accuracy
         ]
 
     def train_step(self, data):
@@ -307,7 +307,7 @@ class VariationalAutoEncoder(tf.keras.Model):
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
         self.precision.update_state(outputs, inputs)
-        self.auc.update_state(outputs, inputs)
+        self.accuracy.update_state(outputs, inputs)
         return {
             "loss": self.total_loss_tracker.result(),
             'pre': self.precision.result(),
@@ -325,7 +325,7 @@ class VariationalAutoEncoder(tf.keras.Model):
         total_loss = reconstruction_loss + kl_loss
         self.total_loss_tracker.update_state(total_loss)
         self.precision.update_state(outputs, inputs)
-        self.auc.update_state(outputs, inputs)
+        self.accuracy.update_state(outputs, inputs)
         return {
             "loss": self.total_loss_tracker.result(),
             'pre': self.precision.result(),
