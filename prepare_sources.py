@@ -20,6 +20,13 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
     args = parser.parse_args()
 
+    # exclude labels
+
+    if ',' in args.exclude:
+        exclude_labels = args.exclude.split(',')
+    else:
+        exclude_labels = [args.exclude]
+
     # update nenvs and nidss
 
     if args.nenvs is not None:
@@ -67,42 +74,87 @@ if __name__ == '__main__':
     # input directories
 
     cl_m_dir = osp.join(classfier_models_dir, 'checkpoints')
+    cl_r_dir = osp.join(classfier_models_dir, 'results')
     ad_m_dir = osp.join(anomaly_detector_models_dir, 'checkpoints')
+    ad_r_dir = osp.join(anomaly_detector_models_dir, 'results')
 
     # output directories
 
     if not osp.isdir(ids_sources_dir):
         os.mkdir(ids_sources_dir)
     cl_w_dir = osp.join(ids_sources_dir, 'weights')
-    if not osp.isdir(w_dir):
-        os.mkdir(w_dir)
-    t_dir = osp.join(ids_sources_dir, 'thresholds')
-    if not osp.isdir(t_dir):
-        os.mkdir(t_dir)
+    if not osp.isdir(cl_w_dir):
+        os.mkdir(cl_w_dir)
+    cl_t_dir = osp.join(ids_sources_dir, 'thresholds')
+    if not osp.isdir(cl_t_dir):
+        os.mkdir(cl_t_dir)
+
+    if not osp.isdir(ads_sources_dir):
+        os.mkdir(ads_sources_dir)
+    ad_w_dir = osp.join(ads_sources_dir, 'weights')
+    if not osp.isdir(ad_w_dir):
+        os.mkdir(ad_w_dir)
+    ad_t_dir = osp.join(ads_sources_dir, 'thresholds')
+    if not osp.isdir(ad_t_dir):
+        os.mkdir(ad_t_dir)
 
     # clean directories
 
-    clean_dir(w_dir, postfix='.tflite')
-    clean_dir(t_dir, postfix='.thr')
+    clean_dir(cl_w_dir, postfix='.tflite')
+    clean_dir(cl_t_dir, postfix='.thr')
+    clean_dir(ad_w_dir, postfix='.tflite')
+    clean_dir(ad_t_dir, postfix='.thr')
 
     # label names
 
     meta = load_meta(feature_dir)
     label_names = [str(item) for item in sorted(meta['labels'])]
+    non_zero_label_names = [str(item) for item in sorted(meta['labels']) if item > 0]
+    all_steps = []
 
-    # compile models
 
-    model_names = [item for item in os.listdir(m_dir) if osp.isdir(osp.join(m_dir, item))]
-    for model_name in model_names:
-        spl = model_name.split('_')
-        input_name = osp.join(m_dir, model_name)
-        sstep = spl[-2]
-        alabel = spl[-1]
-        if alabel in label_names:
-            output_name = osp.join(w_dir, '{0}_{1}.tflite'.format(sstep, alabel))
-            converter = tf.lite.TFLiteConverter.from_saved_model(input_name)
-            tflite_model = converter.convert()
-            open(output_name, "wb").write(tflite_model)
+    # compile models and select thresholds
+
+    for m_dir, w_dir, r_dir, t_dir in zip([cl_m_dir, ad_m_dir], [cl_w_dir, ad_w_dir], [cl_r_dir, ad_r_dir], [cl_t_dir, ad_t_dir]):
+        model_names = [item for item in os.listdir(m_dir) if osp.isdir(osp.join(m_dir, item))]
+        for model_name in model_names:
+            spl = model_name.split('_')
+            input_name = osp.join(m_dir, model_name)
+            sstep = spl[-2]
+            alabel = spl[-1]
+
+            # check labels
+
+            if ',' in alabel:
+                alabels = alabel.split(',')
+            else:
+                alabels = [alabel]
+            compile_model = True
+            for al in alabels:
+                if al not in label_names or al in exclude_labels:
+                    compile_model = False
+                    break
+
+            # compile model and save threshold
+
+            if compile_model:
+                output_name = osp.join(w_dir, '{0}_{1}.tflite'.format(sstep, alabel))
+                converter = tf.lite.TFLiteConverter.from_saved_model(input_name)
+                tflite_model = converter.convert()
+                open(output_name, "wb").write(tflite_model)
+
+            for label_name in non_zero_label_names:
+                label_input = osp.join(r_dir, label_name)
+                model_results = [osp.join(label_input, item) for item in os.listdir(label_input) if osp.isdir(osp.join(label_input, item))]
+        for model_result in model_results:
+            roc = pandas.read_csv(osp.join(model_result, 'roc.csv'), delimiter=' ', header=None).values
+            thrs = []
+            for fpr_level in fpr_levels:
+                idx = np.where(roc[:, 0] <= fpr_level)[0][-1]
+                thrs.append(str(roc[idx, 2]))
+            spl = model_result.split('_')
+            with open(osp.join(t_dir, '{0}.thr'.format('_'.join(spl[-2:]))), 'w') as f:
+                f.write(','.join(thrs))
 
     # copy feature extraction functions to ids, ads and ovs vms
 

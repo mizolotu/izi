@@ -216,7 +216,7 @@ def ae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[ReconstructionPrecision(name='pre'), ReconstructionAuc(name='auc')])
+        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[ReconstructionPrecision(name='pre'), ReconstructionAccuracy(name='acc')])
     return model, 'ae_{0}_{1}'.format(nl, nh)
 
 class Sampling(tf.keras.layers.Layer):
