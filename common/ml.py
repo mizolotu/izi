@@ -198,7 +198,7 @@ class ReconstructionAccuracy(tf.keras.metrics.Metric):
         self.reconstruction_errors.assign([])
         self.true_labels.assign([])
 
-def ae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
+def ae(nfeatures, nl, nh, alpha, dropout=0.5, batchnorm=True, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     if batchnorm:
         norm = tf.keras.layers.BatchNormalization()
@@ -216,7 +216,7 @@ def ae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[ReconstructionPrecision(name='pre'), ReconstructionAccuracy(name='acc')])
+        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[ReconstructionPrecision(name='pre', alpha=alpha), ReconstructionAccuracy(name='acc', alpha=alpha)])
     return model, 'ae_{0}_{1}'.format(nl, nh)
 
 class Sampling(tf.keras.layers.Layer):
