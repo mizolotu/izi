@@ -16,44 +16,70 @@ anomaly_detector_results_dir = '{0}/results'.format(anomaly_detector_models_dir)
 sources_dir = 'sources'
 ovs_sources_dir = f'{sources_dir}/ovs/'
 ids_sources_dir = f'{sources_dir}/ids/'
+ads_sources_dir = f'{sources_dir}/ads/'
 rl_models_dir = 'models'
 rl_results_dir = 'results'
 ids_model_weights_dir = '{0}/weights'.format(ids_sources_dir)
+ads_model_weights_dir = '{0}/weights'.format(ads_sources_dir)
 figures_dir = 'figures'
 roc_dir = '{0}/roc'.format(figures_dir)
 progress_dir = '{0}/progress'.format(figures_dir)
 
 # vagrantfile
 
-nenvs = 1  # number of environments
-nidss = 1  # number of security middle boxes in an environment
 mgmt_network = '192.168.122.0/24'
-ctrl_cpus = 4
-ctrl_ips = ['192.168.254.11']
-ctrl_sources = [['./sources/opendaylight-0.12.3.tar.gz', 'opendaylight-0.12.3.tar.gz'], ['./sources/odl.service', '/home/vagrant/']]
-ctrl_script = 'scripts/odl.sh'
-ovs_cpus = 3
-ovs_ips = ['192.168.254.20', '100.0.0.20']
-ovs_sources = [['./sources/ovs.service', '/home/vagrant/'], ['./sources/ovs', '/home/vagrant/']]
-ovs_script = 'scripts/ovs.sh'
-ovs_mount = ['./data/spl', '/home/vagrant/data/spl']
-ids_cpus = 2
-ids_ips = ['192.168.254.60']
-ids_sources = [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']]
-ids_script = 'scripts/ids.sh'
+env_vms = {
+    'odl': {
+        'unique': True,
+        'n': 1,
+        'cpus': 4,
+        'ips': ['192.168.254.10'],
+        'sources': [['./sources/opendaylight-0.12.3.tar.gz', 'opendaylight-0.12.3.tar.gz'], ['./sources/odl.service', '/home/vagrant/']],
+        'script': 'scripts/odl.sh',
+        'mount': None
+    },
+    'ovs': {
+        'unique': False,
+        'n': 1,
+        'cpus': 3,
+        'ips': ['192.168.254.20', '100.0.0.20'],
+        'sources': [['./sources/ovs.service', '/home/vagrant/'], ['./sources/ovs', '/home/vagrant/']],
+        'script': 'scripts/ovs.sh',
+        'mount': ['./data/spl', '/home/vagrant/data/spl']
+    },
+    'ids': {
+        'unique': False,
+        'n': 1,
+        'cpus': 2,
+        'ips': ['192.168.254.60'],
+        'sources': [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']],
+        'script': 'scripts/ids.sh',
+        'mount': None
+    },
+    'ads': {
+        'unique': False,
+        'n': 1,
+        'cpus': 2,
+        'ips': ['192.168.254.80'],
+        'sources': [['./sources/ads.service', '/home/vagrant/'], ['./sources/ads', '/home/vagrant/']],
+        'script': 'scripts/ads.sh',
+        'mount': None
+    }
+}
 
-# ids
+# ids and ads
 
 seed = 0
 batch_size = 1024  # batch size will actually be double that
 patience = 10
 epochs = 1000
 steps_per_epoch = 4000
-fpr_levels = [0.01, 0.0001, 0.000001]
-ids_params = ['nflows', 'delay']
-n_ids_params = len(ids_params)
+ds_params = ['nflows', 'delay']
+n_ds_params = len(ds_params)
 roc_fname = 'roc.csv'
+fpr_level = None
 fsize_min = 100000
+ad_alpha = 3
 
 # sdn
 
