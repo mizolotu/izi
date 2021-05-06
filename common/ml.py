@@ -141,7 +141,6 @@ class ReconstructionAuc(tf.keras.metrics.Metric):
 
     def result(self):
         probs = self.reconstruction_errors / (tf.reduce_sum(self.reconstruction_errors) + 1)
-        print(probs)
         self.auc.update_state(self.true_labels, probs)
         return self.auc.result()
 
