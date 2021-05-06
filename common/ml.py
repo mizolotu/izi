@@ -232,7 +232,8 @@ def ae(nfeatures, nl, nh, alpha, dropout=0.5, batchnorm=True, lr=5e-5):
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
         model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[
-            ReconstructionAccuracy(name='acc', alpha=alpha), ReconstructionAuc(name='auc')
+            ReconstructionAccuracy(name='acc', alpha=alpha),
+            ReconstructionAuc(name='auc')
         ])
     return model, 'ae_{0}_{1}'.format(nl, nh)
 

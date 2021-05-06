@@ -181,7 +181,7 @@ if __name__ == '__main__':
         testy = np.concatenate([testy, y[:, -1]])
 
     model.save(m_path)
-    
+
     # predict and calculate inference statistics
 
     for label in train_labels:
