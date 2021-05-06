@@ -3,6 +3,8 @@ import os.path as osp
 import tensorflow as tf
 import numpy as np
 
+from sklearn.metrics import roc_auc_score
+
 def load_batches(path, batch_size, nfeatures):
     batches = tf.data.experimental.make_csv_dataset(
         path,
@@ -140,7 +142,7 @@ class ReconstructionAuc(tf.keras.metrics.Metric):
         self.true_labels.assign(tf.concat([self.true_labels.value(), label_true[:, 0]], axis=0))
 
     def result(self):
-        probs = self.reconstruction_errors / (tf.reduce_sum(self.reconstruction_errors) + 1)
+        probs = self.reconstruction_errors / tf.math.reduce_max(self.reconstruction_errors)
         self.auc.update_state(self.true_labels, probs)
         return self.auc.result()
 
@@ -230,7 +232,7 @@ def ae(nfeatures, nl, nh, alpha, dropout=0.5, batchnorm=True, lr=5e-5):
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
         model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[
-            ReconstructionPrecision(name='pre', alpha=alpha), ReconstructionAccuracy(name='acc', alpha=alpha), ReconstructionAuc(name='auc')
+            ReconstructionAccuracy(name='acc', alpha=alpha), ReconstructionAuc(name='auc')
         ])
     return model, 'ae_{0}_{1}'.format(nl, nh)
 
