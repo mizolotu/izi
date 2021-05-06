@@ -133,13 +133,15 @@ class ReconstructionAuc(tf.keras.metrics.Metric):
         self.auc = tf.keras.metrics.AUC()
         self.reconstruction_errors = tf.Variable([], shape=(None,), validate_shape=False)
         self.true_labels = tf.Variable([], shape=(None,), validate_shape=False)
+        self.update_metric = tf.Variable(False)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
-        label_true = tf.clip_by_value(label_true, 0, 1)
-        reconstruction_errors = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
-        self.reconstruction_errors.assign(tf.concat([self.reconstruction_errors.value(), reconstruction_errors], axis=0))
-        self.true_labels.assign(tf.concat([self.true_labels.value(), label_true[:, 0]], axis=0))
+        if self.update_metric:
+            y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
+            label_true = tf.clip_by_value(label_true, 0, 1)
+            reconstruction_errors = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
+            self.reconstruction_errors.assign(tf.concat([self.reconstruction_errors.value(), reconstruction_errors], axis=0))
+            self.true_labels.assign(tf.concat([self.true_labels.value(), label_true[:, 0]], axis=0))
 
     def result(self):
         probs = self.reconstruction_errors / tf.math.reduce_max(self.reconstruction_errors)
@@ -150,6 +152,17 @@ class ReconstructionAuc(tf.keras.metrics.Metric):
         self.reconstruction_errors.assign([])
         self.true_labels.assign([])
         self.auc.reset_states()
+
+class ToggleMetrics(tf.keras.callbacks.Callback):
+
+    def on_test_begin(self, logs):
+        for metric in self.model.metrics:
+            if 'auc' in metric.name:
+                metric.update_metric.assign(True)
+    def on_test_end(self,  logs):
+        for metric in self.model.metrics:
+            if 'auc' in metric.name:
+                metric.update_metric.assign(False)
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
 
@@ -232,7 +245,6 @@ def ae(nfeatures, nl, nh, alpha, dropout=0.5, batchnorm=True, lr=5e-5):
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
         model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[
-            ReconstructionAccuracy(name='acc', alpha=alpha),
             ReconstructionAuc(name='auc')
         ])
     return model, 'ae_{0}_{1}'.format(nl, nh)

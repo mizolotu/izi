@@ -8,7 +8,7 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, anomaly_detection_mapper, load_meta
+from common.ml import set_seeds, load_batches, anomaly_detection_mapper, load_meta, ToggleMetrics
 from config import *
 
 if __name__ == '__main__':
@@ -170,7 +170,7 @@ if __name__ == '__main__':
             patience=patience,
             mode='max',
             restore_best_weights=True
-        )]
+        ), ToggleMetrics()]
     )
 
     errors = []
