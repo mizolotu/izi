@@ -124,17 +124,31 @@ def ae_reconstruction_loss(y_true, y_pred):
     squared_difference = tf.square(y_true - y_pred)
     return tf.math.sqrt(tf.reduce_sum(squared_difference, axis=-1))
 
-class ReconstructionAuc(tf.keras.metrics.AUC):
+class ReconstructionAuc(tf.keras.metrics.Metric):
 
     def __init__(self, name='reconstruction_auc', **kwargs):
         super(ReconstructionAuc, self).__init__(name=name, **kwargs)
+        self.auc = tf.keras.metrics.AUC()
+        self.reconstruction_errors = tf.Variable([], shape=(None,), validate_shape=False)
+        self.true_labels = tf.Variable([], shape=(None,), validate_shape=False)
 
     def update_state(self, y_true, y_pred, sample_weight=None):
         y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
         label_true = tf.clip_by_value(label_true, 0, 1)
-        reconstruction_error = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
-        probs = reconstruction_error / (tf.reduce_sum(reconstruction_error) + 1)
-        super(ReconstructionAuc, self).update_state(label_true, probs, sample_weight)
+        reconstruction_errors = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
+        self.reconstruction_errors.assign(tf.concat([self.reconstruction_errors.value(), reconstruction_errors], axis=0))
+        self.true_labels.assign(tf.concat([self.true_labels.value(), label_true[:, 0]], axis=0))
+
+    def result(self):
+        probs = self.reconstruction_errors / (tf.reduce_sum(self.reconstruction_errors) + 1)
+        print(probs)
+        self.auc.update_state(self.true_labels, probs)
+        return self.auc.result()
+
+    def reset_states(self):
+        self.reconstruction_errors.assign([])
+        self.true_labels.assign([])
+        self.auc.reset_states()
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
 
@@ -216,7 +230,9 @@ def ae(nfeatures, nl, nh, alpha, dropout=0.5, batchnorm=True, lr=5e-5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[ReconstructionPrecision(name='pre', alpha=alpha), ReconstructionAccuracy(name='acc', alpha=alpha)])
+        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[
+            ReconstructionPrecision(name='pre', alpha=alpha), ReconstructionAccuracy(name='acc', alpha=alpha), ReconstructionAuc(name='auc')
+        ])
     return model, 'ae_{0}_{1}'.format(nl, nh)
 
 class Sampling(tf.keras.layers.Layer):
