@@ -181,10 +181,7 @@ if __name__ == '__main__':
         testy = np.concatenate([testy, y[:, -1]])
 
     model.save(m_path)
-    thr = np.mean(errors) + ad_alpha * np.std(errors)
-    with open(osp.join(m_path, 'thr'), 'w') as f:
-        f.write(str(thr))
-
+    
     # predict and calculate inference statistics
 
     for label in train_labels:

@@ -71,6 +71,7 @@ class Interceptor:
         self.intrusion_ids = deque(maxlen=qsize)
 
         self.model_path = osp.join(main_path, 'weights')
+        self.thr_path = osp.join(main_path, 'thresholds')
         self.model_labels = sorted(list(set([item.split('.tflite')[0].split('_')[1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
         self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[0] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
         with open(osp.join(main_path, 'metainfo.json'), 'r') as f:
@@ -87,6 +88,8 @@ class Interceptor:
         model_label = self.model_labels[idx]
         model_step = self.model_steps[self.step_idx]
         self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_step, model_label)))
+        with open(osp.join(self.thr_path, f'{model_step}_{model_label}.thr'), 'r') as f:
+            self.thr = float(f.readline().strip())
         self.model_idx = idx
 
     def set_step(self, idx):
@@ -148,7 +151,7 @@ class Interceptor:
                             p = self.analyze_flow(i)
                         except:
                             p = 0
-                        if p > 0.5:
+                        if p > self.thr:
                             self.intrusion_ids.appendleft(self.flow_ids[i])
                     self.delay = datetime.now().timestamp() - tnow
                     self.nflows = len(self.flow_ids)
@@ -189,7 +192,9 @@ class Interceptor:
     def analyze_flow(self, flow_idx):
         flow_features = self.calculate_flow_features(flow_idx)
         flow_features = (flow_features - self.xmin) / (self.xmax - self.xmin + 1e-10)
-        return self.predict(np.array(flow_features, dtype=np.float32).reshape(1,len(flow_features)))
+        reconstruction = self.predict(np.array(flow_features, dtype=np.float32).reshape(1,len(flow_features)))
+        ...
+        return
 
     def get_intrusions(self):
         intrusions = list(self.intrusion_ids)
