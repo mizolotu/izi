@@ -203,7 +203,7 @@ class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
             probs = np.hstack([probs, np.linalg.norm(reconstructions - x, axis=1)])
             testy = np.hstack([testy, y_labels])
         self.current = roc_auc_score(testy, probs)
-        print('\n', self.current)
+        print('\nValidation AUC:', self.current)
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
 
