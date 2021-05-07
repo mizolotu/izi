@@ -128,10 +128,12 @@ def ae_reconstruction_loss(y_true, y_pred):
 
 class ReconstructionAuc(tf.keras.metrics.Metric):
 
-    def __init__(self, name='reconstruction_auc', **kwargs):
+    def __init__(self, m, n, name='reconstruction_auc', **kwargs):
         super(ReconstructionAuc, self).__init__(name=name, **kwargs)
         self.auc = tf.keras.metrics.AUC()
         self.reconstruction_errors = tf.Variable([], shape=(None,), validate_shape=False)
+        self.ta_index = tf.Variable([[0]])
+        self.reconstruction_errors_per_batch = tf.Variable(shape=(m, n), validate_shape=False)
         self.true_labels = tf.Variable([], shape=(None,), validate_shape=False)
         self.update_metric = tf.Variable(False)
 
@@ -140,10 +142,12 @@ class ReconstructionAuc(tf.keras.metrics.Metric):
             y_true, label_true = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
             label_true = tf.clip_by_value(label_true, 0, 1)
             reconstruction_errors = tf.math.sqrt(tf.reduce_sum(tf.square(y_true - y_pred), axis=-1))
-            self.reconstruction_errors.assign(tf.concat([self.reconstruction_errors.value(), reconstruction_errors], axis=0))
+            self.reconstruction_errors_per_batch = tf.tensor_scatter_nd_update(self.reconstruction_errors_per_batch.value(), self.ta_index, [reconstruction_errors])
+            self.ta_index.assign([[1]])
             self.true_labels.assign(tf.concat([self.true_labels.value(), label_true[:, 0]], axis=0))
 
     def result(self):
+        self.reconstruction_errors = tf.reshape(self.reconstruction_errors_per_batch, (self.reconstruction_errors_per_batch.shape[0] * self.reconstruction_errors_per_batch.shape[1],))
         probs = self.reconstruction_errors / tf.math.reduce_max(self.reconstruction_errors)
         self.auc.update_state(self.true_labels, probs)
         return self.auc.result()
@@ -163,6 +167,43 @@ class ToggleMetrics(tf.keras.callbacks.Callback):
         for metric in self.model.metrics:
             if 'auc' in metric.name:
                 metric.update_metric.assign(False)
+
+class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
+
+    def __init__(self, validation_data, patience=10):
+        super(EarlyStoppingAtMaxAuc, self).__init__()
+        self.patience = patience
+        self.best_weights = None
+        self.validation_data = validation_data
+        self.current = -np.Inf
+
+    def on_train_begin(self, logs=None):
+        self.wait = 0
+        self.stopped_epoch = 0
+        self.best = -np.Inf
+
+    def on_epoch_end(self, epoch, logs=None):
+        if np.greater(self.current, self.best):
+            self.best = self.current
+            self.wait = 0
+            self.best_weights = self.model.get_weights()
+        else:
+            self.wait += 1
+            if self.wait >= self.patience:
+                self.stopped_epoch = epoch
+                self.model.stop_training = True
+                self.model.set_weights(self.best_weights)
+
+    def on_test_end(self, logs):
+        probs = []
+        testy = []
+        for x, y in self.validation_data:
+            y_labels = np.clip(y[:, -1], 0, 1)
+            reconstructions = self.model.predict(x)
+            probs = np.hstack([probs, np.linalg.norm(reconstructions - x, axis=1)])
+            testy = np.hstack([testy, y_labels])
+        self.current = roc_auc_score(testy, probs)
+        print('\n', self.current)
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
 
@@ -226,7 +267,7 @@ class ReconstructionAccuracy(tf.keras.metrics.Metric):
         self.reconstruction_errors.assign([])
         self.true_labels.assign([])
 
-def ae(nfeatures, nl, nh, alpha, dropout=0.5, batchnorm=True, lr=5e-5):
+def ae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     if batchnorm:
         norm = tf.keras.layers.BatchNormalization()
@@ -244,9 +285,7 @@ def ae(nfeatures, nl, nh, alpha, dropout=0.5, batchnorm=True, lr=5e-5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[
-            ReconstructionAuc(name='auc')
-        ])
+        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'ae_{0}_{1}'.format(nl, nh)
 
 class Sampling(tf.keras.layers.Layer):

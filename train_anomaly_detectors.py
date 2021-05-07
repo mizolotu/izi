@@ -8,7 +8,7 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, anomaly_detection_mapper, load_meta, ToggleMetrics
+from common.ml import set_seeds, load_batches, anomaly_detection_mapper, load_meta, EarlyStoppingAtMaxAuc
 from config import *
 
 if __name__ == '__main__':
@@ -147,7 +147,7 @@ if __name__ == '__main__':
                 batches['test'][label] = batches['test'][label].take(num_batches['test'])
 
     model_type = getattr(models, args.model)
-    model, model_name = model_type(nfeatures, args.layers, args.neurons, ad_alpha)
+    model, model_name = model_type(nfeatures, args.layers, args.neurons)
     print('Training {0}'.format(model_name))
     model.summary()
 
@@ -164,13 +164,14 @@ if __name__ == '__main__':
         validation_data=batches['validate'],
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
-        callbacks=[tf.keras.callbacks.EarlyStopping(
-            monitor='val_auc',
-            verbose=0,
-            patience=patience,
-            mode='max',
-            restore_best_weights=True
-        ), ToggleMetrics()]
+        #callbacks=[tf.keras.callbacks.EarlyStopping(
+        #    monitor='val_auc',
+        #    verbose=0,
+        #    patience=patience,
+        #    mode='max',
+        #    restore_best_weights=True
+        #), ToggleMetrics()]
+        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'])]
     )
 
     errors = []
