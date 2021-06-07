@@ -20,7 +20,6 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--attack', help='Attack labels, 0 corresponds to all data', default='1,2,3')
     parser.add_argument('-s', '--step', help='Polling step', default='1.0')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
-
     args = parser.parse_args()
 
     if not args.cuda:
@@ -164,7 +163,7 @@ if __name__ == '__main__':
         validation_data=batches['validate'],
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
-        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model)]
+        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model, nnn=som_nnn)]
     )
 
     # calculate thresholds for fpr levels specified in config
@@ -174,7 +173,11 @@ if __name__ == '__main__':
     thrs = []
     for x, y in batches['validate']:
         reconstructions = model.predict(x)
-        errors = np.concatenate([errors, np.linalg.norm(reconstructions - y[:, :-1], axis=1)])
+        if args.model == 'ae':
+            new_errors = np.linalg.norm(reconstructions - y[:, :-1], axis=1)
+        elif args.model == 'som':
+            new_errors = np.mean(reconstructions[:, :som_nnn], axis=1)
+        errors = np.concatenate([errors, new_errors])
         testy = np.concatenate([testy, y[:, -1]])
     ns_fpr, ns_tpr, ns_thr = roc_curve(testy, errors)
     for fpr_level in fpr_levels:
@@ -197,7 +200,11 @@ if __name__ == '__main__':
             y_labels = y[:, -1]
             t_now = time()
             reconstructions = model.predict(x)
-            probs = np.hstack([probs, np.linalg.norm(reconstructions - x, axis=1)])
+            if args.model == 'ae':
+                new_probs = np.linalg.norm(reconstructions - y[:, :-1], axis=1)
+            elif args.model == 'som':
+                new_probs = np.mean(reconstructions[:, :som_nnn], axis=1)
+            probs = np.hstack([probs, new_probs])
             testy = np.hstack([testy, y_labels])
             t_test += (time() - t_now)
 

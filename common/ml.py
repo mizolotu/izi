@@ -517,7 +517,6 @@ class DSOM(tf.keras.models.Model):
             # Compute topographic weights batches
 
             w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
-            print(w_batch)
 
             # calculate loss
 

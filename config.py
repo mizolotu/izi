@@ -73,12 +73,13 @@ seed = 0
 batch_size = 1024  # batch size will actually be double that
 patience = 10
 epochs = 100
-steps_per_epoch = 4000
+steps_per_epoch = 1000
 ds_params = ['nflows', 'delay']
 n_ds_params = len(ds_params)
 roc_fname = 'roc.csv'
 fpr_levels = [0.01, 0.001, 0.0001]
 fsize_min = 100000
+som_nnn = 4
 
 # sdn
 
