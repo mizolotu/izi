@@ -18,7 +18,18 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--nadss', help='Number of ADS boxes in each environment', type=int, default=1)
     parser.add_argument('-e', '--exclude', help='Model labels to avoid, for experiment purposes')
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
+    parser.add_argument('-m', '--models', help='IDS models', default='mlp')
     args = parser.parse_args()
+
+    # models
+
+    if args.models is not None:
+        if ',' in args.models:
+            model_types = args.models.split(',')
+        else:
+            model_types = [args.models]
+    else:
+        model_types = []
 
     # exclude labels
 
@@ -70,37 +81,24 @@ if __name__ == '__main__':
 
     # input directories
 
-    cl_m_dir = osp.join(classfier_models_dir, 'checkpoints')
-    cl_r_dir = osp.join(classfier_models_dir, 'results')
-    ad_m_dir = osp.join(anomaly_detector_models_dir, 'checkpoints')
-    ad_r_dir = osp.join(anomaly_detector_models_dir, 'results')
+    m_dir = osp.join(ids_models_dir, 'checkpoints')
+    r_dir = osp.join(ids_models_dir, 'results')
 
     # output directories
 
     if not osp.isdir(ids_sources_dir):
         os.mkdir(ids_sources_dir)
-    cl_w_dir = osp.join(ids_sources_dir, 'weights')
-    if not osp.isdir(cl_w_dir):
-        os.mkdir(cl_w_dir)
-    cl_t_dir = osp.join(ids_sources_dir, 'thresholds')
-    if not osp.isdir(cl_t_dir):
-        os.mkdir(cl_t_dir)
-
-    if not osp.isdir(ads_sources_dir):
-        os.mkdir(ads_sources_dir)
-    ad_w_dir = osp.join(ads_sources_dir, 'weights')
-    if not osp.isdir(ad_w_dir):
-        os.mkdir(ad_w_dir)
-    ad_t_dir = osp.join(ads_sources_dir, 'thresholds')
-    if not osp.isdir(ad_t_dir):
-        os.mkdir(ad_t_dir)
+    w_dir = osp.join(ids_sources_dir, 'weights')
+    if not osp.isdir(w_dir):
+        os.mkdir(w_dir)
+    t_dir = osp.join(ids_sources_dir, 'thresholds')
+    if not osp.isdir(t_dir):
+        os.mkdir(t_dir)
 
     # clean directories
 
-    clean_dir(cl_w_dir, postfix='.tflite')
-    clean_dir(cl_t_dir, postfix='.thr')
-    clean_dir(ad_w_dir, postfix='.tflite')
-    clean_dir(ad_t_dir, postfix='.thr')
+    clean_dir(w_dir, postfix='.tflite')
+    clean_dir(t_dir, postfix='.thr')
 
     # label names
 
@@ -111,44 +109,51 @@ if __name__ == '__main__':
 
     # compile models and select thresholds
 
-    for m_dir, w_dir, r_dir, t_dir in zip([cl_m_dir, ad_m_dir], [cl_w_dir, ad_w_dir], [cl_r_dir, ad_r_dir], [cl_t_dir, ad_t_dir]):
-        model_names = [item for item in os.listdir(m_dir) if osp.isdir(osp.join(m_dir, item))]
-        non_zero_label_names = []
-        for model_name in model_names:
-            spl = model_name.split('_')
-            input_name = osp.join(m_dir, model_name)
-            sstep = spl[-2]
-            alabel = spl[-1]
+    model_names = [item for item in os.listdir(m_dir) if osp.isdir(osp.join(m_dir, item))]
+    non_zero_label_names = []
+    for model_name in model_names:
+        spl = model_name.split('_')
+        input_name = osp.join(m_dir, model_name)
+        model_type = spl[0]
+        sstep = spl[-1]
+        alabel = spl[-2]
+        model = '_'.join(spl[:-1])
 
-            # check labels
+        # check labels
 
-            if ',' in alabel:
-                alabels = alabel.split(',')
-            else:
-                alabels = [alabel]
+        if ',' in alabel:
+            alabels = alabel.split(',')
+        else:
+            alabels = [alabel]
+
+        # compile?
+
+        if model_type in model_types:
             compile_model = True
             for al in alabels:
                 if al not in label_names or al in exclude_labels:
                     compile_model = False
                     break
+        else:
+            compile_model = False
 
-            # compile model and copy threshold if there is any
+        # compile model and copy threshold if there is any
 
-            if compile_model:
-                output_name = osp.join(w_dir, '{0}_{1}.tflite'.format(sstep, alabel))
-                converter = tf.lite.TFLiteConverter.from_saved_model(input_name)
-                tflite_model = converter.convert()
-                open(output_name, "wb").write(tflite_model)
+        if compile_model:
+            output_name = osp.join(w_dir, '{0}_{1}.tflite'.format(model, sstep))
+            converter = tf.lite.TFLiteConverter.from_saved_model(input_name)
+            tflite_model = converter.convert()
+            open(output_name, "wb").write(tflite_model)
 
-                if 'thr' in os.listdir(input_name):
-                    with open(osp.join(input_name, 'thr')) as f:
-                        thr = f.readline().strip()
-                    with open(osp.join(t_dir, '{0}_{1}.thr'.format(sstep, alabel)), 'w') as f:
-                        f.write(thr)
+            if 'thr' in os.listdir(input_name):
+                with open(osp.join(input_name, 'thr')) as f:
+                    thr = f.readline().strip()
+                with open(osp.join(t_dir, '{0}_{1}.thr'.format(model, sstep)), 'w') as f:
+                    f.write(thr)
 
     # copy feature extraction functions to ids, ads and ovs vms
 
-    for dir in [ids_sources_dir, ads_sources_dir, ovs_sources_dir]:
+    for dir in [ids_sources_dir, ovs_sources_dir]:
         if not osp.isdir('{0}/common'.format(dir)):
             os.mkdir('{0}/common'.format(dir))
         shutil.copy('common/pcap.py', '{0}/common/'.format(dir))
@@ -157,4 +162,3 @@ if __name__ == '__main__':
     # copy meta for ids and ads
 
     shutil.copy('{0}/metainfo.json'.format(feature_dir), ids_sources_dir)
-    shutil.copy('{0}/metainfo.json'.format(feature_dir), ads_sources_dir)

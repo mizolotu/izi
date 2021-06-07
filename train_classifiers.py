@@ -79,14 +79,14 @@ if __name__ == '__main__':
 
     # create output directories
 
-    if not osp.isdir(classfier_models_dir):
-        os.mkdir(classfier_models_dir)
+    if not osp.isdir(ids_models_dir):
+        os.mkdir(ids_models_dir)
 
-    models_path = osp.join(classfier_models_dir, 'checkpoints')
+    models_path = osp.join(ids_models_dir, 'checkpoints')
     if not osp.isdir(models_path):
         os.mkdir(models_path)
 
-    results_path = osp.join(classfier_models_dir, 'results')
+    results_path = osp.join(ids_models_dir, 'results')
     if not osp.isdir(results_path):
         os.mkdir(results_path)
 
@@ -220,7 +220,7 @@ if __name__ == '__main__':
 
         results = [str(sk_auc)]
 
-        r_path = osp.join(foutput[label], '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
+        r_path = osp.join(foutput[label], '{0}_{1}_{2}'.format(model_name, args.attack, args.step))
         if not osp.isdir(r_path):
             os.mkdir(r_path)
         stats_path = osp.join(r_path, 'stats.csv')
