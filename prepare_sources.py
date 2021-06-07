@@ -13,9 +13,9 @@ if __name__ == '__main__':
     # parse args
 
     parser = arp.ArgumentParser(description='Prepare resources')
-    parser.add_argument('-n', '--nenvs', help='Number of environments', type=int)
-    parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int)
-    parser.add_argument('-a', '--nadss', help='Number of ADS boxes in each environment', type=int)
+    parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=1)
+    parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int, default=1)
+    parser.add_argument('-a', '--nadss', help='Number of ADS boxes in each environment', type=int, default=1)
     parser.add_argument('-e', '--exclude', help='Model labels to avoid, for experiment purposes')
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
     args = parser.parse_args()
@@ -33,17 +33,11 @@ if __name__ == '__main__':
     # update nenvs and nidss
 
     if args.nenvs is not None:
-        nenvs = args.nenvs
-    else:
-        nenvs = env_vms['ovs']['n']
+        env_vms['ovs']['n'] = args.nenvs
     if args.nidss is not None:
-        nidss = args.nidss
-    else:
-        nidss = env_vms['ids']['n']
+        env_vms['ids']['n'] = args.nidss
     if args.nadss is not None:
-        nadss = args.nadss
-    else:
-        nadss = env_vms['ads']['n']
+        env_vms['ads']['n'] = args.nadss
 
     # preparare vagrant file
 
@@ -51,7 +45,7 @@ if __name__ == '__main__':
 
     for key in env_vms.keys():
         vm_ips = env_vms[key]['ips']
-        for i in range(nenvs):
+        for i in range(env_vms['ovs']['n']):
             for j in range(env_vms[key]['n']):
                 vm_name = f'{key}_{i}_{j}'
                 vms.append(vm_name)
@@ -138,7 +132,7 @@ if __name__ == '__main__':
                     compile_model = False
                     break
 
-            # compile model and save threshold
+            # compile model and copy threshold if there is any
 
             if compile_model:
                 output_name = osp.join(w_dir, '{0}_{1}.tflite'.format(sstep, alabel))

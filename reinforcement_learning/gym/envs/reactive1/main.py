@@ -81,10 +81,8 @@ class AttackMitigationEnv():
 
         controller_vm = [vm for vm in self.vms if vm['role'] == 'sdn']
         assert len(controller_vm) == 1
-        controller_name = controller_vm[0]['vm']
         controller_ip = controller_vm[0]['ip']
-        if controller_name == ctrl_name:
-            self.controller = Odl(controller_ip)
+        self.controller = Odl(controller_ip)
 
         # tables and tunnels
 
@@ -139,7 +137,7 @@ class AttackMitigationEnv():
 
         with open(actions_fpath, 'w') as f:
             for i in range(act_dim):
-                fun, args, idx_val = self._action_mapper(i)
+                fun, args, idx_val, q = self._action_mapper(i)
                 line = f"{i};{fun.__name__};{idx_val};{','.join([str(item) for item in args])}\n"
                 f.write(line)
 

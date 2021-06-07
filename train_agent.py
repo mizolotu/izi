@@ -25,6 +25,8 @@ if __name__ == '__main__':
 
     if args.nenvs is not None:
         nenvs = args.nenvs
+    else:
+        nenvs = env_vms['ovs']['n']
 
     meta = load_meta(feature_dir)
     labels = sorted(meta['labels'])

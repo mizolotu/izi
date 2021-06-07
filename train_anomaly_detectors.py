@@ -14,10 +14,10 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='vae')
+    parser.add_argument('-m', '--model', help='Model', default='som')
     parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
     parser.add_argument('-n', '--neurons', help='Number of neurons', default=324, type=int)
-    parser.add_argument('-a', '--attack', help='Attack labels, 0 corresponds to all data', default='0')
+    parser.add_argument('-a', '--attack', help='Attack labels, 0 corresponds to all data', default='1,2,3')
     parser.add_argument('-s', '--step', help='Polling step', default='1.0')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
 
@@ -164,24 +164,28 @@ if __name__ == '__main__':
         validation_data=batches['validate'],
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
-        #callbacks=[tf.keras.callbacks.EarlyStopping(
-        #    monitor='val_auc',
-        #    verbose=0,
-        #    patience=patience,
-        #    mode='max',
-        #    restore_best_weights=True
-        #), ToggleMetrics()]
-        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'])]
+        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model)]
     )
+
+    # calculate thresholds for fpr levels specified in config
 
     errors = []
     testy = []
+    thrs = []
     for x, y in batches['validate']:
         reconstructions = model.predict(x)
         errors = np.concatenate([errors, np.linalg.norm(reconstructions - y[:, :-1], axis=1)])
         testy = np.concatenate([testy, y[:, -1]])
+    ns_fpr, ns_tpr, ns_thr = roc_curve(testy, errors)
+    for fpr_level in fpr_levels:
+        idx = np.where(ns_fpr <= fpr_level)[0][-1]
+        thrs.append(str(ns_thr[idx]))
+        print(ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
+
+    # save model and threshold
 
     model.save(m_path)
+    open(osp.join(m_path, 'thr'), 'w').write(','.join(thrs))
 
     # predict and calculate inference statistics
 
@@ -190,7 +194,7 @@ if __name__ == '__main__':
         probs = []
         testy = []
         for x, y in batches['test'][label]:
-            y_labels = np.clip(y[:, -1], 0, 1)
+            y_labels = y[:, -1]
             t_now = time()
             reconstructions = model.predict(x)
             probs = np.hstack([probs, np.linalg.norm(reconstructions - x, axis=1)])

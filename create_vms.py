@@ -9,7 +9,7 @@ if __name__ == '__main__':
     # parse args
 
     parser = arp.ArgumentParser(description='Create VMs.')
-    parser.add_argument('-p', '--provision', help='Provision?', default=True, type=bool)
+    parser.add_argument('-p', '--provision', help='Provision?', default=False, type=bool)
     args = parser.parse_args()
 
     # start vagrant
@@ -44,6 +44,8 @@ if __name__ == '__main__':
     for vm in vms:
         if vm.startswith('ids'):
             roles.append('ids')
+        elif vm.startswith('ads'):
+            roles.append('ads')
         elif vm.startswith('ovs'):
             roles.append('ovs')
         elif vm.startswith(ctrl_name):

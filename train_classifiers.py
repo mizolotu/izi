@@ -172,7 +172,25 @@ if __name__ == '__main__':
         )]
     )
 
+    # calculate thresholds for fpr levels specified in config
+
+    probs = []
+    testy = []
+    thrs = []
+    for x, y in batches['validate']:
+        predictions = model.predict(x)
+        probs = np.hstack([probs, predictions[:, 0]])
+        testy = np.concatenate([testy, y])
+    ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
+    for fpr_level in fpr_levels:
+        idx = np.where(ns_fpr <= fpr_level)[0][-1]
+        thrs.append(str(ns_thr[idx]))
+        print(ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
+
+    # save model and threshold
+
     model.save(m_path)
+    open(osp.join(m_path, 'thr'), 'w').write(','.join(thrs))
 
     # predict and calculate inference statistics
 

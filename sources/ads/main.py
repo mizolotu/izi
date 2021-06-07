@@ -1,5 +1,6 @@
 import tflite_runtime.interpreter as tflite
-import logging, pcap
+import logging, pcap, inspect
+import os.path as osp
 
 from common.data import *
 from flask import Flask, request, jsonify
@@ -192,7 +193,7 @@ class Interceptor:
     def analyze_flow(self, flow_idx):
         flow_features = self.calculate_flow_features(flow_idx)
         flow_features = (flow_features - self.xmin) / (self.xmax - self.xmin + 1e-10)
-        reconstruction = self.predict(np.array(flow_features, dtype=np.float32).reshape(1,len(flow_features)))
+        reconstruction = self.predict(np.array(flow_features, dtype=np.float32).reshape(1, len(flow_features)))
         ...
         return
 
@@ -203,7 +204,8 @@ class Interceptor:
 
 if __name__ == "__main__":
 
-    model_path = '/home/vagrant/ids/'
+    fname = inspect.getframeinfo(inspect.currentframe()).filename
+    model_path = os.path.dirname(os.path.abspath(fname))
     iface = 'vxlan_sys_4789'
 
     interceptor = Interceptor(iface, model_path)

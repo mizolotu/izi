@@ -18,18 +18,6 @@ def load_batches(path, batch_size, nfeatures):
     )
     return batches
 
-def load_batches_for_anomaly_detection(path, batch_size, nfeatures):
-    batches = tf.data.experimental.make_csv_dataset(
-        path,
-        batch_size=batch_size,
-        header=False,
-        shuffle=True,
-        column_names=[str(i) for i in range(nfeatures)],
-        column_defaults=[tf.float32 for _ in range(nfeatures)],
-        select_columns=[str(i) for i in range(nfeatures)]
-    )
-    return batches
-
 def load_meta(fpath, fname='metainfo.json'):
     meta = None
     try:
@@ -48,9 +36,10 @@ def classification_mapper(features, label, xmin, xmax, eps=1e-10):
     label = tf.clip_by_value(label, 0, 1)
     return features, label
 
-def anomaly_detection_mapper(features, labels, xmin, xmax, eps=1e-10):
+def anomaly_detection_mapper(features, label, xmin, xmax, eps=1e-10):
     features = (tf.stack(list(features.values()), axis=-1) - xmin) / (xmax - xmin + eps)
-    features_with_labels = tf.concat([features, tf.reshape(labels, (-1, 1))], axis=1)
+    label = tf.clip_by_value(label, 0, 1)
+    features_with_labels = tf.concat([features, tf.reshape(label, (-1, 1))], axis=1)
     return features, features_with_labels
 
 def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
@@ -170,12 +159,14 @@ class ToggleMetrics(tf.keras.callbacks.Callback):
 
 class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
 
-    def __init__(self, validation_data, patience=10):
+    def __init__(self, validation_data, patience=10, model_type='ae', nnn=4):
         super(EarlyStoppingAtMaxAuc, self).__init__()
         self.patience = patience
         self.best_weights = None
         self.validation_data = validation_data
         self.current = -np.Inf
+        self.model_type = model_type
+        self.nnn = nnn
 
     def on_train_begin(self, logs=None):
         self.wait = 0
@@ -200,7 +191,13 @@ class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
         for x, y in self.validation_data:
             y_labels = np.clip(y[:, -1], 0, 1)
             reconstructions = self.model.predict(x)
-            probs = np.hstack([probs, np.linalg.norm(reconstructions - x, axis=1)])
+            if self.model_type == 'ae':
+                new_probs = np.linalg.norm(reconstructions - x, axis=1)
+            elif self.model_type == 'som':
+                new_probs = np.mean(reconstructions[:, :self.nnn], axis=1)
+            else:
+                raise NotImplemented
+            probs = np.hstack([probs, new_probs])
             testy = np.hstack([testy, y_labels])
         self.current = roc_auc_score(testy, probs)
         print('\nValidation AUC:', self.current)
@@ -406,3 +403,152 @@ def vae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
     model.build((None, nfeatures - 1))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr), loss=ae_reconstruction_loss)
     return model, 'vae_{0}_{1}'.format(nl, nh)
+
+class MLPLayer(tf.keras.layers.Layer):
+
+    def __init__(self, nl, nh, dropout, batchnorm):
+        super(MLPLayer, self).__init__()
+        self.layers = []
+        if batchnorm:
+            norm = tf.keras.layers.BatchNormalization()
+            self.layers.append(norm)
+        for i in range(nl):
+            self.layers.append(tf.keras.layers.Dense(nh, activation='relu'))
+            if dropout is not None:
+                self.layers.append(tf.keras.layers.Dropout(dropout))
+
+    def call(self, inputs):
+        x = inputs
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+
+class SOMLayer(tf.keras.layers.Layer):
+
+    def __init__(self, map_size, prototypes=None, **kwargs):
+        if 'input_shape' not in kwargs and 'latent_dim' in kwargs:
+            kwargs['input_shape'] = (kwargs.pop('latent_dim'),)
+        super(SOMLayer, self).__init__(**kwargs)
+        self.map_size = map_size
+        self.n_prototypes = map_size[0] * map_size[1]
+        self.initial_prototypes = prototypes
+        self.input_spec = tf.keras.layers.InputSpec(ndim=2)
+        self.prototypes = None
+        self.built = False
+
+    def build(self, input_shape):
+        assert(len(input_shape) == 2)
+        input_dim = input_shape[1]
+        self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, input_dim))
+        self.prototypes = self.add_weight(shape=(self.n_prototypes, input_dim), initializer='glorot_uniform', name='prototypes')
+        if self.initial_prototypes is not None:
+            self.set_weights(self.initial_prototypes)
+            del self.initial_prototypes
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        d = tf.reduce_sum(tf.square(tf.expand_dims(inputs, axis=1) - self.prototypes), axis=2)
+        return d
+
+    def compute_output_shape(self, input_shape):
+        assert(input_shape and len(input_shape) == 2)
+        return input_shape[0], self.n_prototypes
+
+    def get_config(self):
+        config = {'map_size': self.map_size}
+        base_config = super(SOMLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+def som_loss(weights, distances):
+    return tf.reduce_mean(tf.reduce_sum(weights * distances, axis=1))
+
+class DSOM(tf.keras.models.Model):
+
+    def __init__(self, nlayers, nhidden, map_size, dropout, batchnorm, T_min=0.1, T_max=10.0, niterations=10000):
+        super(DSOM, self).__init__()
+        self.map_size = map_size
+        self.n_prototypes = map_size[0] * map_size[1]
+        self.mlp_layer = MLPLayer(nlayers, nhidden, dropout, batchnorm)
+        self.som_layer = SOMLayer(map_size, name='SOM')
+        self.T_min = T_min
+        self.T_max = T_max
+        self.niterations = niterations
+        self.current_iteration = 0
+        self.total_loss_tracker = tf.keras.metrics.Mean(name='total_loss')
+
+    @property
+    def prototypes(self):
+        return self.som_layer.get_weights()[0]
+
+    def call(self, x):
+        x = self.mlp_layer(x)
+        d = self.som_layer(x)
+        return tf.sort(d, axis=1)  # tf.math.argmin(d, axis=1)
+
+    def map_dist(self, y_pred):
+        labels = np.arange(self.n_prototypes)
+        tmp = tf.expand_dims(y_pred, axis=1)
+        d_row = tf.math.abs(tmp - labels) // self.map_size[1]
+        d_col = tf.math.abs(tmp % self.map_size[1] - labels % self.map_size[1])
+        return tf.cast(d_row + d_col, tf.float32)
+
+    @staticmethod
+    def neighborhood_function(d, T):
+        return tf.math.exp(-(d ** 2) / (T ** 2))
+
+    def train_step(self, data):
+        inputs, outputs = data
+        with tf.GradientTape() as tape:
+
+            # Compute cluster assignments for batches
+
+            inputs = self.mlp_layer(inputs)
+            d = self.som_layer(inputs)
+            y_pred = tf.math.argmin(d, axis=1)
+
+            # Update temperature parameter
+
+            self.current_iteration += 1
+            if self.current_iteration > self.niterations:
+                self.current_iteration = self.niterations
+            self.T = self.T_max * (self.T_min / self.T_max) ** (self.current_iteration / (self.niterations - 1))
+
+            # Compute topographic weights batches
+
+            w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
+            print(w_batch)
+
+            # calculate loss
+
+            loss = som_loss(w_batch, d)
+
+        grads = tape.gradient(loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.total_loss_tracker.update_state(loss)
+        return {
+            "total_loss": self.total_loss_tracker.result()
+        }
+
+    def test_step(self, data):
+        inputs, outputs = data
+
+        # Compute cluster assignments for batches
+
+        inputs = self.mlp_layer(inputs)
+        d = self.som_layer(inputs)
+        y_pred = tf.math.argmin(d, axis=1)
+        w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
+        loss = som_loss(w_batch, d)
+        self.total_loss_tracker.update_state(loss)
+        return {
+            "total_loss": self.total_loss_tracker.result()
+        }
+
+def som(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
+    msize = np.int(np.sqrt(nh)) + 1
+    map_size = [msize, msize]
+    model = DSOM(nl, nh, map_size, dropout, batchnorm)
+    model.build(input_shape=(None, nfeatures - 1))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
+    return model, 'som_{0}_{1}'.format(nl, nh)
