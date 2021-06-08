@@ -83,8 +83,8 @@ class Interceptor:
         self.intrusion_ids = deque(maxlen=qsize)
         self.model_path = osp.join(main_path, 'weights')
         self.thr_path = osp.join(main_path, 'thresholds')
-        self.model_labels = sorted(list(set(['_'.join(item.split('.tflite')[0].split('_')[:1]) for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
-        self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
+        self.model_labels = sorted(list(set(['_'.join(item.split('.tflite')[0].split('_')[:-1]) for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
+        self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[-1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
         with open(osp.join(main_path, 'metainfo.json'), 'r') as f:
             meta = json.load(f)
         self.xmin = np.array(meta['xmin'])

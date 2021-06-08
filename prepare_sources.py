@@ -60,8 +60,8 @@ if __name__ == '__main__':
                 cpus.append(env_vms[key]['cpus'])
                 ips.append(vm_ips)
                 sources.append(env_vms[key]['sources'])
-                scripts.append(env_vms[key]['script'])
                 mounts.append(env_vms[key]['mount'])
+                scripts.append(env_vms[key]['script'])
                 vm_ips = increment_ips(vm_ips)
             if env_vms[key]['unique']:
                 break

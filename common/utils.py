@@ -31,9 +31,9 @@ def vagrantfile_vms(names, cpus, ips, sources, scripts, mounts):
             lines.append(f"    {name}.vm.network :private_network, :ip => '{ip}'\n")
         for source in source_list:
             lines.append(f"    {name}.vm.provision 'file', source: '{source[0]}', destination: '{source[1]}'\n")
-        lines.append(f"    {name}.vm.provision :shell, :path => '{script}', privileged: false\n")
         if mount is not None:
             lines.append(f"    {name}.vm.synced_folder '{mount[0]}', '{mount[1]}', type: 'nfs', nfs_udp: false\n")
+        lines.append(f"    {name}.vm.provision :shell, :path => '{script}', privileged: false\n")
         lines.append("  end\n\n")
     return lines
 
