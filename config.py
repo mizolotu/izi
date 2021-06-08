@@ -9,18 +9,14 @@ vms_fpath = '{0}/vms.json'.format(log_dir)
 ofports_fpath = '{0}/ofports.json'.format(log_dir)
 nodes_fpath = '{0}/nodes.json'.format(log_dir)
 actions_fpath = '{0}/actions.csv'.format(log_dir)
-classfier_models_dir = 'models/classifiers'
-classfier_results_dir = '{0}/results'.format(classfier_models_dir)
-anomaly_detector_models_dir = 'models/anomaly_detectors'
-anomaly_detector_results_dir = '{0}/results'.format(anomaly_detector_models_dir)
+ids_models_dir = 'models/ids'
+ids_results_dir = '{0}/results'.format(ids_models_dir)
 sources_dir = 'sources'
 ovs_sources_dir = f'{sources_dir}/ovs/'
 ids_sources_dir = f'{sources_dir}/ids/'
-ads_sources_dir = f'{sources_dir}/ads/'
 rl_models_dir = 'models'
 rl_results_dir = 'results'
 ids_model_weights_dir = '{0}/weights'.format(ids_sources_dir)
-ads_model_weights_dir = '{0}/weights'.format(ads_sources_dir)
 figures_dir = 'figures'
 roc_dir = '{0}/roc'.format(figures_dir)
 progress_dir = '{0}/progress'.format(figures_dir)
@@ -56,18 +52,9 @@ env_vms = {
         'script': 'scripts/ids.sh',
         'mount': None
     },
-    'ads': {
-        'unique': False,
-        'n': 1,
-        'cpus': 2,
-        'ips': ['192.168.254.80'],
-        'sources': [['./sources/ads.service', '/home/vagrant/'], ['./sources/ads', '/home/vagrant/']],
-        'script': 'scripts/ads.sh',
-        'mount': None
-    }
 }
 
-# ids and ads
+# ids
 
 seed = 0
 batch_size = 1024  # batch size will actually be double that
@@ -79,7 +66,6 @@ n_ds_params = len(ds_params)
 roc_fname = 'roc.csv'
 fpr_levels = [0.01, 0.001, 0.0001]
 fsize_min = 100000
-som_nnn = 4
 
 # sdn
 
