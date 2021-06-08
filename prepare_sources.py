@@ -15,10 +15,9 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Prepare resources')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=1)
     parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int, default=1)
-    parser.add_argument('-a', '--nadss', help='Number of ADS boxes in each environment', type=int, default=1)
     parser.add_argument('-e', '--exclude', help='Model labels to avoid, for experiment purposes')
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
-    parser.add_argument('-m', '--models', help='IDS models', default='mlp')
+    parser.add_argument('-m', '--models', help='IDS models', default='mlp,ae,som')
     args = parser.parse_args()
 
     # models
@@ -47,8 +46,6 @@ if __name__ == '__main__':
         env_vms['ovs']['n'] = args.nenvs
     if args.nidss is not None:
         env_vms['ids']['n'] = args.nidss
-    if args.nadss is not None:
-        env_vms['ads']['n'] = args.nadss
 
     # preparare vagrant file
 

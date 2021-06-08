@@ -57,6 +57,7 @@ if __name__ == '__main__':
         attacks = [int(args.attack)]
     attacks = sorted(attacks)
     train_labels = [0] + [label for label in labels if label in attacks]
+    non_train_labels = [label for label in labels if label > 0 and label not in attacks]
     attack_labels_str = [str(item) for item in train_labels if item > 0]
 
     print(f'Training using attack labels {train_labels}')
@@ -90,11 +91,8 @@ if __name__ == '__main__':
         os.mkdir(results_path)
 
     foutput = {}
-    for label in train_labels:
-        if label > 0:
-            foutput[label] = osp.join(results_path, str(int(label)))
-        else:
-            foutput[label] = osp.join(results_path, ','.join(attack_labels_str))
+    for label in non_train_labels:
+        foutput[label] = osp.join(results_path, str(int(label)))
         if not osp.isdir(foutput[label]):
             os.mkdir(foutput[label])
 
@@ -133,17 +131,11 @@ if __name__ == '__main__':
         batches['validate'] = batches['validate'].take(num_batches['validate'])
 
     batches['test'] = {}
-    for label in labels:
-        if label > 0:
-            batches_ = [load_batches(fp, batch_size, nfeatures).map(ad_mapper) for fp in fpaths_star['test'][label]]
-            batches['test'][label] = tf.data.experimental.sample_from_datasets([batches_[0], batches_[1]], [0.5, 0.5]).unbatch().shuffle(batch_size * 2).batch(batch_size)
-            if num_batches['test'] is not None:
-                batches['test'][label] = batches['test'][label].take(num_batches['test'])
-        else:
-            batches_ = [load_batches(fp, batch_size, nfeatures).map(ad_mapper) for fp in fpaths_star['test'][label]]
-            batches['test'][label] = tf.data.experimental.sample_from_datasets(batches_, [0.5] + [0.5 / (len(train_labels) - 1) for _ in train_labels[1:]]).unbatch().shuffle(batch_size * 2).batch(batch_size)
-            if num_batches['test'] is not None:
-                batches['test'][label] = batches['test'][label].take(num_batches['test'])
+    for label in non_train_labels:
+        batches_ = [load_batches(fp, batch_size, nfeatures).map(ad_mapper) for fp in fpaths_star['test'][label]]
+        batches['test'][label] = tf.data.experimental.sample_from_datasets([batches_[0], batches_[1]], [0.5, 0.5]).unbatch().shuffle(batch_size * 2).batch(batch_size)
+        if num_batches['test'] is not None:
+            batches['test'][label] = batches['test'][label].take(num_batches['test'])
 
     model_type = getattr(models, args.model)
     model, model_name = model_type(nfeatures, args.layers, args.neurons)
@@ -152,7 +144,7 @@ if __name__ == '__main__':
 
     # create model checkpoint directories
 
-    m_path = osp.join(models_path, f'{model_name}_{args.step}_{args.attack}')
+    m_path = osp.join(models_path, f'{model_name}_{args.attack}_{args.step}')
     if not osp.isdir(m_path):
         os.mkdir(m_path)
 
@@ -163,7 +155,7 @@ if __name__ == '__main__':
         validation_data=batches['validate'],
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
-        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model, nnn=som_nnn)]
+        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model)]
     )
 
     # calculate thresholds for fpr levels specified in config
@@ -176,7 +168,7 @@ if __name__ == '__main__':
         if args.model == 'ae':
             new_errors = np.linalg.norm(reconstructions - y[:, :-1], axis=1)
         elif args.model == 'som':
-            new_errors = np.mean(reconstructions[:, :som_nnn], axis=1)
+            new_errors = reconstructions
         errors = np.concatenate([errors, new_errors])
         testy = np.concatenate([testy, y[:, -1]])
     ns_fpr, ns_tpr, ns_thr = roc_curve(testy, errors)
@@ -192,7 +184,7 @@ if __name__ == '__main__':
 
     # predict and calculate inference statistics
 
-    for label in train_labels:
+    for label in non_train_labels:
         t_test = 0
         probs = []
         testy = []
@@ -203,7 +195,7 @@ if __name__ == '__main__':
             if args.model == 'ae':
                 new_probs = np.linalg.norm(reconstructions - y[:, :-1], axis=1)
             elif args.model == 'som':
-                new_probs = np.mean(reconstructions[:, :som_nnn], axis=1)
+                new_probs = reconstructions
             probs = np.hstack([probs, new_probs])
             testy = np.hstack([testy, y_labels])
             t_test += (time() - t_now)

@@ -159,14 +159,13 @@ class ToggleMetrics(tf.keras.callbacks.Callback):
 
 class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
 
-    def __init__(self, validation_data, patience=10, model_type='ae', nnn=4):
+    def __init__(self, validation_data, patience=10, model_type='ae'):
         super(EarlyStoppingAtMaxAuc, self).__init__()
         self.patience = patience
         self.best_weights = None
         self.validation_data = validation_data
         self.current = -np.Inf
         self.model_type = model_type
-        self.nnn = nnn
 
     def on_train_begin(self, logs=None):
         self.wait = 0
@@ -194,7 +193,7 @@ class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
             if self.model_type == 'ae':
                 new_probs = np.linalg.norm(reconstructions - x, axis=1)
             elif self.model_type == 'som':
-                new_probs = np.mean(reconstructions[:, :self.nnn], axis=1)
+                new_probs = reconstructions
             else:
                 raise NotImplemented
             probs = np.hstack([probs, new_probs])
@@ -431,7 +430,7 @@ class SOMLayer(tf.keras.layers.Layer):
             kwargs['input_shape'] = (kwargs.pop('latent_dim'),)
         super(SOMLayer, self).__init__(**kwargs)
         self.map_size = map_size
-        self.n_prototypes = map_size[0] * map_size[1]
+        self.nprototypes = map_size[0] * map_size[1]
         self.initial_prototypes = prototypes
         self.input_spec = tf.keras.layers.InputSpec(ndim=2)
         self.prototypes = None
@@ -441,7 +440,7 @@ class SOMLayer(tf.keras.layers.Layer):
         assert(len(input_shape) == 2)
         input_dim = input_shape[1]
         self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, input_dim))
-        self.prototypes = self.add_weight(shape=(self.n_prototypes, input_dim), initializer='glorot_uniform', name='prototypes')
+        self.prototypes = self.add_weight(shape=(self.nprototypes, input_dim), initializer='glorot_uniform', name='prototypes')
         if self.initial_prototypes is not None:
             self.set_weights(self.initial_prototypes)
             del self.initial_prototypes
@@ -453,7 +452,7 @@ class SOMLayer(tf.keras.layers.Layer):
 
     def compute_output_shape(self, input_shape):
         assert(input_shape and len(input_shape) == 2)
-        return input_shape[0], self.n_prototypes
+        return input_shape[0], self.nprototypes
 
     def get_config(self):
         config = {'map_size': self.map_size}
@@ -465,10 +464,10 @@ def som_loss(weights, distances):
 
 class DSOM(tf.keras.models.Model):
 
-    def __init__(self, nlayers, nhidden, map_size, dropout, batchnorm, T_min=0.1, T_max=10.0, niterations=10000):
+    def __init__(self, nlayers, nhidden, map_size, dropout, batchnorm, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
         super(DSOM, self).__init__()
         self.map_size = map_size
-        self.n_prototypes = map_size[0] * map_size[1]
+        self.nprototypes = map_size[0] * map_size[1]
         self.mlp_layer = MLPLayer(nlayers, nhidden, dropout, batchnorm)
         self.som_layer = SOMLayer(map_size, name='SOM')
         self.T_min = T_min
@@ -476,6 +475,7 @@ class DSOM(tf.keras.models.Model):
         self.niterations = niterations
         self.current_iteration = 0
         self.total_loss_tracker = tf.keras.metrics.Mean(name='total_loss')
+        self.nnn = nnn
 
     @property
     def prototypes(self):
@@ -484,10 +484,12 @@ class DSOM(tf.keras.models.Model):
     def call(self, x):
         x = self.mlp_layer(x)
         d = self.som_layer(x)
-        return tf.sort(d, axis=1)  # tf.math.argmin(d, axis=1)
+        s = tf.sort(d, axis=1)
+        spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
+        return tf.reduce_mean(spl[0], axis=1)  # tf.math.argmin(d, axis=1)
 
     def map_dist(self, y_pred):
-        labels = np.arange(self.n_prototypes)
+        labels = np.arange(self.nprototypes)
         tmp = tf.expand_dims(y_pred, axis=1)
         d_row = tf.math.abs(tmp - labels) // self.map_size[1]
         d_col = tf.math.abs(tmp % self.map_size[1] - labels % self.map_size[1])

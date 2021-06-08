@@ -152,7 +152,7 @@ if __name__ == '__main__':
 
     # create model and results directories
 
-    m_path = osp.join(models_path, '{0}_{1}_{2}'.format(model_name, args.step, args.attack))
+    m_path = osp.join(models_path, '{0}_{1}_{2}'.format(model_name, args.attack, args.step))
     if not osp.isdir(m_path):
         os.mkdir(m_path)
 

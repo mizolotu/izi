@@ -1,5 +1,5 @@
 import tflite_runtime.interpreter as tflite
-import logging, pcap
+import logging, pcap, inspect
 
 from common.data import *
 from flask import Flask, request, jsonify
@@ -10,10 +10,22 @@ app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
+@app.route('/')
+def info():
+    return jsonify({'nlabels': len(interceptor.model_labels), 'nsteps': len(interceptor.model_steps)})
+
 @app.route('/reset')
 def restart():
     interceptor.reset()
     return jsonify('ok')
+
+@app.route('/model', methods=['GET', 'POST'])
+def model_label():
+    if request.method == 'POST':
+        data = request.data.decode('utf-8')
+        jdata = json.loads(data)
+        interceptor.set_model(jdata['model'])
+    return jsonify({'model': interceptor.model_labels[interceptor.model_idx]})
 
 @app.route('/step', methods=['GET', 'POST'])
 def polling_step():
@@ -23,13 +35,13 @@ def polling_step():
         interceptor.set_step(jdata['step'])
     return jsonify({'step': interceptor.model_steps[interceptor.step_idx]})
 
-@app.route('/model', methods=['GET', 'POST'])
-def model_label():
+@app.route('/threshold', methods=['GET', 'POST'])
+def model_threshold():
     if request.method == 'POST':
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
-        interceptor.set_model(jdata['model'])
-    return jsonify({'model': interceptor.model_labels[interceptor.model_idx]})
+        interceptor.set_threshold(jdata['threshold'])
+    return jsonify({'threshold': interceptor.model_labels[interceptor.thr_idx]})
 
 @app.route('/intrusions')
 def intrusions():
@@ -63,37 +75,47 @@ class Interceptor:
     dst_port_idx = 3
     proto_idx = 4
 
-    def __init__(self, iface, main_path, model_idx=0, step_idx=0, qsize=10000):
+    def __init__(self, iface, main_path, model_idx=0, step_idx=0, thr_idx=0, qsize=10000):
 
         self.iface = iface
         self.flows = []
         self.flow_ids = []
         self.intrusion_ids = deque(maxlen=qsize)
-
         self.model_path = osp.join(main_path, 'weights')
-        self.model_labels = sorted(list(set([item.split('.tflite')[0].split('_')[1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
-        self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[0] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
+        self.thr_path = osp.join(main_path, 'thresholds')
+        self.model_labels = sorted(list(set(['_'.join(item.split('.tflite')[0].split('_')[:1]) for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
+        self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
         with open(osp.join(main_path, 'metainfo.json'), 'r') as f:
             meta = json.load(f)
         self.xmin = np.array(meta['xmin'])
         self.xmax = np.array(meta['xmax'])
         self.model_idx = model_idx
         self.step_idx = step_idx
+        self.thr_idx = thr_idx
         self.set_model(model_idx)
         self.set_step(step_idx)
+        self.set_threshold(thr_idx)
         self.to_be_reset = False
+
+    def load_model(self, model_label, model_step):
+        self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_label, model_step)))
+        self.model_type = fname.split('_')[0]
+        self.thrs = [float(item) for item in open(osp.join(self.thr_path, f'{model_label}_{model_step}.thr')).readline().strip().split(',')]
 
     def set_model(self, idx):
         model_label = self.model_labels[idx]
         model_step = self.model_steps[self.step_idx]
-        self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_step, model_label)))
+        self.load_model(model_label, model_step)
         self.model_idx = idx
 
     def set_step(self, idx):
         model_step = self.model_steps[idx]
         model_label = self.model_labels[self.model_idx]
-        self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_step, model_label)))
+        self.load_model(model_label, model_step)
         self.step_idx = idx
+
+    def set_threshold(self, idx):
+        self.thr_idx = idx
 
     def reset(self):
         step_idx = 0
@@ -147,8 +169,8 @@ class Interceptor:
                         try:
                             p = self.analyze_flow(i)
                         except:
-                            p = 0
-                        if p > 0.5:
+                            p = -np.inf
+                        if p > self.thrs[self.thr_idx]:
                             self.intrusion_ids.appendleft(self.flow_ids[i])
                     self.delay = datetime.now().timestamp() - tnow
                     self.nflows = len(self.flow_ids)
@@ -178,7 +200,7 @@ class Interceptor:
         output_details = self.interpreter.get_output_details()
         self.interpreter.set_tensor(input_details[0]['index'], x)
         self.interpreter.invoke()
-        p = self.interpreter.get_tensor(output_details[0]['index'])[0][0]
+        p = self.interpreter.get_tensor(output_details[0]['index'])[0]
         return p
 
     def calculate_flow_features(self, flow_idx):
@@ -189,7 +211,14 @@ class Interceptor:
     def analyze_flow(self, flow_idx):
         flow_features = self.calculate_flow_features(flow_idx)
         flow_features = (flow_features - self.xmin) / (self.xmax - self.xmin + 1e-10)
-        return self.predict(np.array(flow_features, dtype=np.float32).reshape(1,len(flow_features)))
+        prediction = self.predict(np.array(flow_features, dtype=np.float32).reshape(1,len(flow_features)))
+        if self.model_type == 'mlp':
+            result = prediction[0]
+        elif self.model_type == 'ae':
+            result = np.linalg.norm(flow_features - prediction[0])
+        elif self.model_type == 'som':
+            result = prediction[0]
+        return result
 
     def get_intrusions(self):
         intrusions = list(self.intrusion_ids)
@@ -198,7 +227,8 @@ class Interceptor:
 
 if __name__ == "__main__":
 
-    model_path = '/home/vagrant/ids/'
+    fname = inspect.getframeinfo(inspect.currentframe()).filename
+    model_path = os.path.dirname(os.path.abspath(fname))
     iface = 'vxlan_sys_4789'
 
     interceptor = Interceptor(iface, model_path)
