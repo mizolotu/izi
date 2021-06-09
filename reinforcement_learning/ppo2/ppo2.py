@@ -535,6 +535,8 @@ class Runner(AbstractEnvRunner):
 
         print(f'Step time in {env_idx}: {(time.time() - tstart) / self.n_steps}')
 
+        rewards = self.env.reward_one(env_idx)
+
     def _run(self):
         """
         Run a learning step of the model

@@ -103,8 +103,12 @@ def replay_pcap(fpath, iface, duration):
 def samples():
     data = request.data.decode('utf-8')
     jdata = json.loads(data)
-    in_vals, out_vals = flow_collector.retrieve_data(jdata['window'])
-    return jsonify(in_vals, out_vals)
+    vals = flow_collector.retrieve_data(jdata['window'])
+    return jsonify(vals)
+
+@app.route('/report')
+def report():
+    return jsonify({'in_pkts': list(flow_collector.in_pkts), 'out_pkts': list(flow_collector.out_pkts), 'timestamps': list(flow_collector.state_timestamps)})
 
 @app.route('/reset')
 def reset():
@@ -113,19 +117,17 @@ def reset():
 
 class FlowCollector():
 
-    def __init__(self, qsize=100000, in_iface='obs_br', out_iface='rew_br'):
+    def __init__(self, in_iface='obs_br', out_iface='rew_br'):
         self.in_iface = in_iface
         self.out_iface = out_iface
-        self.in_samples = []
-        self.out_samples = []
-        self.in_queue = deque(maxlen=qsize)
-        self.out_queue = deque(maxlen=qsize)
-        self.qsize = qsize
+        self.in_pkts = deque()
+        self.out_pkts = deque()
+        self.state_timestamps = deque()
 
     def start(self):
-        in_thr = Thread(target=self._recv, args=(self.in_iface, self.in_queue), daemon=True)
+        in_thr = Thread(target=self._recv, args=(self.in_iface, self.in_pkts), daemon=True)
         in_thr.start()
-        out_thr = Thread(target=self._recv, args=(self.out_iface, self.out_queue), daemon=True)
+        out_thr = Thread(target=self._recv, args=(self.out_iface, self.out_pkts), daemon=True)
         out_thr.start()
 
     def _recv(self, iface, dq):
@@ -145,44 +147,26 @@ class FlowCollector():
             except Exception as e:
                 print(e)
 
-
     def retrieve_data(self, window):
-        in_thr = Thread(target=self._retrieve_data_in, args=(window,), daemon=True)
-        in_thr.start()
-        out_thr = Thread(target=self._retrieve_data_out, args=(window,), daemon=True)
-        out_thr.start()
-        for thr in [in_thr, out_thr]:
-            thr.join()
-        return self.in_samples, self.out_samples
-
-    def _retrieve_data_in(self, window):
         tnow = datetime.now().timestamp()
-        self.in_samples = []
-        in_items = list(self.in_queue)
+        self.state_timestamps.appendleft(tnow)
+        in_items = list(self.in_pkts)
+        samples = []
         for item in in_items:
             if item[0] > tnow - window:
-                self.in_samples.append(item[1:])
+                samples.append(item[1:])
             else:
                 break
-
-    def _retrieve_data_out(self, window):
-        tnow = datetime.now().timestamp()
-        self.out_samples = []
-        out_items = list(self.out_queue)
-        for item in out_items:
-            if item[0] > tnow - window:
-                self.out_samples.append(item[1:])
-            else:
-                break
+        return samples
 
     def clear_queues(self):
-        self.in_queue.clear()
-        self.out_queue.clear()
+        self.in_pkts.clear()
+        self.out_pkts.clear()
+        self.state_timestamps.clear()
 
 if __name__ == '__main__':
 
     iface = 'in_br'
-
     home_dir = '/home/vagrant'
     data_dir = f'{home_dir}/data/spl'
     episode_raw_dir = f'{home_dir}/episode_raw'

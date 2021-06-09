@@ -14,7 +14,7 @@ from threading import Thread
 from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples, reset_flow_collector
+from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples, reset_flow_collector, get_flow_report
 from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions, get_vnf_param
 from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, replay_ip_traffic_on_interface
 
@@ -107,7 +107,7 @@ class AttackMitigationEnv():
         self.n_apps = len(applications)
         on_off_frame_shape = (self.n_apps, (self.n_ids + 1) * self.n_ids)
         self.on_off_frame = np.zeros(on_off_frame_shape)
-        obs_shape = (self.stack_size, self.n_apps, 4 + self.n_ids + on_off_frame_shape[1])
+        obs_shape = (self.stack_size, self.n_apps, 2 + self.n_ids + on_off_frame_shape[1])
         self.app_counts_stack = deque(maxlen=self.stack_size)
         self.in_samples_by_attacker_stack = deque(maxlen=self.stack_size)
         self.out_samples_by_attacker_stack = deque(maxlen=self.stack_size)
@@ -153,6 +153,7 @@ class AttackMitigationEnv():
         # reward
 
         self.n_attackers = len(attackers)
+        self.precision = []
 
         # spaces
 
@@ -189,9 +190,9 @@ class AttackMitigationEnv():
                     x[idx, 0] += features[0]
         return x
 
-    def _process_reward_samples(self, samples):
-        x = np.zeros(self.n_attackers + 1)
-        for id, features, flags in samples:
+    def _process_reward_samples(self, in_samples, out_ids):
+        x = np.zeros((self.n_attackers + 1, 2))
+        for id, features, flags in in_samples:
             src_ip = id[0]
             dst_ip = id[2]
             if src_ip in attackers:
@@ -202,7 +203,11 @@ class AttackMitigationEnv():
                 x[idx] += 1
             else:
                 idx = -1
-                x[idx] += 1
+            x[idx, 0] += 1
+            if id in out_ids:
+                x[idx, 1] += 1
+            else:
+                print(id)
         return x
 
     def _measure_delay(self):
@@ -262,6 +267,22 @@ class AttackMitigationEnv():
 
         return intrusion_ips, intrusion_numbers
 
+    def _get_precision(self, intrusion_ips, intrusion_numbers):
+        tp = 0
+        fp = 0
+        for intrusion_ips_by_ids, intrusion_numbers_by_ids in zip(intrusion_ips, intrusion_numbers):
+            for intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids in zip(intrusion_ips_by_ids, intrusion_numbers_by_ids):
+                for ip, n in zip(intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids):
+                    if ip in attackers:
+                        tp += n
+                    else:
+                        fp += n
+        if (tp + fp) > 0:
+            precision = tp / (tp + fp)
+        else:
+            precision = np.nan
+        self.precision.append(precision)
+
     def _get_reward(self, intrusion_ips, intrusion_numbers):
 
         reward = -1
@@ -295,22 +316,7 @@ class AttackMitigationEnv():
             attack = np.nan
             reward += 0
 
-        # count intrusions
 
-        tp = 0
-        fp = 0
-        for intrusion_ips_by_ids, intrusion_numbers_by_ids in zip(intrusion_ips, intrusion_numbers):
-            for intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids in zip(intrusion_ips_by_ids, intrusion_numbers_by_ids):
-                for ip, n in zip(intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids):
-                    if ip in attackers:
-                        tp += n
-                    else:
-                        fp += n
-        if (tp + fp) > 0:
-            precision = tp / (tp + fp)
-            reward += precision * precision_weight
-        else:
-            precision = np.nan
             reward += 0.5 * precision_weight
 
         return reward, normal, attack, precision
@@ -452,6 +458,7 @@ class AttackMitigationEnv():
         return action_fun, args, on_off_idx_and_value, queue_the_action
 
     def _take_action(self, i):
+        i = 52
         func, args, on_off_idx_and_value, queue_the_action = self._action_mapper(i)
         if queue_the_action:
             self.actions_queue.appendleft((func, args))
@@ -486,6 +493,10 @@ class AttackMitigationEnv():
         # reset flow collector
 
         reset_flow_collector(self.ovs_vm['mgmt'], flask_port)
+
+        # clear lists
+
+        self.precision = []
 
         # reset ids
 
@@ -538,35 +549,25 @@ class AttackMitigationEnv():
 
         # calculate obs
 
-        in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-        in_samples_by_app = self._process_app_samples(in_samples)
-        out_samples_by_app = self._process_app_samples(out_samples)
-        in_samples_by_attacker = self._process_reward_samples(in_samples)
-        out_samples_by_attacker = self._process_reward_samples(out_samples)
+        samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+        samples_by_app = self._process_app_samples(samples)
         frame = np.hstack([
-            in_samples_by_app,
-            out_samples_by_app,
+            samples_by_app,
             np.zeros((self.n_apps, self.n_ids)),
             np.array(self.on_off_frame)
         ])
         self.app_counts_stack.append(frame)
-        self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
-        self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
 
         while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
 
-            in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-            in_samples_by_app = self._process_app_samples(in_samples)
-            out_samples_by_app = self._process_app_samples(out_samples)
+            samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+            samples_by_app = self._process_app_samples(samples)
             frame = np.hstack([
-                in_samples_by_app,
-                out_samples_by_app,
+                samples_by_app,
                 np.zeros((self.n_apps, self.n_ids)),
                 np.array(self.on_off_frame)
             ])
             self.app_counts_stack.append(frame)
-            self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
-            self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
 
         obs = np.array(self.app_counts_stack)
 
@@ -598,16 +599,14 @@ class AttackMitigationEnv():
         # obs
 
         t0 = time()
-        in_samples, out_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+        in_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
         if self.debug:
             print('get obs', time() - t0)
         if time() - t0 > self.max_obs_time:
             self.max_obs_time = time() - t0
-        in_samples_by_app = self._process_app_samples(in_samples)
-        out_samples_by_app = self._process_app_samples(out_samples)
+        samples_by_app = self._process_app_samples(in_samples)
         processed_counts = []
-        processed_counts.append(in_samples_by_app)
-        processed_counts.append(out_samples_by_app)
+        processed_counts.append(samples_by_app)
         nintrusions = np.zeros((self.n_apps, self.n_ids))
         for i in range(self.n_apps):
             for j in range(self.n_ids):
@@ -625,13 +624,28 @@ class AttackMitigationEnv():
         if self.debug:
             print(f'Delays: {[np.mean(item) for item in self.delay]}')
 
-        # reward
+        # fake reward and info, the real ones are calculated once the episode is over
 
-        in_samples_by_attacker = self._process_reward_samples(in_samples)
-        out_samples_by_attacker = self._process_reward_samples(out_samples)
-        self.in_samples_by_attacker_stack.append(in_samples_by_attacker)
-        self.out_samples_by_attacker_stack.append(out_samples_by_attacker)
-        reward, normal, attack, precision = self._get_reward(intrusion_ips, intrusion_numbers)
+        self._get_precision(intrusion_ips, intrusion_numbers)
+        reward, normal, attack, precision = 0.0, 0.0, 0.0, 0.0
         done = False
 
         return obs, reward, done, {'r': reward, 'n': normal, 'a': attack, 'p': precision}
+
+    def reward(self):
+        in_pkts, out_pkts, state_timestamps = get_flow_report(self.ovs_vm['ip'], flask_port)
+        print(len(in_pkts), len(out_pkts))
+        in_pkts_timestamps = np.array([item[0] for item in in_pkts])
+        out_pkts_ids = [item[1] for item in out_pkts]
+
+        # reward
+
+        ts_last = 0
+        for ts_now in state_timestamps:
+            idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
+            in_samples = [in_pkts[i][1:] for i in idx]
+            ts_last = ts_now
+            samples_by_attacker = self._process_reward_samples(in_samples, out_pkts_ids)
+            #print(samples_by_attacker)
+
+        reward, normal, attack = self._get_reward(samples_by_attacker)

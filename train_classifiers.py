@@ -58,6 +58,7 @@ if __name__ == '__main__':
         attacks = [int(args.attack)]
     attacks = sorted(attacks)
     train_labels = [0] + [label for label in labels if label in attacks]
+    non_train_labels = [label for label in labels if label > 0 and label not in attacks]
     attack_labels_str = [str(item) for item in train_labels if item > 0]
 
     print(f'Training using attack labels {train_labels}')
@@ -194,7 +195,12 @@ if __name__ == '__main__':
 
     # predict and calculate inference statistics
 
-    for label in train_labels:
+    if len(non_train_labels) == 1:
+        test_labels = non_train_labels
+    else:
+        test_labels = train_labels
+
+    for label in test_labels:
         t_test = 0
         probs = []
         testy = []
