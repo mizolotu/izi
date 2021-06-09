@@ -16,7 +16,7 @@ def reset_ids(ids_ip, ids_port, sleep_interval=0.1):
 def set_vnf_param(ids_ip, ids_port, param, value):
     uri = f'http://{ids_ip}:{ids_port}/{param}'
     r = requests.post(uri, json={param: value})
-    value = float(r.json()[param])
+    value = r.json()[param]
     return value
 
 if __name__ == '__main__':

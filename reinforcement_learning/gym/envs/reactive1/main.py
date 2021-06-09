@@ -54,8 +54,8 @@ class AttackMitigationEnv():
 
         ids_model_names = [item.split('.tflite')[0] for item in os.listdir(ids_model_weights_dir) if item.endswith('.tflite')]
         spl = [item.split('_') for item in ids_model_names]
-        steps = sorted(list(set([item[0] for item in spl])))
-        models = sorted(list(set([item[1] for item in spl])))
+        models = sorted(list(set(['_'.join(item[:-1]) for item in spl])))
+        steps = sorted(list(set([item[-1] for item in spl])))
         self.n_steps = len(steps)
         self.n_models = len(models)
 
@@ -327,7 +327,7 @@ class AttackMitigationEnv():
             ids_name = self.ids_vms[ids_idx]['vm']
             app = applications[app_idx]
             action_fun = mirror_app_to_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], priorities['medium'], app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
+            args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], priorities['medium'], app, self.ovs_vm['vm'], ids_name, self.tunnels)
             on_off_idx_and_value = (app_idx, ids_idx, 1)
             queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions:
@@ -360,7 +360,7 @@ class AttackMitigationEnv():
                     ips.append(ip)
                     self.ips_to_check_or_block[ids_to][app_idx].append(ip)
             action_fun = mirror_ip_app_to_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, 'ovs_{0}'.format(self.id), ids_name, self.tunnels)
+            args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, self.ovs_vm['vm'], ids_name, self.tunnels)
             on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 1)
             queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions:

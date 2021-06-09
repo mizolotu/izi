@@ -9,6 +9,7 @@ from threading import Thread
 from flask import Flask, request, jsonify
 from datetime import datetime
 from common.data import read_pkt
+from time import sleep
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -40,43 +41,49 @@ def prepare():
     return jsonify(fpath)
 
 def calculate_probs(samples_dir, fsize_min=100000):
-    profile_files = sorted([item for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith('.csv')])
-    profiles = []
-    ips = []
-    for profile_file in profile_files:
-        ip = profile_file.split('.csv')[0]
-        fpath = osp.join(samples_dir, profile_file)
-        vals = pandas.read_csv(fpath, header=None).values
-        fnames = vals[:, 0]
-        fsizes = np.array([Path(osp.join(home_dir, f)).stat().st_size for f in fnames])
-        freqs = vals[:, 1:]
-        freqs0 = freqs[:, 0]
-        freqs1 = freqs[:, 1:]
-        probs = np.zeros_like(freqs1, dtype=float)
-        nlabels = freqs1.shape[1]
-        for i in range(nlabels):
-            s = np.sum(freqs1[:, i])
-            if s == 0:
-                probs1 = np.sum(freqs1, axis=1)  # sum of frequencies of files with malicious traffic
-                idx0 = np.where((probs1 == 0) & (fsizes > fsize_min))[0]  # index of files with no malicious traffic
-                counts0 = np.zeros_like(freqs0)
-                counts0[idx0] = freqs0[idx0]
-                s0 = np.sum(counts0)
-                probs[:, i] = counts0 / s0
-            else:
-                idx1 = np.where(fsizes > fsize_min)[0]
-                if len(idx1) > 0:
-                    counts1 = np.zeros_like(freqs1[:, i])
-                    counts1[idx1] = freqs1[idx1, i]
-                    s1 = np.sum(counts1)
-                    probs[:, i] = counts1 / s1
-                else:
-                    s1 = np.sum(freqs1[:, i])
-                    probs[:, i] = freqs1[:, i] / s1
+    ready = False
+    while not ready:
+        try:
+            profile_files = sorted([item for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith('.csv')])
+            profiles = []
+            ips = []
+            for profile_file in profile_files:
+                ip = profile_file.split('.csv')[0]
+                fpath = osp.join(samples_dir, profile_file)
+                vals = pandas.read_csv(fpath, header=None).values
+                fnames = vals[:, 0]
+                fsizes = np.array([Path(osp.join(home_dir, f)).stat().st_size for f in fnames])
+                freqs = vals[:, 1:]
+                freqs0 = freqs[:, 0]
+                freqs1 = freqs[:, 1:]
+                probs = np.zeros_like(freqs1, dtype=float)
+                nlabels = freqs1.shape[1]
+                for i in range(nlabels):
+                    s = np.sum(freqs1[:, i])
+                    if s == 0:
+                        probs1 = np.sum(freqs1, axis=1)  # sum of frequencies of files with malicious traffic
+                        idx0 = np.where((probs1 == 0) & (fsizes > fsize_min))[0]  # index of files with no malicious traffic
+                        counts0 = np.zeros_like(freqs0)
+                        counts0[idx0] = freqs0[idx0]
+                        s0 = np.sum(counts0)
+                        probs[:, i] = counts0 / s0
+                    else:
+                        idx1 = np.where(fsizes > fsize_min)[0]
+                        if len(idx1) > 0:
+                            counts1 = np.zeros_like(freqs1[:, i])
+                            counts1[idx1] = freqs1[idx1, i]
+                            s1 = np.sum(counts1)
+                            probs[:, i] = counts1 / s1
+                        else:
+                            s1 = np.sum(freqs1[:, i])
+                            probs[:, i] = freqs1[:, i] / s1
 
-        profiles.append({'fpath': fpath, 'fnames': fnames, 'probs': probs})
-        ips.append(ip)
-
+                profiles.append({'fpath': fpath, 'fnames': fnames, 'probs': probs})
+                ips.append(ip)
+            ready = True
+        except Exception as e:
+            print(e)
+            sleep(1)
     return ips, profiles
 
 def select_file(profile, label, aug=True):
