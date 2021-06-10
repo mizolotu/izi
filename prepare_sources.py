@@ -15,30 +15,11 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Prepare resources')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=1)
     parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int, default=1)
-    parser.add_argument('-e', '--exclude', help='Model labels to avoid, for experiment purposes')
+    parser.add_argument('-l', '--labels', help='Model labels to compile', nargs='+', default=['1', '2', '3', '4', '1,2,3,4'])
+    parser.add_argument('-e', '--exclude', help='Model labels to avoid', nargs='+', default=[])
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
-    parser.add_argument('-m', '--models', help='IDS models', default='mlp,ae,som')
+    parser.add_argument('-m', '--models', help='IDS models', nargs='+', default=['mlp'])
     args = parser.parse_args()
-
-    # models
-
-    if args.models is not None:
-        if ',' in args.models:
-            model_types = args.models.split(',')
-        else:
-            model_types = [args.models]
-    else:
-        model_types = []
-
-    # exclude labels
-
-    if args.exclude is not None:
-        if ',' in args.exclude:
-            exclude_labels = args.exclude.split(',')
-        else:
-            exclude_labels = [args.exclude]
-    else:
-        exclude_labels = []
 
     # update nenvs and nidss
 
@@ -125,10 +106,10 @@ if __name__ == '__main__':
 
         # compile?
 
-        if model_type in model_types:
+        if model_type in args.models and alabel in args.labels:
             compile_model = True
             for al in alabels:
-                if al not in label_names or al in exclude_labels:
+                if al not in label_names or al in args.exclude:
                     compile_model = False
                     break
         else:
