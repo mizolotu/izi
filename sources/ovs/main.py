@@ -108,7 +108,9 @@ def samples():
 
 @app.route('/report')
 def report():
-    return jsonify({'in_pkts': list(flow_collector.in_pkts), 'out_pkts': list(flow_collector.out_pkts), 'timestamps': list(flow_collector.state_timestamps)})
+    in_pkts = [[ts, *read_pkt(pkt)] for ts, pkt in list(flow_collector.in_pkts)]
+    out_pkts = [[ts, *read_pkt(pkt)] for ts, pkt in list(flow_collector.out_pkts)]
+    return jsonify({'in_pkts': in_pkts, 'out_pkts': out_pkts, 'timestamps': list(flow_collector.state_timestamps)})
 
 @app.route('/reset')
 def reset():
@@ -138,12 +140,7 @@ class FlowCollector():
                 ready = True
                 while True:
                     ts, raw = next(sniffer)
-                    try:
-                        id, features, flags = read_pkt(raw)
-                        if id is not None:
-                            dq.appendleft((ts, id, features, flags))
-                    except Exception as e:
-                        print(e)
+                    dq.appendleft((ts, raw))
             except Exception as e:
                 print(e)
 
@@ -154,7 +151,7 @@ class FlowCollector():
         samples = []
         for item in in_items:
             if item[0] > tnow - window:
-                samples.append(item[1:])
+                samples.append(read_pkt(item[1]))
             else:
                 break
         return samples

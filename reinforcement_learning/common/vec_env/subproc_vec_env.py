@@ -29,8 +29,8 @@ def _worker(remote, parent_remote, env_fn_wrapper):
             elif cmd == 'render':
                 remote.send(env.render(data))
             elif cmd == 'reward':
-                reward = env.reward()
-                remote.send(reward)
+                rewards, infos = env.reward()
+                remote.send((rewards, infos))
             elif cmd == 'close':
                 env.close()
                 remote.close()
@@ -135,8 +135,8 @@ class SubprocVecEnv(VecEnv):
 
     def reward_one(self, env_idx):
         self.remotes[env_idx].send(('reward', None))
-        rewards = self.remotes[env_idx].recv()
-        return rewards
+        rewards, infos = self.remotes[env_idx].recv()
+        return rewards, infos
 
     def reset(self):
         for remote in self.remotes:

@@ -515,7 +515,7 @@ class Runner(AbstractEnvRunner):
 
             self.obs[env_idx], rewards, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
 
-            self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
+            #self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
 
             self.model.num_timesteps += 1
 
@@ -531,11 +531,12 @@ class Runner(AbstractEnvRunner):
 
                     return [None] * 9
 
-            self.mb_rewards[env_idx].append(rewards)
+            #self.mb_rewards[env_idx].append(rewards)
 
         print(f'Step time in {env_idx}: {(time.time() - tstart) / self.n_steps}')
 
-        rewards = self.env.reward_one(env_idx)
+        self.mb_rewards[env_idx], infos = self.env.reward_one(env_idx)
+        self.scores[env_idx] = [[info['r'], info['n'], info['a'], info['p']] for info in infos]
 
     def _run(self):
         """
@@ -583,7 +584,7 @@ class Runner(AbstractEnvRunner):
         mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_scores = [np.vstack([self.scores[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs)]
         mb_states = self.states
         self.dones = np.array(self.dones)
 

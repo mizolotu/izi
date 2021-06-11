@@ -175,39 +175,39 @@ class AttackMitigationEnv():
     def _process_app_samples(self, samples):
         x = np.zeros((self.n_apps, 2))
         for id, features, flags in samples:
-            src_port = id[1]
-            dst_port = id[3]
-            if id[4] in [1, 6, 17]:
-                proto, proto_number = ip_proto(id[4])
-                if (proto, src_port) in applications:
-                    idx = applications.index((proto, src_port))
-                    x[idx, 0] += features[0]
-                elif (proto, dst_port) in applications:
-                    idx = applications.index((proto, dst_port))
-                    x[idx, 0] += features[0]
-                elif (proto, ) in applications:
-                    idx = applications.index((proto, ))
-                    x[idx, 0] += features[0]
+            if id is not None:
+                src_port = id[1]
+                dst_port = id[3]
+                if id[4] in [1, 6, 17]:
+                    proto, proto_number = ip_proto(id[4])
+                    if (proto, src_port) in applications:
+                        idx = applications.index((proto, src_port))
+                        x[idx, 0] += features[0]
+                    elif (proto, dst_port) in applications:
+                        idx = applications.index((proto, dst_port))
+                        x[idx, 0] += features[0]
+                    elif (proto,) in applications:
+                        idx = applications.index((proto,))
+                        x[idx, 0] += features[0]
         return x
 
     def _process_reward_samples(self, in_samples, out_ids):
         x = np.zeros((self.n_attackers + 1, 2))
         for id, features, flags in in_samples:
-            src_ip = id[0]
-            dst_ip = id[2]
-            if src_ip in attackers:
-                idx = attackers.index(src_ip)
-                x[idx] += 1
-            elif dst_ip in attackers:
-                idx = attackers.index(dst_ip)
-                x[idx] += 1
-            else:
-                idx = -1
-            x[idx, 0] += 1
-            if id in out_ids:
-                x[idx, 1] += 1
-            else:
-                print(id)
+            if id is not None:
+                src_ip = id[0]
+                dst_ip = id[2]
+                if src_ip in attackers:
+                    idx = attackers.index(src_ip)
+                    x[idx] += 1
+                elif dst_ip in attackers:
+                    idx = attackers.index(dst_ip)
+                    x[idx] += 1
+                else:
+                    idx = -1
+                x[idx, 0] += 1
+                if id in out_ids:
+                    x[idx, 1] += 1
         return x
 
     def _measure_delay(self):
@@ -283,17 +283,15 @@ class AttackMitigationEnv():
             precision = np.nan
         self.precision.append(precision)
 
-    def _get_reward(self, intrusion_ips, intrusion_numbers):
+    def _get_normal_attack(self, sample_counts):
 
-        reward = -1
-
-        before_count_deltas = np.mean(np.vstack(self.in_samples_by_attacker_stack), axis=0)
-        after_count_deltas = np.mean(np.vstack(self.out_samples_by_attacker_stack), axis=0)
+        reward = 0
         normal = []
         attack = []
+
         for i in range(self.n_attackers + 1):
-            b = before_count_deltas[i]
-            a = after_count_deltas[i]
+            b = sample_counts[i, 0]
+            a = sample_counts[i, 1]
             if b > 0:
                 blocked = np.clip(b - a, 0, b)
                 allowed = np.clip(a, 0, b)
@@ -316,10 +314,7 @@ class AttackMitigationEnv():
             attack = np.nan
             reward += 0
 
-
-            reward += 0.5 * precision_weight
-
-        return reward, normal, attack, precision
+        return normal, attack
 
     def _action_mapper(self, i):
 
@@ -458,7 +453,6 @@ class AttackMitigationEnv():
         return action_fun, args, on_off_idx_and_value, queue_the_action
 
     def _take_action(self, i):
-        i = 52
         func, args, on_off_idx_and_value, queue_the_action = self._action_mapper(i)
         if queue_the_action:
             self.actions_queue.appendleft((func, args))
@@ -549,15 +543,7 @@ class AttackMitigationEnv():
 
         # calculate obs
 
-        samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-        samples_by_app = self._process_app_samples(samples)
-        frame = np.hstack([
-            samples_by_app,
-            np.zeros((self.n_apps, self.n_ids)),
-            np.array(self.on_off_frame)
-        ])
-        self.app_counts_stack.append(frame)
-
+        self.app_counts_stack.clear()
         while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
 
             samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
@@ -568,7 +554,6 @@ class AttackMitigationEnv():
                 np.array(self.on_off_frame)
             ])
             self.app_counts_stack.append(frame)
-
         obs = np.array(self.app_counts_stack)
 
         return obs
@@ -624,28 +609,59 @@ class AttackMitigationEnv():
         if self.debug:
             print(f'Delays: {[np.mean(item) for item in self.delay]}')
 
-        # fake reward and info, the real ones are calculated once the episode is over
+        # append precision
 
         self._get_precision(intrusion_ips, intrusion_numbers)
+
+        # fake reward and info, the real ones are calculated once the episode is over
+
         reward, normal, attack, precision = 0.0, 0.0, 0.0, 0.0
         done = False
 
         return obs, reward, done, {'r': reward, 'n': normal, 'a': attack, 'p': precision}
 
+    def _calculate_reward(self, normal, attack, precision, reward_min=-1.5):
+        reward = reward_min
+        if np.isnan(normal):
+            reward += 1
+        else:
+            reward += normal
+        if np.isnan(attack):
+            reward += 0
+        else:
+            reward += attack
+        if np.isnan(precision):
+            reward += 0.5
+        else:
+            reward += precision
+        return reward
+
     def reward(self):
+
+        # lists
+
+        rewards = []
+        infos = []
+
+        # get report
+
         in_pkts, out_pkts, state_timestamps = get_flow_report(self.ovs_vm['ip'], flask_port)
-        print(len(in_pkts), len(out_pkts))
         in_pkts_timestamps = np.array([item[0] for item in in_pkts])
         out_pkts_ids = [item[1] for item in out_pkts]
 
-        # reward
+        # calculate reward
 
         ts_last = 0
-        for ts_now in state_timestamps:
+
+        for ts_i, ts_now in enumerate(state_timestamps[self.stack_size:]):
             idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
             in_samples = [in_pkts[i][1:] for i in idx]
             ts_last = ts_now
             samples_by_attacker = self._process_reward_samples(in_samples, out_pkts_ids)
-            #print(samples_by_attacker)
+            normal, attack = self._get_normal_attack(samples_by_attacker)
+            precision = self.precision[ts_i]
+            reward = self._calculate_reward(normal, attack, precision)
+            rewards.append(reward)
+            infos.append({'r': reward, 'n': normal, 'a': attack, 'p': precision})
 
-        reward, normal, attack = self._get_reward(samples_by_attacker)
+        return rewards, infos
