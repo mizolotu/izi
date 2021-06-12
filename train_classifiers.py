@@ -123,6 +123,8 @@ if __name__ == '__main__':
 
     cl_mapper = lambda x,y: classification_mapper(x, y, xmin=xmin, xmax=xmax)
 
+    # batches
+
     batches = {}
     for stage in ['train', 'validate', 'test']:
         if stage == 'test':
@@ -146,9 +148,10 @@ if __name__ == '__main__':
             if num_batches[stage] is not None:
                 batches[stage] = batches[stage].take(num_batches[stage])
 
+    # define model
+
     model_type = getattr(models, args.model)
     model, model_name = model_type(nfeatures, args.layers, args.neurons)
-    print('Training {0}'.format(model_name))
     model.summary()
 
     # create model and results directories
@@ -157,41 +160,49 @@ if __name__ == '__main__':
     if not osp.isdir(m_path):
         os.mkdir(m_path)
 
-    # fit the model
+    # try to load the model
 
-    model.fit(
-        batches['train'],
-        validation_data=batches['validate'],
-        epochs=epochs,
-        steps_per_epoch=steps_per_epoch,
-        callbacks=[tf.keras.callbacks.EarlyStopping(
-            monitor='val_auc',
-            verbose=0,
-            patience=patience,
-            mode='max',
-            restore_best_weights=True
-        )]
-    )
+    try:
+        model = tf.keras.models.load_model(m_path)
 
-    # calculate thresholds for fpr levels specified in config
+    # otherwise train a new one
 
-    probs = []
-    testy = []
-    thrs = []
-    for x, y in batches['validate']:
-        predictions = model.predict(x)
-        probs = np.hstack([probs, predictions[:, 0]])
-        testy = np.concatenate([testy, y])
-    ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
-    for fpr_level in fpr_levels:
-        idx = np.where(ns_fpr <= fpr_level)[0][-1]
-        thrs.append(str(ns_thr[idx]))
-        print(ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
+    except Exception as e:
+        print(e)
+        print('Training {0}'.format(model_name))
+        model.fit(
+            batches['train'],
+            validation_data=batches['validate'],
+            epochs=epochs,
+            steps_per_epoch=steps_per_epoch,
+            callbacks=[tf.keras.callbacks.EarlyStopping(
+                monitor='val_auc',
+                verbose=0,
+                patience=patience,
+                mode='max',
+                restore_best_weights=True
+            )]
+        )
 
-    # save model and threshold
+        # calculate thresholds for fpr levels specified in config
 
-    model.save(m_path)
-    open(osp.join(m_path, 'thr'), 'w').write(','.join(thrs))
+        probs = []
+        testy = []
+        thrs = []
+        for x, y in batches['validate']:
+            predictions = model.predict(x)
+            probs = np.hstack([probs, predictions[:, 0]])
+            testy = np.concatenate([testy, y])
+        ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
+        for fpr_level in fpr_levels:
+            idx = np.where(ns_fpr <= fpr_level)[0][-1]
+            thrs.append(str(ns_thr[idx]))
+            print(ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
+
+        # save model and threshold
+
+        model.save(m_path)
+        open(osp.join(m_path, 'thr'), 'w').write(','.join(thrs))
 
     # predict and calculate inference statistics
 
