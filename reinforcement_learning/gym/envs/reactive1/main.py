@@ -197,7 +197,6 @@ class AttackMitigationEnv():
             if id is not None:
                 src_ip = id[0]
                 dst_ip = id[2]
-                print(src_ip, dst_ip, src_ip in attackers, dst_ip in attackers)
                 if src_ip in attackers:
                     idx = attackers.index(src_ip)
                     x[idx] += 1
