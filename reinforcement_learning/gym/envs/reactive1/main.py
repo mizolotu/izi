@@ -560,8 +560,6 @@ class AttackMitigationEnv():
 
     def step(self, action):
 
-        action = 4
-
         # step count
 
         self.step_count += 1
