@@ -285,6 +285,8 @@ class AttackMitigationEnv():
 
     def _get_normal_attack(self, sample_counts):
 
+        print(sample_counts)
+
         reward = 0
         normal = []
         attack = []
