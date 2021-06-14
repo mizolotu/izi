@@ -534,6 +534,7 @@ class Runner(AbstractEnvRunner):
             #self.mb_rewards[env_idx].append(rewards)
 
         print(f'Step time in {env_idx}: {(time.time() - tstart) / self.n_steps}')
+        print(infos)
 
         self.mb_rewards[env_idx], infos = self.env.reward_one(env_idx)
         self.scores[env_idx] = [[info['r'], info['n'], info['a'], info['p']] for info in infos]
