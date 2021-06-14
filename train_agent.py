@@ -19,6 +19,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train RL agent.')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int)
+    parser.add_argument('-a', '--attacks', help='Attack labels', nargs='+', default=train_attacks)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     args = parser.parse_args()
@@ -29,7 +30,7 @@ if __name__ == '__main__':
     meta = load_meta(feature_dir)
     attack_labels = sorted([label for label in meta['labels'] if label > 0])
     attack_indexes = []
-    for a in train_attacks:
+    for a in args.attacks:
         if a in attack_labels:
             idx = attack_labels.index(a)
             if idx not in attack_indexes:
