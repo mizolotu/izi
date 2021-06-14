@@ -1,17 +1,22 @@
 import argparse as arp
 import os.path as osp
 
+from common import data
 from common.data import find_data_files, count_labels
 from common.ml import load_meta
-from common.data import label_cicids17 as labeler  # move this to args TO DO
 from pathlib import Path
 from config import *
 
 if __name__ == '__main__':
 
-    parser = arp.ArgumentParser(description='Calculate probabilities')
+    parser = arp.ArgumentParser(description='Calculate frequencies')
+    parser.add_argument('-l', '--labeler', help='Labeler', default='label_cicids17')
     parser.add_argument('-e', '--exclude', help='Exclude patterns', default=f'20180220,20180221,{aug_postfix}')
     args = parser.parse_args()
+
+    # import labeler
+
+    labeler = getattr(data, args.labeler)
 
     # input data
 
