@@ -99,7 +99,7 @@ class Interceptor:
 
     def load_model(self, model_label, model_step):
         self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_label, model_step)))
-        self.model_type = fname.split('_')[0]
+        self.model_type = model_label.split('_')[0]
         self.thrs = [float(item) for item in open(osp.join(self.thr_path, f'{model_label}_{model_step}.thr')).readline().strip().split(',')]
 
     def set_model(self, idx):
@@ -217,7 +217,7 @@ class Interceptor:
         elif self.model_type == 'ae':
             result = np.linalg.norm(flow_features - prediction[0])
         elif self.model_type == 'som':
-            result = prediction[0]
+            result = prediction
         return result
 
     def get_intrusions(self):
