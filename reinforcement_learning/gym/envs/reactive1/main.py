@@ -646,6 +646,7 @@ class AttackMitigationEnv():
         # get report
 
         in_pkts, out_pkts, state_timestamps = get_flow_report(self.ovs_vm['ip'], flask_port)
+        print(len(in_pkts), len(out_pkts))
         in_pkts_timestamps = np.array([item[0] for item in in_pkts])
         out_pkts_ids = [item[1] for item in out_pkts]
 
