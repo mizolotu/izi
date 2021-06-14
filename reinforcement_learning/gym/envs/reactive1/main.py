@@ -192,6 +192,7 @@ class AttackMitigationEnv():
         return x
 
     def _process_reward_samples(self, in_samples, out_ids):
+        print(in_samples)
         x = np.zeros((self.n_attackers + 1, 2))
         for id, features, flags in in_samples:
             if id is not None:
@@ -284,8 +285,6 @@ class AttackMitigationEnv():
         self.precision.append(precision)
 
     def _get_normal_attack(self, sample_counts):
-
-        print(sample_counts)
 
         reward = 0
         normal = []
