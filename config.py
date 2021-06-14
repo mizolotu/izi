@@ -120,9 +120,9 @@ directions = ['source', 'destination']
 
 precision_weight = 1
 obs_stack_size = 4
-train_attacks = [1, 2, 3, 4]
+train_attacks = [1]
 episode_duration = 32
-nsteps = 96
+nsteps = 64
 nepisodes = 100000
 
 # other

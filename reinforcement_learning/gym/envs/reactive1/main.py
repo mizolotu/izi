@@ -631,9 +631,9 @@ class AttackMitigationEnv():
         else:
             reward += attack
         if np.isnan(precision):
-            reward += 0.5
+            reward += precision_weight * 0.5
         else:
-            reward += precision
+            reward += precision_weight * precision
         return reward
 
     def reward(self):
@@ -646,14 +646,14 @@ class AttackMitigationEnv():
         # get report
 
         in_pkts, out_pkts, state_timestamps = get_flow_report(self.ovs_vm['ip'], flask_port)
-        print(len(in_pkts), len(out_pkts))
+        print(f'Packets in: {len(in_pkts)}, packets out: {len(out_pkts)}')
         in_pkts_timestamps = np.array([item[0] for item in in_pkts])
         out_pkts_ids = [item[1] for item in out_pkts]
 
         # calculate reward
 
+        print('Calculating reward may take time...')
         ts_last = 0
-
         for ts_i, ts_now in enumerate(state_timestamps[self.stack_size:]):
             idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
             in_samples = [in_pkts[i][1:] for i in idx]
@@ -664,5 +664,6 @@ class AttackMitigationEnv():
             reward = self._calculate_reward(normal, attack, precision)
             rewards.append(reward)
             infos.append({'r': reward, 'n': normal, 'a': attack, 'p': precision})
+        print('Done!')
 
         return rewards, infos
