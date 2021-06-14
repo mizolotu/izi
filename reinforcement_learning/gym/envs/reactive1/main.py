@@ -192,12 +192,12 @@ class AttackMitigationEnv():
         return x
 
     def _process_reward_samples(self, in_samples, out_ids):
-        print(in_samples)
         x = np.zeros((self.n_attackers + 1, 2))
         for id, features, flags in in_samples:
             if id is not None:
                 src_ip = id[0]
                 dst_ip = id[2]
+                print(src_ip, dst_ip, src_ip in attackers, dst_ip in attackers)
                 if src_ip in attackers:
                     idx = attackers.index(src_ip)
                     x[idx] += 1
