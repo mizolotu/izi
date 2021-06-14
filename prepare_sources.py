@@ -1,6 +1,5 @@
-import os, pandas, shutil
+import os, shutil
 import os.path as osp
-import numpy as np
 import tensorflow as tf
 import argparse as arp
 
@@ -24,7 +23,7 @@ if __name__ == '__main__':
     # update nenvs and nidss
 
     if args.nenvs is not None:
-        env_vms['ovs']['n'] = args.nenvs
+        nenvs = args.nenvs
     if args.nidss is not None:
         env_vms['ids']['n'] = args.nidss
 
@@ -34,7 +33,7 @@ if __name__ == '__main__':
 
     for key in env_vms.keys():
         vm_ips = env_vms[key]['ips']
-        for i in range(env_vms['ovs']['n']):
+        for i in range(nenvs):
             for j in range(env_vms[key]['n']):
                 vm_name = f'{key}_{i}_{j}'
                 vms.append(vm_name)
