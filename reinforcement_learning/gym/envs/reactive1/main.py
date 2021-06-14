@@ -537,7 +537,6 @@ class AttackMitigationEnv():
 
         for host in self.internal_hosts:
             _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration, aug=self.aug)
-            print(_)
 
         self.tstart = time()
         self.tstep = time()

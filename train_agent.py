@@ -37,7 +37,6 @@ if __name__ == '__main__':
             if idx not in attack_indexes:
                 attack_indexes.append(idx)
     attack_indexes = cycle(attack_indexes)
-    print(attack_indexes)
 
     env_class = AttackMitigationEnv
     algorithm = ppo
