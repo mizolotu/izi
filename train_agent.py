@@ -29,14 +29,15 @@ if __name__ == '__main__':
         nenvs = env_vms['ovs']['n']
 
     meta = load_meta(feature_dir)
-    labels = sorted(meta['labels'])
+    attack_labels = sorted([label for label in meta['labels'] if label > 0])
     attack_indexes = []
     for a in train_attacks:
-        if a in labels:
-            idx = labels.index(a)
+        if a in attack_labels:
+            idx = attack_labels.index(a)
             if idx not in attack_indexes:
                 attack_indexes.append(idx)
     attack_indexes = cycle(attack_indexes)
+    print(attack_indexes)
 
     env_class = AttackMitigationEnv
     algorithm = ppo
