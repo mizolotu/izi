@@ -80,7 +80,8 @@ def calculate_probs(samples_dir, fsize_min=100000):
 
                 profiles.append({'fpath': fpath, 'fnames': fnames, 'probs': probs})
                 ips.append(ip)
-            ready = True
+            if len(ips) > 0 and len(profiles) > 0:
+                ready = True
         except Exception as e:
             print(e)
             sleep(1)

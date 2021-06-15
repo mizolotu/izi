@@ -472,7 +472,8 @@ class AttackMitigationEnv():
 
     def reset(self, sleep_duration=3):
 
-        print(f'Max obs time in {self.id}: {self.max_obs_time}')
+        if self.debug:
+            print(f'Max obs time in {self.id}: {self.max_obs_time}')
 
         # end of the episode
 
@@ -636,7 +637,7 @@ class AttackMitigationEnv():
             reward += precision_weight * precision
         return reward
 
-    def reward(self):
+    def reward(self, n_steps_to_check=3):
 
         # lists
 
@@ -648,22 +649,23 @@ class AttackMitigationEnv():
         in_pkts, out_pkts, state_timestamps = get_flow_report(self.ovs_vm['ip'], flask_port)
         print(f'In environment {self.id}, packets in: {len(in_pkts)}, packets out: {len(out_pkts)}')
         in_pkts_timestamps = np.array([item[0] for item in in_pkts])
-        out_pkts_ids = [item[1] for item in out_pkts]
+        out_pkts_timestamps = np.array([item[0] for item in out_pkts])
 
         # calculate reward
 
-        print('Calculating reward may take time...')
         ts_last = 0
         for ts_i, ts_now in enumerate(state_timestamps[self.stack_size:]):
-            idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
-            in_samples = [in_pkts[i][1:] for i in idx]
+            in_idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
+            in_samples = [in_pkts[i][1:] for i in in_idx]
+            out_idx = np.where((out_pkts_timestamps > (ts_last - n_steps_to_check * self.step_duration)) & (out_pkts_timestamps <= (ts_now + n_steps_to_check * self.step_duration)))[0]
+            out_sample_ids = [out_pkts[i][1] for i in out_idx]
+            #out_pkts_ids = [item[1] for item in out_pkts]
             ts_last = ts_now
-            samples_by_attacker = self._process_reward_samples(in_samples, out_pkts_ids)
+            samples_by_attacker = self._process_reward_samples(in_samples, out_sample_ids)
             normal, attack = self._get_normal_attack(samples_by_attacker)
             precision = self.precision[ts_i]
             reward = self._calculate_reward(normal, attack, precision)
             rewards.append(reward)
             infos.append({'r': reward, 'n': normal, 'a': attack, 'p': precision})
-        print('Done!')
 
         return rewards, infos
