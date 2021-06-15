@@ -659,7 +659,6 @@ class AttackMitigationEnv():
             in_samples = [in_pkts[i][1:] for i in in_idx]
             out_idx = np.where((out_pkts_timestamps > (ts_last - n_steps_to_check * self.step_duration)) & (out_pkts_timestamps <= (ts_now + n_steps_to_check * self.step_duration)))[0]
             out_sample_ids = [out_pkts[i][1] for i in out_idx]
-            #out_pkts_ids = [item[1] for item in out_pkts]
             ts_last = ts_now
             samples_by_attacker = self._process_reward_samples(in_samples, out_sample_ids)
             normal, attack = self._get_normal_attack(samples_by_attacker)
