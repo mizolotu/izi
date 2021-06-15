@@ -71,5 +71,5 @@ if __name__ == '__main__':
         print('Could not load the model, a new model will be created!')
         model = algorithm(policy, env, n_steps=nsteps, verbose=1)
     finally:
-        cb = CheckpointCallback(nsteps, modeldir, verbose=1)
+        cb = CheckpointCallback(nsteps * nenvs, modeldir, verbose=1)
         model.learn(total_timesteps=total_steps, callback=cb)
