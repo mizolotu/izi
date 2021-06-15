@@ -1,7 +1,7 @@
 import argparse as arp
 import sys
 
-from reinforcement_learning.gym.envs.reactive1.main import AttackMitigationEnv
+from reinforcement_learning.gym.envs.reactive_discrete.main import ReactiveDiscreteEnv
 from reinforcement_learning.ppo2.ppo2 import PPO2 as ppo
 from reinforcement_learning.common.vec_env.subproc_vec_env import SubprocVecEnv
 from reinforcement_learning.common.policies import MlpPolicy
@@ -30,7 +30,7 @@ if __name__ == '__main__':
         print('Please specify at least one of the following: rl model checkpoint or your manual security policy')
         sys.exit(1)
 
-    env_class = AttackMitigationEnv
+    env_class = ReactiveDiscreteEnv
     algorithm = ppo
     modeldir = '{0}/{1}/{2}'.format(rl_models_dir, env_class.__name__, algorithm.__name__)
     policy = MlpPolicy

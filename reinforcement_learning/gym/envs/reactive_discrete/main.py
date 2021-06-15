@@ -11,14 +11,14 @@ from common.ids import restart_ids
 from common.utils import ip_proto
 from threading import Thread
 
-from reinforcement_learning.gym.envs.reactive1.init_flow_tables import clean_ids_tables, init_ovs_tables
-from reinforcement_learning.gym.envs.reactive1.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
-from reinforcement_learning.gym.envs.reactive1.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive1.sdn_state import get_flow_counts, get_flow_samples, reset_flow_collector, get_flow_report
-from reinforcement_learning.gym.envs.reactive1.nfv_state import get_intrusions, get_vnf_param
-from reinforcement_learning.gym.envs.reactive1.generate_traffic import set_seed, replay_ip_traffic_on_interface
+from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, init_ovs_tables
+from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
+from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
+from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, get_flow_samples, reset_flow_collector, get_flow_report
+from reinforcement_learning.gym.envs.reactive_discrete.nfv_state import get_intrusions, get_vnf_param
+from reinforcement_learning.gym.envs.reactive_discrete.generate_traffic import set_seed, replay_ip_traffic_on_interface
 
-class AttackMitigationEnv():
+class ReactiveDiscreteEnv():
 
     def __init__(self, env_id, label, aug, seed=None, policy=None):
 
@@ -637,7 +637,7 @@ class AttackMitigationEnv():
             reward += precision_weight * precision
         return reward
 
-    def reward(self, n_steps_to_check=3):
+    def reward(self, n_steps_backward=3, n_steps_forward=5):
 
         # lists
 
@@ -657,7 +657,7 @@ class AttackMitigationEnv():
         for ts_i, ts_now in enumerate(state_timestamps[self.stack_size:]):
             in_idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
             in_samples = [in_pkts[i][1:] for i in in_idx]
-            out_idx = np.where((out_pkts_timestamps > (ts_last - n_steps_to_check * self.step_duration)) & (out_pkts_timestamps <= (ts_now + n_steps_to_check * self.step_duration)))[0]
+            out_idx = np.where((out_pkts_timestamps > (ts_last - n_steps_backward * self.step_duration)) & (out_pkts_timestamps <= (ts_now + n_steps_forward * self.step_duration)))[0]
             out_sample_ids = [out_pkts[i][1] for i in out_idx]
             ts_last = ts_now
             samples_by_attacker = self._process_reward_samples(in_samples, out_sample_ids)
