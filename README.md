@@ -100,7 +100,7 @@ ROC curves will be saved in ```figures/roc``` directory.
 python3 calculate_frequencies.py
 ```
 
-2. If needed, modify values ```nenvs``` (number of environments) and ```nids``` (number of security middle boxes in an environment) in file ```config.py```. Minimum values are correspondingly 1 and 1, maximum depend on the amount of computational and memory resources you have. 
+2. If needed, modify values ```nenvs``` (number of environments) and ```env_vms['ids']['n']``` (number of security middle boxes in an environment) in file ```config.py```. Minimum values are correspondingly 1 and 1, maximum depend on the amount of computational and memory resources you have. 
 
 3. Prepare all resources needed for the environment:
 
