@@ -105,7 +105,7 @@ python3 calculate_frequencies.py
 3. Prepare all resources needed for the environment:
 
 ```bash
-python3 prepare_sources.py
+sudo python3 prepare_sources.py
 ```
 
 4. Create VMs one-by-one using vagrant command line tool, e.g. 
