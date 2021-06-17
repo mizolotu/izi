@@ -121,7 +121,7 @@ sudo python3 create_vms.py
 
 to collect necessary information about VM ips, keys, etc.
 
-You can also try to create VMs using this script with additional argument (this however will not generate any output, so if there is an error, you will never know): 
+Instead of using vagrant command tool, you can also try to create VMs using this script with additional argument (this however will not generate any output, so if there is an error, you will never know): 
 
 ```bash
 sudo python3 create_vms.py -p True
