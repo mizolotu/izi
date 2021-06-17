@@ -127,6 +127,12 @@ You can also try to create VMs using this script with additional argument (this 
 sudo python3 create_vms.py -p True
 ```
 
+5. Connect VMs:
+
+```bash
+sudo python3 connect_vms.py
+```
+
 ## Train and evaluate RL-agent
 
 1. Start training an RL agent:
