@@ -108,28 +108,23 @@ python3 calculate_frequencies.py
 python3 prepare_sources.py
 ```
 
-4. Create VMs (this will not generate any output, so if there is an error, you will never know): 
-
-```bash
-sudo python3 create_vms.py
-```
-Instead, you can create VMs one-by-one using vagrant command line tool, e.g. 
+4. Create VMs one-by-one using vagrant command line tool, e.g. 
 
 ```bash
 sudo vagrant up <vm name>
 ```
-This will provide more debug information. VM names can be found in ```Vagrantfile```: odl, ovs_0, etc. Once all VMs are created, you still have to run:
+VM names can be found in ```Vagrantfile```, e.g. odl_0_0, ovs_0_0, ids_0_0, etc. Once all VMs are created, run:
 
 ```bash
-sudo python3 create_vms.py -p False
+sudo python3 create_vms.py
 ```
 
-to collect necessary information about VM ips, keys, etc. VM provision will be omitted. 
+to collect necessary information about VM ips, keys, etc.
 
-5. Create veth pairs and connect VMs with VXLAN tunnels: 
+You can also try to create VMs using this script with additional argument (this however will not generate any output, so if there is an error, you will never know): 
 
 ```bash
-sudo python3 connect_vms.py
+sudo python3 create_vms.py -p True
 ```
 
 ## Train and evaluate RL-agent
