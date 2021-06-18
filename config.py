@@ -14,8 +14,8 @@ ids_results_dir = '{0}/results'.format(ids_models_dir)
 sources_dir = 'sources'
 ovs_sources_dir = f'{sources_dir}/ovs/'
 ids_sources_dir = f'{sources_dir}/ids/'
-rl_models_dir = 'models'
-rl_results_dir = 'results'
+models_dir = 'models'
+results_dir = 'results'
 ids_model_weights_dir = '{0}/weights'.format(ids_sources_dir)
 figures_dir = 'figures'
 roc_dir = '{0}/roc'.format(figures_dir)
@@ -119,12 +119,14 @@ directions = ['source', 'destination']
 
 # rl
 
-precision_weight = 1
+reward_min = -1.0
+precision_weight = 0
 obs_stack_size = 4
 train_attacks = [1]
 episode_duration = 32
 nsteps = 64
 nepisodes = 100000
+ntests = 10
 
 # other
 
@@ -136,3 +138,5 @@ csv_postfix = '.csv'
 aug_postfix = '_aug'
 flask_port = 5000
 flow_window = 1
+baseline = 'Baseline'
+progress = 'progress.csv'

@@ -279,9 +279,12 @@ class ReactiveDiscreteEnv():
                         fp += n
         if (tp + fp) > 0:
             precision = tp / (tp + fp)
+            precision_ = precision
         else:
             precision = np.nan
+            precision_ = 0.5
         self.precision.append(precision)
+        return precision_
 
     def _get_normal_attack(self, sample_counts):
 
@@ -612,16 +615,16 @@ class ReactiveDiscreteEnv():
 
         # append precision
 
-        self._get_precision(intrusion_ips, intrusion_numbers)
+        reward = self._get_precision(intrusion_ips, intrusion_numbers)
 
-        # fake reward and info, the real ones are calculated once the episode is over
+        # fake info, the real ones are calculated once the episode is over
 
-        reward, normal, attack, precision = 0.0, 0.0, 0.0, 0.0
+        info = {}
         done = False
 
-        return obs, reward, done, {'r': reward, 'n': normal, 'a': attack, 'p': precision}
+        return obs, reward, done, info
 
-    def _calculate_reward(self, normal, attack, precision, reward_min=-1.5):
+    def _calculate_reward(self, normal, attack, precision):
         reward = reward_min
         if np.isnan(normal):
             reward += 1
