@@ -17,13 +17,19 @@ def make_env(env_class, *args):
 
 if __name__ == '__main__':
 
+    print('ppo' in locals())
+
     parser = arp.ArgumentParser(description='Train RL agent.')
+    parser.add_argument('-e', '--environment', help='Environment name', default='ReactiveDiscreteEnv')
+    parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo')
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=nenvs)
-    parser.add_argument('-a', '--attacks', help='Attack labels', nargs='+', default=train_attacks)
+    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=train_attacks)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     args = parser.parse_args()
+
+    # number of environments
 
     if args.nenvs is not None:
         nenvs = args.nenvs
@@ -33,26 +39,26 @@ if __name__ == '__main__':
     meta = load_meta(feature_dir)
     attack_labels = sorted([label for label in meta['labels'] if label > 0])
     attack_indexes = []
-    for a in args.attacks:
+    for a in args.labels:
         if a in attack_labels:
             idx = attack_labels.index(a)
             if idx not in attack_indexes:
                 attack_indexes.append(idx)
     attack_indexes = cycle(attack_indexes)
-    attack_str = ','.join([str(item) for item in args.attacks])
+    attack_str = ','.join([str(item) for item in args.labels])
 
     # environment and algorithm
 
-    env_class = ReactiveDiscreteEnv
-    algorithm = ppo
+    env_class = locals()[args.environment]
+    algorithm = locals()[args.algorithm]
     policy = MlpPolicy
     total_steps = nsteps * nepisodes
 
     # configure logger
 
     _dir = f'{env_class.__name__}/{algorithm.__name__}/{args.scenario}_{attack_str}'
-    modeldir = f'{rl_models_dir}/{_dir}'
-    logdir = f'{rl_results_dir}/{_dir}'
+    modeldir = f'{models_dir}/{_dir}'
+    logdir = f'{results_dir}/{_dir}'
     format_strs = os.getenv('', 'stdout,log,csv').split(',')
     logger.configure(os.path.abspath(logdir), format_strs)
 
