@@ -54,7 +54,7 @@ class PPO2(ActorCriticRLModel):
     :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
         If None, the number of cpu of the current machine will be used.
     """
-    def __init__(self, policy, env, gamma=0.99, n_steps=256, ent_coef=0.001, learning_rate=2.5e-4, vf_coef=0.5, pre_coeff=0.01,
+    def __init__(self, policy, env, gamma=0.99, n_steps=256, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
@@ -65,9 +65,6 @@ class PPO2(ActorCriticRLModel):
         self.n_steps = n_steps
         self.ent_coef = ent_coef
         self.vf_coef = vf_coef
-
-        self.pre_coeff = pre_coeff
-
         self.max_grad_norm = max_grad_norm
         self.gamma = gamma
         self.lam = lam
@@ -150,14 +147,8 @@ class PPO2(ActorCriticRLModel):
                     self.old_vpred_ph = tf.compat.v1.placeholder(tf.float32, [None], name="old_vpred_ph")
                     self.learning_rate_ph = tf.compat.v1.placeholder(tf.float32, [], name="learning_rate_ph")
                     self.clip_range_ph = tf.compat.v1.placeholder(tf.float32, [], name="clip_range_ph")
-
-                    self.precision_ph = tf.compat.v1.placeholder(tf.float32, [None], name="precision_ph")
-
                     neglogpac = train_model.proba_distribution.neglogp(self.action_ph)
                     self.entropy = tf.reduce_mean(input_tensor=train_model.proba_distribution.entropy())
-
-                    self.precision = tf.reduce_mean(input_tensor=self.precision_ph)
-
                     vpred = train_model.value_flat
 
                     # Value function clipping: not present in the original PPO
@@ -199,7 +190,7 @@ class PPO2(ActorCriticRLModel):
                     self.params = tf.compat.v1.trainable_variables()
                     weight_params = [v for v in self.params if '/b' not in v.name]
                     l2_loss = tf.reduce_sum([tf.nn.l2_loss(v) for v in weight_params])
-                    loss = self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef + l2_loss * L2_WEIGHT - self.pre_coeff * self.precision
+                    loss = self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef + l2_loss * L2_WEIGHT
 
                     tf.compat.v1.summary.scalar('entropy_loss', self.entropy)
                     tf.compat.v1.summary.scalar('policy_gradient_loss', self.pg_loss)
@@ -254,7 +245,7 @@ class PPO2(ActorCriticRLModel):
 
                 self.summary = tf.compat.v1.summary.merge_all()
 
-    def _train_step(self, learning_rate, cliprange, obs, returns, masks, actions, values, neglogpacs, precisions, update, writer, states=None, cliprange_vf=None):
+    def _train_step(self, learning_rate, cliprange, obs, returns, masks, actions, values, neglogpacs, update, writer, states=None, cliprange_vf=None):
         """
         Training of PPO2 Algorithm
 
@@ -275,12 +266,12 @@ class PPO2(ActorCriticRLModel):
         """
         advs = returns - values
         advs = (advs - advs.mean()) / (advs.std() + 1e-8)
-        td_map = {self.train_model.obs_ph: obs, self.action_ph: actions,
-                  self.advs_ph: advs, self.rewards_ph: returns,
-                  self.learning_rate_ph: learning_rate, self.clip_range_ph: cliprange,
-                  self.old_neglog_pac_ph: neglogpacs, self.old_vpred_ph: values,
-                  self.precision_ph: precisions
-                  }
+        td_map = {
+            self.train_model.obs_ph: obs, self.action_ph: actions,
+            self.advs_ph: advs, self.rewards_ph: returns,
+            self.learning_rate_ph: learning_rate, self.clip_range_ph: cliprange,
+            self.old_neglog_pac_ph: neglogpacs, self.old_vpred_ph: values
+        }
         if states is not None:
             td_map[self.train_model.states_ph] = states
             td_map[self.train_model.dones_ph] = masks
@@ -350,7 +341,7 @@ class PPO2(ActorCriticRLModel):
                 # true_reward is the reward without discount
                 rollout = self.runner.run(callback)
                 # Unpack
-                obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward, precisions = rollout
+                obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
 
                 callback.on_rollout_end()
 
@@ -370,7 +361,7 @@ class PPO2(ActorCriticRLModel):
                                                                             self.n_batch + start) // batch_size)
                             end = start + batch_size
                             mbinds = inds[start:end]
-                            slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs, precisions))
+                            slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs))
                             mb_loss_vals.append(self._train_step(lr_now, cliprange_now, *slices, writer=writer, update=timestep, cliprange_vf=cliprange_vf_now))
                 else:  # recurrent version
                     update_fac = max(self.n_batch // self.nminibatches // self.noptepochs // self.n_steps, 1)
@@ -492,7 +483,6 @@ class Runner(AbstractEnvRunner):
         self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
         self.mb_dones = [[] for _ in range(self.n_envs)]
         self.mb_rewards = [[] for _ in range(self.n_envs)]
-        self.mb_precisions = [[] for _ in range(self.n_envs)]
         self.scores = [[] for _ in range(self.n_envs)]
 
     def _run_one(self, env_idx):
@@ -521,8 +511,7 @@ class Runner(AbstractEnvRunner):
 
             tnow = time.time()
 
-            self.obs[env_idx], precisions, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
-            self.mb_precisions[env_idx].append(precisions)
+            self.obs[env_idx], rewards, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
 
             #self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
 
@@ -569,7 +558,6 @@ class Runner(AbstractEnvRunner):
         self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
         self.mb_dones = [[] for _ in range(self.n_envs)]
         self.mb_rewards = [[] for _ in range(self.n_envs)]
-        self.mb_precisions = [[] for _ in range(self.n_envs)]
         self.scores = [[] for _ in range(self.n_envs)]
 
         ep_infos = []
@@ -590,7 +578,6 @@ class Runner(AbstractEnvRunner):
 
         mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_precisions = [np.hstack([self.mb_precisions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
         mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
@@ -612,7 +599,6 @@ class Runner(AbstractEnvRunner):
 
         mb_obs = np.asarray(mb_obs, dtype=self.obs.dtype)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32)
-        mb_precisions = np.asarray(mb_precisions, dtype=np.float32)
         mb_actions = np.asarray(mb_actions)
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
@@ -635,8 +621,8 @@ class Runner(AbstractEnvRunner):
             mb_advs[step] = last_gae_lam = delta + self.gamma * self.lam * nextnonterminal * last_gae_lam
         mb_returns = mb_advs + mb_values
 
-        mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward, mb_precisions = map(
-            swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward, mb_precisions)
+        mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward = map(
+            swap_and_flatten, (mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, true_reward)
         )
 
         # reset data
@@ -647,10 +633,9 @@ class Runner(AbstractEnvRunner):
         self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
         self.mb_dones = [[] for _ in range(self.n_envs)]
         self.mb_rewards = [[] for _ in range(self.n_envs)]
-        self.mb_precisions = [[] for _ in range(self.n_envs)]
         self.scores = [[] for _ in range(self.n_envs)]
 
-        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, mb_states, ep_infos, true_reward, mb_precisions
+        return mb_obs, mb_returns, mb_dones, mb_actions, mb_values, mb_neglogpacs, mb_states, ep_infos, true_reward
 
     def _run_(self):
         """
