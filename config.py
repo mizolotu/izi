@@ -65,7 +65,7 @@ steps_per_epoch = 1000
 ds_params = ['nflows', 'delay']
 n_ds_params = len(ds_params)
 roc_fname = 'roc.csv'
-fpr_levels = [0.01, 0.001, 0.0001]
+fpr_levels = [0.1, 0.01, 0.001, 0.0001]
 fsize_min = 100000
 
 # sdn
