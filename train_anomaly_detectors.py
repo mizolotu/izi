@@ -8,7 +8,7 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, anomaly_detection_mapper, load_meta, EarlyStoppingAtMaxAuc
+from common.ml import set_seeds, load_batches, anomaly_detection_mapper, load_meta, EarlyStoppingAtMaxAuc, ae_reconstruction_loss
 from config import *
 
 if __name__ == '__main__':
@@ -151,7 +151,10 @@ if __name__ == '__main__':
     # load model
 
     try:
-        model = tf.keras.models.load_model(m_path)
+        if model_type == 'ae':
+            model = tf.keras.models.load_model(m_path, custom_objects={'ae_reconstruction_loss': ae_reconstruction_loss})
+        else:
+            model = tf.keras.models.load_model(m_path)
 
     except Exception as e:
         print(e)
