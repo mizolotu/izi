@@ -151,10 +151,7 @@ if __name__ == '__main__':
     # load model
 
     try:
-        if model_type == 'ae':
-            model = tf.keras.models.load_model(m_path, custom_objects={'ae_reconstruction_loss': ae_reconstruction_loss})
-        else:
-            model = tf.keras.models.load_model(m_path)
+        model = tf.keras.models.load_model(m_path, compile=False)
 
     except Exception as e:
         print(e)
