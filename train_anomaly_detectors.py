@@ -153,7 +153,8 @@ if __name__ == '__main__':
     try:
         model = tf.keras.models.load_model(m_path)
 
-    except:
+    except Exception as e:
+        print(e)
 
         # fit the model
 
