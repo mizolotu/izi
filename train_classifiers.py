@@ -163,7 +163,7 @@ if __name__ == '__main__':
     # try to load the model
 
     try:
-        model = tf.keras.models.load_model(m_path)
+        model = tf.keras.models.load_model(m_path, compile=False)
 
     # otherwise train a new one
 
