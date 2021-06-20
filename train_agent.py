@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo')
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=nenvs)
-    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=train_attacks)
+    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     args = parser.parse_args()

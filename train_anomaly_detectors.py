@@ -15,8 +15,8 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-m', '--model', help='Model', default='som')
-    parser.add_argument('-l', '--layers', help='Number of layers', default=2, type=int)
-    parser.add_argument('-n', '--neurons', help='Number of neurons', default=324, type=int)
+    parser.add_argument('-l', '--layers', help='Number of layers', default=0, type=int)
+    parser.add_argument('-n', '--neurons', help='Number of neurons', default=512, type=int)
     parser.add_argument('-a', '--attack', help='Attack labels, 0 corresponds to all data', default='1,2,3')
     parser.add_argument('-s', '--step', help='Polling step', default='1.0')
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)

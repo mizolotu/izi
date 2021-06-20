@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
     parser.add_argument('-r', '--reset', help='Default reset actions',nargs='+', default=[0,1,2,3,4,5,6,7,8,9,10,11,49,56])
     parser.add_argument('-t', '--step', help='Default step actions',nargs='+', default=[24,25,26,27,28,29,30,31,32,33,34,35])
-    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=train_attacks)
+    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
     parser.add_argument('-d', '--ntests', help='Number of tests', default=ntests, type=int)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=True, type=bool)
     parser.add_argument('-b', '--baseline', help='Baseline', default=False, type=bool)
@@ -41,7 +41,6 @@ if __name__ == '__main__':
             idx = attack_labels.index(a)
             if idx not in attack_indexes:
                 attack_indexes.append(idx)
-    attack_index = int(np.random.choice(attack_indexes))
     attack_str = ','.join([str(item) for item in args.labels])
     env_class = locals()[args.environment]
     algorithm = locals()[args.algorithm]
@@ -57,7 +56,7 @@ if __name__ == '__main__':
     except Exception as e:
         default_policy = {'reset': args.reset, 'step': args.step}
         print(f'Static policy to be executed: {default_policy}')
-        env_fns = [make_env(env_class, 0, attack_index, args.augment, seed, default_policy)]
+        env_fns = [make_env(env_class, 0, attack_indexes, args.augment, seed, default_policy)]
         env = SubprocVecEnv(env_fns)
         model = algorithm(policy, env, n_steps=nsteps, verbose=1)
     finally:

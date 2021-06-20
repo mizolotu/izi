@@ -10,6 +10,7 @@ from collections import deque
 from common.ids import restart_ids
 from common.utils import ip_proto
 from threading import Thread
+from itertools import cycle
 
 from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
@@ -58,6 +59,7 @@ class ReactiveDiscreteEnv():
         steps = sorted(list(set([item[-1] for item in spl])))
         self.n_steps = len(steps)
         self.n_models = len(models)
+        self.n_thrs = len(fpr_levels)
 
         # ovs vm
 
@@ -99,7 +101,9 @@ class ReactiveDiscreteEnv():
 
         # traffic
 
-        self.label = label
+        if type(label) is not list:
+            label = [label]
+        self.label = cycle(label)
 
         # obs
 
@@ -123,7 +127,7 @@ class ReactiveDiscreteEnv():
         self.n_unmirror_int_actions = self.n_apps * (self.n_ids - 1) * self.n_ids
         self.n_block_actions = self.n_apps * self.n_ids
         self.n_unblock_actions = self.n_apps * self.n_ids
-        self.n_ids_actions = (self.n_models + self.n_steps) * self.n_ids
+        self.n_ids_actions = (self.n_models + self.n_steps + self.n_thrs) * self.n_ids
         act_dim = self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + \
                   self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
         self.actions_queue = deque()
@@ -438,9 +442,12 @@ class ReactiveDiscreteEnv():
             if value < self.n_models:
                 param = 'model'
                 value = int(value)
-            else:
+            elif value < self.n_models + self.n_steps:
                 param = 'step'
                 value = int(value) - self.n_models
+            else:
+                param = 'threshold'
+                value = int(value) - self.n_models - self.n_steps
             action_fun = set_vnf_param
             args = (ids_ip, flask_port, param, value)
             on_off_idx_and_value = None
@@ -536,8 +543,9 @@ class ReactiveDiscreteEnv():
 
         # generate traffic
 
+        attack_label = next(self.label)
         for host in self.internal_hosts:
-            _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, self.label, episode_duration, aug=self.aug)
+            _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
 
         self.tstart = time()
         self.tstep = time()
