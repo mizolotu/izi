@@ -148,15 +148,26 @@ if __name__ == '__main__':
     if not osp.isdir(m_path):
         os.mkdir(m_path)
 
-    # fit the model
+    # load model
 
-    model.fit(
-        batches['train'],
-        validation_data=batches['validate'],
-        epochs=epochs,
-        steps_per_epoch=steps_per_epoch,
-        callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model)]
-    )
+    try:
+        model = tf.keras.models.load_model(m_path)
+
+    except:
+
+        # fit the model
+
+        model.fit(
+            batches['train'],
+            validation_data=batches['validate'],
+            epochs=epochs,
+            steps_per_epoch=steps_per_epoch,
+            callbacks = [EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model)]
+        )
+
+        #save model
+
+        model.save(m_path)
 
     # calculate thresholds for fpr levels specified in config
 
@@ -177,9 +188,8 @@ if __name__ == '__main__':
         thrs.append(str(ns_thr[idx]))
         print(ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
 
-    # save model and threshold
+    # save threshold
 
-    model.save(m_path)
     open(osp.join(m_path, 'thr'), 'w').write(','.join(thrs))
 
     # predict and calculate inference statistics
