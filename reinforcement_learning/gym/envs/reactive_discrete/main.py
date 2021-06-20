@@ -434,7 +434,7 @@ class ReactiveDiscreteEnv():
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions:
             action_array = np.zeros(self.n_ids_actions)
             action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions - self.n_unblock_actions] = 1
-            action_array = action_array.reshape(self.n_ids, self.n_models + self.n_steps)
+            action_array = action_array.reshape(self.n_ids, self.n_models + self.n_steps + self.n_thrs)
             ids_i, value_i = np.where(action_array == 1)
             ids_idx = ids_i[0]
             value = value_i[0]
