@@ -26,8 +26,10 @@ if __name__ == '__main__':
     if not args.cuda:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         physical_devices = tf.config.list_physical_devices('GPU')
+        print(physical_devices)
         try:
-            tf.config.experimental.set_memory_growth(physical_devices[0], True)
+            for device in physical_devices:
+                tf.config.experimental.set_memory_growth(device, True)
         except Exception as e:
             print(e)
 
