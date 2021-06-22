@@ -25,10 +25,7 @@ if __name__ == '__main__':
 
     if not args.cuda:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        tf.keras.backend.set_session(tf.Session(config=config))
-
+        
     # global params
 
     num_batches = {
