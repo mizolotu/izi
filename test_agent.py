@@ -22,7 +22,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo')
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
-    parser.add_argument('-r', '--reset', help='Default reset actions',nargs='+', default=[0,1,2,3,4,5,6,7,8,9,10,11,51,54,58])
+    parser.add_argument('-r', '--reset', help='Default reset actions',nargs='+', default=[0,1,2,3,4,5,6,7,8,9,10,11,49,56,58])
     parser.add_argument('-t', '--step', help='Default step actions',nargs='+', default=[24,25,26,27,28,29,30,31,32,33,34,35])
     parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
     parser.add_argument('-d', '--ntests', help='Number of tests', default=ntests, type=int)

@@ -248,7 +248,7 @@ class ReactiveDiscreteEnv():
                         idx = intrusion_ips[i][app_idx].index(src_ip)
                         intrusion_numbers[i][app_idx][idx] += 1
                     if dst_ip not in intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
-                        intrusion_ips[i].append(dst_ip)
+                        intrusion_ips[i][app_idx].append(dst_ip)
                         intrusion_numbers[i][app_idx].append(1)
                     elif dst_ip in intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
                         idx = intrusion_ips[i][app_idx].index(dst_ip)
@@ -263,7 +263,7 @@ class ReactiveDiscreteEnv():
                         idx = self.intrusion_ips[i][app_idx].index(src_ip)
                         self.intrusion_numbers[i][app_idx][idx] += 1
                     if dst_ip not in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
-                        self.intrusion_ips[i].append(dst_ip)
+                        self.intrusion_ips[i][app_idx].append(dst_ip)
                         self.intrusion_numbers[i][app_idx].append(1)
                     elif dst_ip in self.intrusion_ips[i][app_idx] and dst_ip not in self.internal_hosts:
                         idx = self.intrusion_ips[i][app_idx].index(dst_ip)
@@ -646,7 +646,7 @@ class ReactiveDiscreteEnv():
             reward += precision_weight * precision
         return reward
 
-    def reward(self, n_steps_backward=3, n_steps_forward=5):
+    def reward(self, n_steps_backward=1, n_steps_forward=3):
 
         # lists
 
