@@ -25,13 +25,9 @@ if __name__ == '__main__':
 
     if not args.cuda:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-        physical_devices = tf.config.list_physical_devices('GPU')
-        print(physical_devices)
-        try:
-            for device in physical_devices:
-                tf.config.experimental.set_memory_growth(device, True)
-        except Exception as e:
-            print(e)
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        tf.keras.backend.set_session(tf.Session(config=config))
 
     # global params
 
