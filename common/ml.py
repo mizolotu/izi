@@ -42,7 +42,7 @@ def anomaly_detection_mapper(features, label, xmin, xmax, eps=1e-10):
     features_with_labels = tf.concat([features, tf.reshape(label, (-1, 1))], axis=1)
     return features, features_with_labels
 
-def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
+def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=False, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
