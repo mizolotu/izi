@@ -277,6 +277,7 @@ class ReactiveDiscreteEnv():
         for intrusion_ips_by_ids, intrusion_numbers_by_ids in zip(intrusion_ips, intrusion_numbers):
             for intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids in zip(intrusion_ips_by_ids, intrusion_numbers_by_ids):
                 for ip, n in zip(intrusion_ips_by_app_and_ids, intrusion_numbers_by_app_and_ids):
+                    #print(ip, n)
                     if ip in attackers:
                         tp += n
                     else:
@@ -619,7 +620,7 @@ class ReactiveDiscreteEnv():
             print(f'Delays: {[np.mean(item) for item in self.delay]}')
 
         # append precision
-
+        #print(intrusion_ips)
         self._get_precision(intrusion_ips, intrusion_numbers)
 
         # fake reward and info, the real ones are calculated once the episode is over
@@ -646,7 +647,7 @@ class ReactiveDiscreteEnv():
             reward += precision_weight * precision
         return reward
 
-    def reward(self, n_steps_backward=1, n_steps_forward=3):
+    def reward(self, n_steps_backward=0, n_steps_forward=0):
 
         # lists
 
