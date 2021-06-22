@@ -18,6 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['Baseline', 'PPO2'])
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
     parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=train_attacks)
+    parser.add_argument('-n', '--ntests', help='Number of tests', default=ntests, type=int)
     parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(1e6))
     args = parser.parse_args()
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
 
         # baseline
 
-        if len(r) <= ntests:
+        if len(r) <= args.ntests:
             x = np.arange(1, args.timesteps // nsteps) * x[0]
             r = np.ones(args.timesteps // nsteps) * np.nanmean(r)
             n = np.ones(args.timesteps // nsteps) * np.nanmean(n)
