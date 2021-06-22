@@ -18,6 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--exclude', help='Model labels to avoid', nargs='+', default=[])
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
     parser.add_argument('-m', '--models', help='IDS models', nargs='+', default=['mlp'])
+    parser.add_argument('-u', '--ubuntu', help='Ubuntu version', default=ubuntu_version)
     args = parser.parse_args()
 
     # update nenvs and nidss
@@ -47,7 +48,7 @@ if __name__ == '__main__':
                 break
 
     vagrant_file_lines = vagrantfile_provider(mgmt_network=mgmt_network, storage_pool_name=args.storage)
-    vagrant_file_lines.extend(vagrantfile_vms(vms, cpus, ips, sources, scripts, mounts))
+    vagrant_file_lines.extend(vagrantfile_vms(vms, cpus, ips, sources, scripts, mounts, args.ubuntu))
     vagrant_file_lines.extend(vagrantfile_end())
     with open('Vagrantfile', 'w') as f:
         f.writelines(vagrant_file_lines)
