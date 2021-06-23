@@ -6,7 +6,7 @@ sudo ovs-ofctl del-flows br
 pip3 install -U pip
 pip3 install -U setuptools
 pip3 install pandas pyyaml h5py flask pypcap kaitaistruct scapy
-pip3 install https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.5.0-cp36-cp36m-linux_x86_64.whl
+pip3 install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
 sudo cp ids.service /etc/systemd/system/
 sudo systemctl enable ids
 sudo systemctl start ids
