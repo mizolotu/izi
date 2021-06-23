@@ -96,6 +96,7 @@ class Interceptor:
         self.set_step(step_idx)
         self.set_threshold(thr_idx)
         self.to_be_reset = False
+        self.delay = 0
 
     def load_model(self, model_label, model_step):
         self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_label, model_step)))
