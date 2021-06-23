@@ -14,6 +14,7 @@ from reinforcement_learning.common import ActorCriticRLModel, tf_util, SetVerbos
 from reinforcement_learning.common.runners import AbstractEnvRunner
 from reinforcement_learning.common.policies import ActorCriticPolicy, RecurrentActorCriticPolicy
 from threading import Thread
+from reinforcement_learning.common.math_util import safe_mean
 
 # For ACER
 def get_by_index(input_tensor, idx):
@@ -181,8 +182,8 @@ class ACER(ActorCriticRLModel):
         If None, the number of cpu of the current machine will be used.
     """
 
-    def __init__(self, policy, env, gamma=0.99, n_steps=20, num_procs=None, q_coef=0.5, ent_coef=0.01, max_grad_norm=10,
-                 learning_rate=7e-4, lr_schedule='linear', rprop_alpha=0.99, rprop_epsilon=1e-5, buffer_size=5000,
+    def __init__(self, policy, env, gamma=0.99, n_steps=64, num_procs=None, q_coef=0.5, ent_coef=0.01, max_grad_norm=10,
+                 learning_rate=1e-3, lr_schedule='linear', rprop_alpha=0.99, rprop_epsilon=1e-5, buffer_size=5000,
                  replay_ratio=4, replay_start=1000, correction_term=10.0, trust_region=True,
                  alpha=0.99, delta=1, verbose=0, tensorboard_log=None,
                  _init_setup_model=True, policy_kwargs=None,
@@ -546,7 +547,7 @@ class ACER(ActorCriticRLModel):
 
         return self.names_ops, step_return[1:]  # strip off _train
 
-    def learn(self, total_timesteps, callback=None, log_interval=100, tb_log_name="ACER",
+    def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="ACER",
               reset_num_timesteps=True):
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
@@ -574,7 +575,7 @@ class ACER(ActorCriticRLModel):
 
                 callback.on_rollout_start()
 
-                enc_obs, obs, actions, rewards, mus, dones, masks = self.runner.run(callback)
+                enc_obs, obs, actions, rewards, mus, dones, masks, ep_infos = self.runner.run(callback)
                 callback.update_locals(locals())
                 callback.on_rollout_end()
 
@@ -583,6 +584,8 @@ class ACER(ActorCriticRLModel):
                     break
 
                 episode_stats.feed(rewards, dones)
+
+                self.ep_info_buf.extend(ep_infos)
 
                 if buffer is not None:
                     buffer.put(enc_obs, actions, rewards, mus, dones, masks)
@@ -610,11 +613,17 @@ class ACER(ActorCriticRLModel):
                     # IMP: In EpisodicLife env, during training, we get done=True at each loss of life,
                     # not just at the terminal state. Thus, this is mean until end of life, not end of episode.
                     # For true episode rewards, see the monitor files in the log folder.
-                    logger.record_tabular("mean_episode_length", episode_stats.mean_length())
-                    logger.record_tabular("mean_episode_reward", episode_stats.mean_reward())
-                    for name, val in zip(names_ops, values_ops):
-                        logger.record_tabular(name, float(val))
+                    #logger.record_tabular("mean_episode_length", episode_stats.mean_length())
+                    #logger.record_tabular("mean_episode_reward", episode_stats.mean_reward())
+                    #for name, val in zip(names_ops, values_ops):
+                    #    logger.record_tabular(name, float(val))
                     logger.dump_tabular()
+
+                    if len(self.ep_info_buf) > 0 and len(self.ep_info_buf[0]) > 0:
+                        logger.logkv('ep_reward_mean', safe_mean([ep_info['r'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_normal_mean', safe_mean([ep_info['n'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_attack_mean', safe_mean([ep_info['a'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_precision_mean', safe_mean([ep_info['p'] for ep_info in self.ep_info_buf]))
 
                 if (self.replay_ratio > 0 and
                     buffer is not None and
@@ -721,6 +730,9 @@ class _Runner(AbstractEnvRunner):
         :return: ([float], [float], [int64], [float], [float], [bool], [float])
                  encoded observation, observations, actions, rewards, mus, dones, masks
         """
+
+        self.obs[:] = self.env.reset()
+
         enc_obs = [self.obs]
         mb_obs, mb_actions, mb_mus, mb_dones, mb_rewards = [], [], [], [], []
         for _ in range(self.n_steps):
@@ -753,6 +765,7 @@ class _Runner(AbstractEnvRunner):
             mb_rewards.append(rewards)
             enc_obs.append(obs)
         mb_obs.append(np.copy(self.obs))
+
         mb_dones.append(self.dones)
 
         enc_obs = np.asarray(enc_obs, dtype=self.obs_dtype).swapaxes(1, 0)
@@ -773,9 +786,9 @@ class _Runner(AbstractEnvRunner):
     def _run(self):
 
         self.mb_obs = [[] for _ in range(self.n_envs)]
+        self.enc_obs = [[] for _ in range(self.n_envs)]
         self.mb_actions = [[] for _ in range(self.n_envs)]
-        self.mb_values = [[] for _ in range(self.n_envs)]
-        self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
+        self.mb_mus = [[] for _ in range(self.n_envs)]
         self.mb_dones = [[] for _ in range(self.n_envs)]
         self.mb_rewards = [[] for _ in range(self.n_envs)]
         self.scores = [[] for _ in range(self.n_envs)]
@@ -794,60 +807,71 @@ class _Runner(AbstractEnvRunner):
         for th in threads:
             th.join()
 
-            self.model.num_timesteps += self.n_envs
+        self.model.num_timesteps += self.n_envs
 
-            if self.callback is not None:
-                # Abort training early
-                self.callback.update_locals(locals())
-                if self.callback.on_step() is False:
-                    self.continue_training = False
-                    # Return dummy values
-                    return [None] * 7
+        if self.callback is not None:
+            # Abort training early
+            self.callback.update_locals(locals())
+            if self.callback.on_step() is False:
+                self.continue_training = False
+                # Return dummy values
+                return [None] * 7
 
-            # states information for statefull models like LSTM
-            self.states = states
-            self.dones = dones
-            self.obs = obs
-            mb_rewards.append(rewards)
-            enc_obs.append(obs)
-        mb_obs.append(np.copy(self.obs))
-        mb_dones.append(self.dones)
+        # combine data gathered into batches
 
-        enc_obs = np.asarray(enc_obs, dtype=self.obs_dtype).swapaxes(1, 0)
+        mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps + 1)]
+        enc_obs = [np.stack([self.enc_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps + 1)]
+        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_mus = [np.vstack([self.mb_mus[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
+        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps + 1)]
+        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs)]
+        mb_states = self.states
+        self.dones = np.array(self.dones)
+
+        for scores_in_env in mb_scores:
+            maybe_ep_info = {
+                'r': safe_mean(scores_in_env[:, 0]),
+                'n': safe_mean(scores_in_env[:, 1]),
+                'a': safe_mean(scores_in_env[:, 2]),
+                'p': safe_mean(scores_in_env[:, 3])
+            }
+            ep_infos.append(maybe_ep_info)
+
+        # states information for statefull models like LSTM
+
+        enc_obs = np.asarray(mb_obs, dtype=self.obs_dtype).swapaxes(1, 0)
         mb_obs = np.asarray(mb_obs, dtype=self.obs_dtype).swapaxes(1, 0)
         mb_actions = np.asarray(mb_actions, dtype=np.int64).swapaxes(1, 0)
         mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
         mb_mus = np.asarray(mb_mus, dtype=np.float32).swapaxes(1, 0)
         mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
-
         mb_masks = mb_dones  # Used for statefull models like LSTM's to mask state when done
         mb_dones = mb_dones[:, 1:]  # Used for calculating returns. The dones array is now aligned with rewards
 
         # shapes are now [nenv, nsteps, []]
         # When pulling from buffer, arrays will now be reshaped in place, preventing a deep copy.
 
-        return enc_obs, mb_obs, mb_actions, mb_rewards, mb_mus, mb_dones, mb_masks
+        return enc_obs, mb_obs, mb_actions, mb_rewards, mb_mus, mb_dones, mb_masks, ep_infos
 
     def _run_one(self, env_idx):
 
         enc_obs = [self.obs]
 
         for _ in range(self.n_steps):
-            actions, _, states, _ = self.model.step(self.obs, self.states, self.dones)
+            actions, _, states, _ = self.model.step(self.obs[env_idx:env_idx+1], self.states, self.dones[env_idx:env_idx+1])
             mus = self.model.proba_step(self.obs, self.states, self.dones)
-
-            print(mus)
-
+            self.enc_obs[env_idx].append(np.copy(self.obs.copy()[env_idx]))
             self.mb_obs[env_idx].append(np.copy(self.obs.copy()[env_idx]))
             self.mb_actions[env_idx].append(actions[0])
-            self.mb_mus[env_idx].append(mus[0])
+            self.mb_mus[env_idx].append(mus[0, :])
             self.mb_dones[env_idx].append(self.dones[env_idx])
 
             clipped_actions = actions
             # Clip the actions to avoid out of bound error
             if isinstance(self.env.action_space, Box):
                 clipped_actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
-            obs, rewards, dones, _ = self.env.step(clipped_actions)
+            obs, rewards, dones, _ = self.env.step_one(env_idx, clipped_actions)
 
             self.model.num_timesteps += self.n_envs
 
@@ -860,25 +884,15 @@ class _Runner(AbstractEnvRunner):
                     return [None] * 7
 
             # states information for statefull models like LSTM
-            self.states = states
-            self.dones = dones
-            self.obs = obs
-            mb_rewards.append(rewards)
-            enc_obs.append(obs)
-        mb_obs.append(np.copy(self.obs))
-        mb_dones.append(self.dones)
 
-        enc_obs = np.asarray(enc_obs, dtype=self.obs_dtype).swapaxes(1, 0)
-        mb_obs = np.asarray(mb_obs, dtype=self.obs_dtype).swapaxes(1, 0)
-        mb_actions = np.asarray(mb_actions, dtype=np.int64).swapaxes(1, 0)
-        mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
-        mb_mus = np.asarray(mb_mus, dtype=np.float32).swapaxes(1, 0)
-        mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
+            self.dones[env_idx] = dones
+            self.obs[env_idx] = obs
 
-        mb_masks = mb_dones  # Used for statefull models like LSTM's to mask state when done
-        mb_dones = mb_dones[:, 1:]  # Used for calculating returns. The dones array is now aligned with rewards
+        # last step?
 
-        # shapes are now [nenv, nsteps, []]
-        # When pulling from buffer, arrays will now be reshaped in place, preventing a deep copy.
+        self.enc_obs[env_idx].append(np.copy(self.obs.copy()[env_idx]))
+        self.mb_obs[env_idx].append(np.copy(self.obs.copy()[env_idx]))
+        self.mb_dones[env_idx].append(self.dones[env_idx])
 
-        return enc_obs, mb_obs, mb_actions, mb_rewards, mb_mus, mb_dones, mb_masks
+        self.mb_rewards[env_idx], infos = self.env.reward_one(env_idx)
+        self.scores[env_idx] = [[info['r'], info['n'], info['a'], info['p']] for info in infos]
