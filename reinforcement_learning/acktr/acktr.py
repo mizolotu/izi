@@ -53,10 +53,10 @@ class ACKTR(ActorCriticRLModel):
         If None, the number of cpu of the current machine will be used.
     """
 
-    def __init__(self, policy, env, gamma=0.99, nprocs=None, n_steps=16, ent_coef=0.001, vf_coef=0.5, vf_fisher_coef=1.0,
-                 learning_rate=0.06, max_grad_norm=0.5, kfac_clip=0.001, lr_schedule='linear', verbose=0,
+    def __init__(self, policy, env, gamma=0.99, nprocs=None, n_steps=64, ent_coef=0.01, vf_coef=0.5, vf_fisher_coef=1.0,
+                 learning_rate=1e-3, max_grad_norm=0.5, kfac_clip=0.001, lr_schedule='linear', verbose=0,
                  tensorboard_log=None, _init_setup_model=True, async_eigen_decomp=False, kfac_update=1,
-                 gae_lambda=None, policy_kwargs=None, full_tensorboard_log=False, seed=None, n_cpu_tf_sess=1):
+                 gae_lambda=0.95, policy_kwargs=None, full_tensorboard_log=False, seed=None, n_cpu_tf_sess=1):
 
         if nprocs is not None:
             warnings.warn("nprocs will be removed in a future version (v3.x.x) "
@@ -116,8 +116,8 @@ class ACKTR(ActorCriticRLModel):
             return PPO2Runner(
                 env=self.env, model=self, n_steps=self.n_steps, gamma=self.gamma, lam=self.gae_lambda)
         else:
-            return A2CRunner(
-                self.env, self, n_steps=self.n_steps, gamma=self.gamma)
+            #return A2CRunner(self.env, self, n_steps=self.n_steps, gamma=self.gamma)
+            return PPO2Runner(env=self.env, model=self, n_steps=self.n_steps, gamma=self.gamma)
 
     def _get_pretrain_placeholders(self):
         policy = self.train_model
@@ -282,7 +282,7 @@ class ACKTR(ActorCriticRLModel):
 
         return policy_loss, value_loss, policy_entropy
 
-    def learn(self, total_timesteps, callback=None, log_interval=128, tb_log_name="ACKTR", reset_num_timesteps=True):
+    def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="ACKTR", reset_num_timesteps=True):
 
         new_tb_log = self._init_num_timesteps(reset_num_timesteps)
         callback = self._init_callback(callback)

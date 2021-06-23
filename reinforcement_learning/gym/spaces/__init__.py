@@ -7,7 +7,8 @@ from reinforcement_learning.gym.spaces.tuple import Tuple
 from reinforcement_learning.gym.spaces.dict import Dict
 
 from reinforcement_learning.gym.spaces.utils import flatdim
+from reinforcement_learning.gym.spaces.utils import flatten_space
 from reinforcement_learning.gym.spaces.utils import flatten
 from reinforcement_learning.gym.spaces.utils import unflatten
 
-__all__ = ["Space", "Box", "Discrete", "MultiDiscrete", "MultiBinary", "Tuple", "Dict", "flatdim", "flatten", "unflatten"]
+__all__ = ["Space", "Box", "Discrete", "MultiDiscrete", "MultiBinary", "Tuple", "Dict", "flatdim", "flatten_space", "flatten", "unflatten"]
