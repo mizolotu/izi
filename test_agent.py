@@ -19,11 +19,12 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Test agent.')
     parser.add_argument('-e', '--environment', help='Environment name', default='ReactiveDiscreteEnv')
+    parser.add_argument('-i', '--id', help='Environment id', default=0, type=int)
     parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo')
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
-    parser.add_argument('-r', '--reset', help='Default reset actions',nargs='+', type=int, default=[0,1,2,3,4,5,6,7,8,9,10,11,50,54,58]) # 4 48 54 58
-    parser.add_argument('-t', '--step', help='Default step actions',nargs='+', type=int, default=[24,25,26,27,28,29,30,31,32,33,34,35]) # 28
+    parser.add_argument('-r', '--reset', help='Default reset actions',nargs='+', type=int, default=[4, 48, 54, 58]) # 0,1,2,3,4,5,6,7,8,9,10,11,50,54,58
+    parser.add_argument('-t', '--step', help='Default step actions',nargs='+', type=int, default=[28]) # 24,25,26,27,28,29,30,31,32,33,34,35
     parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
     parser.add_argument('-d', '--ntests', help='Number of tests', default=ntests, type=int)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=False, type=bool)
