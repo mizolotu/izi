@@ -129,7 +129,6 @@ def ssh_copy(vm, source_dir, destination_dir):
         for name in files:
             source = osp.join(root, name)
             destination = source.replace(source_dir, destination_dir)
-            print(source, destination)
             ftp_client.put(source, destination)
     ftp_client.close()
     ssh.close()
