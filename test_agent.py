@@ -50,14 +50,14 @@ if __name__ == '__main__':
 
     try:
         model = algorithm.load('{0}/{1}'.format(modeldir, args.checkpoint))
-        env_fns = [make_env(env_class, 0, int(args.attack), args.augment, args.seed)]
+        env_fns = [make_env(env_class, args.id, int(args.attack), args.augment, args.seed)]
         env = SubprocVecEnv(env_fns)
         model.set_env(env)
         print('Model has been loaded from {0}!'.format(args.checkpoint))
     except Exception as e:
         default_policy = {'reset': args.reset, 'step': args.step}
         print(f'Static policy to be executed: {default_policy}')
-        env_fns = [make_env(env_class, 0, attack_indexes, args.augment, seed, default_policy)]
+        env_fns = [make_env(env_class, args.id, attack_indexes, args.augment, seed, default_policy)]
         env = SubprocVecEnv(env_fns)
         model = algorithm(policy, env, n_steps=nsteps, verbose=1)
     finally:
