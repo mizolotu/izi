@@ -22,12 +22,12 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo')
     parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
-    parser.add_argument('-r', '--reset', help='Default reset actions',nargs='+', type=int, default=[0,1,2,3,4,5,6,7,8,9,10,11,50,54,58])
-    parser.add_argument('-t', '--step', help='Default step actions',nargs='+', type=int, default=[24,25,26,27,28,29,30,31,32,33,34,35])
+    parser.add_argument('-r', '--reset', help='Default reset actions',nargs='+', type=int, default=[0,1,2,3,4,5,6,7,8,9,10,11,50,54,58]) # 4 48 54 58
+    parser.add_argument('-t', '--step', help='Default step actions',nargs='+', type=int, default=[24,25,26,27,28,29,30,31,32,33,34,35]) # 28
     parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
     parser.add_argument('-d', '--ntests', help='Number of tests', default=ntests, type=int)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=False, type=bool)
-    parser.add_argument('-b', '--baseline', help='Baseline', default=False, type=bool)
+    parser.add_argument('-p', '--prefix', help='Prefix')
     parser.add_argument('-n', '--nenvs', help='Number of environments', default=nenvs, type=int)
     args = parser.parse_args()
 
@@ -64,14 +64,14 @@ if __name__ == '__main__':
 
     # save the result as baseline for default policy
 
-    if args.baseline:
+    if args.prefix is not None:
         env_dir = osp.join(results_dir, env_class.__name__)
-        baseline_dir = osp.join(env_dir, baseline)
-        baseline_scenario_dir = osp.join(baseline_dir, f'{args.scenario}_{attack_str}')
-        for d in [env_dir, baseline_dir, baseline_scenario_dir]:
+        _dir = osp.join(env_dir, args.prefix)
+        _scenario_dir = osp.join(_dir, f'{args.scenario}_{attack_str}')
+        for d in [env_dir, _dir, _scenario_dir]:
             if not osp.isdir(d):
                 os.mkdir(d)
-        fpath = osp.join(baseline_scenario_dir, progress)
+        fpath = osp.join(_scenario_dir, progress)
         p = pd.DataFrame({
             'ep_reward_mean': r,
             'ep_normal_mean': n,
@@ -80,8 +80,3 @@ if __name__ == '__main__':
             'total_timesteps': [i * args.nenvs * nsteps for i in range(1, args.ntests + 1)]
         })
         p.to_csv(fpath, index=False)
-
-
-
-
-

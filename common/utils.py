@@ -120,6 +120,26 @@ def ssh_command(ssh, command, sleeptime=0.001):
         sleep(sleeptime)
     return stdout.readlines()
 
+def ssh_copy(vm, source_dir, destination_dir):
+    keyfile = vm['key']
+    mgmt = vm['mgmt']
+    ssh = ssh_connect(mgmt, keyfile)
+    ftp_client = ssh.open_sftp()
+    for root, dirs, files in os.walk(source_dir, topdown=False):
+        for name in files:
+            source = osp.join(root, name)
+            destination = source.replace(source_dir, destination_dir)
+            print(source, destination)
+            ftp_client.put(source, destination)
+    ftp_client.close()
+    ssh.close()
+
+def ssh_restart_service(vm, service):
+    keyfile = vm['key']
+    mgmt = vm['mgmt']
+    ssh = ssh_connect(mgmt, keyfile)
+    ssh_command(ssh, f'sudo service {service} restart')
+
 def nat_ip(ip, prefix):
     pspl = prefix.split('.')
     l = len(pspl)
