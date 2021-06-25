@@ -480,6 +480,8 @@ class ReactiveDiscreteEnv():
 
     def reset(self, sleep_duration=3):
 
+        print('Reset start')
+
         if self.debug:
             print(f'Max obs time in {self.id}: {self.max_obs_time}')
 
@@ -566,9 +568,13 @@ class ReactiveDiscreteEnv():
             self.app_counts_stack.append(frame)
         obs = np.array(self.app_counts_stack)
 
+        print('Reset end')
+
         return obs
 
     def step(self, action):
+
+        print('Step start')
 
         # step count
 
@@ -628,6 +634,8 @@ class ReactiveDiscreteEnv():
         reward = 0.0
         info = {}
         done = False
+
+        print('Step end')
 
         return obs, reward, done, info
 
