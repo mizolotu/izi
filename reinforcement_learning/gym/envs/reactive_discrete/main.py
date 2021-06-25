@@ -522,7 +522,6 @@ class ReactiveDiscreteEnv():
             count = 0
             for table in tables:
                 flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
-                print(self.id, flows, counts)
                 if len(flows) == 1:
                     count += 1
                 else:
