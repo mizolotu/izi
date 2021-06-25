@@ -859,6 +859,9 @@ class _Runner(AbstractEnvRunner):
         enc_obs = [self.obs]
 
         for _ in range(self.n_steps):
+
+            print(_)
+
             actions, _, states, _ = self.model.step(self.obs[env_idx:env_idx+1], self.states, self.dones[env_idx:env_idx+1])
             mus = self.model.proba_step(self.obs, self.states, self.dones)
             self.enc_obs[env_idx].append(np.copy(self.obs.copy()[env_idx]))
