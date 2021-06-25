@@ -478,7 +478,7 @@ class ReactiveDiscreteEnv():
                 counts_r[i] = counts[idx]
         return counts_r
 
-    def reset(self, sleep_duration=3):
+    def reset(self, sleep_duration=5):
 
         print('Reset start in', self.id)
 
