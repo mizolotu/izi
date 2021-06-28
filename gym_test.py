@@ -18,6 +18,6 @@ if __name__ == '__main__':
     env = SubprocVecEnv(env_fns)
 
     #model = ppo(ppo_policy, env, verbose=1)
-    #model = acktr(policy, env, verbose=1)
-    model = acer(policy, env, verbose=1)
+    model = acktr(policy, env, verbose=1)
+    #model = acer(policy, env, verbose=1)
     model.learn(total_timesteps=nsteps)
