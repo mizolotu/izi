@@ -12,7 +12,56 @@ def moving_average(x, step=1, window=10):
 
     return np.vstack(seq)
 
-def generate_line_scatter(names, values, colors, xlabel, ylabel, xrange, show_legend=True):
+def generate_line_scatter(names, values, colors, dashes, xlabel, ylabel, xrange, show_legend=True, yanchor='bottom', ylegend=0):
+
+    traces = []
+
+    for i in range(len(names)):
+
+        x = values[i][0].tolist()
+        y = values[i][1].tolist()
+
+        traces.append(
+            go.Scatter(
+                x=x,
+                y=y,
+                line=dict(color=colors[i], dash=dashes[i]),
+                mode='lines',
+                showlegend=show_legend,
+                name=names[i],
+            )
+        )
+
+    layout = go.Layout(
+        template='plotly_white',
+        xaxis=dict(
+            title=xlabel,
+            showgrid=True,
+            showline=False,
+            showticklabels=True,
+            ticks='outside',
+            zeroline=False,
+            range=xrange
+        ),
+        yaxis=dict(
+            title=ylabel,
+            showgrid=True,
+            showline=False,
+            showticklabels=True,
+            ticks='outside',
+            zeroline=False
+        ),
+        legend=dict(
+            yanchor=yanchor,
+            y=ylegend,
+            xanchor="right",
+            x=1
+        )
+    )
+
+    return traces, layout
+
+def generate_marker_scatter(names, values, colors, markers, xlabel, ylabel, xrange, show_legend=True):
 
     traces = []
 
@@ -26,9 +75,10 @@ def generate_line_scatter(names, values, colors, xlabel, ylabel, xrange, show_le
                 x=x,
                 y=y,
                 line=dict(color=colors[i]),
-                mode='lines',
+                mode='lines+markers',
                 showlegend=show_legend,
                 name=names[i],
+                marker=dict(symbol=markers[i])
             )
         )
 
