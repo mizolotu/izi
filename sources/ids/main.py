@@ -41,7 +41,7 @@ def model_threshold():
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
         interceptor.set_threshold(jdata['threshold'])
-    return jsonify({'threshold': interceptor.model_labels[interceptor.thr_idx]})
+    return jsonify({'threshold': interceptor.thrs[interceptor.thr_idx]})
 
 @app.route('/intrusions')
 def intrusions():
