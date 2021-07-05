@@ -1,6 +1,6 @@
 import json
 
-from common.utils import ssh_copy, ssh_restart_service
+from common.utils import ssh_copy, ssh_clear, ssh_restart_service
 from config import *
 
 if __name__ == '__main__':
@@ -18,11 +18,15 @@ if __name__ == '__main__':
     # copy ids files and restart service
 
     for vm in ids_vms:
+        ssh_clear(vm, ids_remote_weights_dir)
+        ssh_clear(vm, ids_remote_thresholds_dir)
         ssh_copy(vm, ids_sources_dir, ids_remote_dir)
         ssh_restart_service(vm, 'ids')
 
     # copy ids files and restart service
 
     for vm in ovs_vms:
+        ssh_clear(vm, ids_remote_weights_dir)
+        ssh_clear(vm, ids_remote_thresholds_dir)
         ssh_copy(vm, ovs_sources_dir, ovs_remote_dir)
         ssh_restart_service(vm, 'ovs')

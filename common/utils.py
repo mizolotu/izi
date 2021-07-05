@@ -133,11 +133,19 @@ def ssh_copy(vm, source_dir, destination_dir):
     ftp_client.close()
     ssh.close()
 
+def ssh_clear(vm, dir):
+    keyfile = vm['key']
+    mgmt = vm['mgmt']
+    ssh = ssh_connect(mgmt, keyfile)
+    ssh_command(ssh, f'sudo rm {dir}/*')
+    ssh.close()
+
 def ssh_restart_service(vm, service):
     keyfile = vm['key']
     mgmt = vm['mgmt']
     ssh = ssh_connect(mgmt, keyfile)
     ssh_command(ssh, f'sudo service {service} restart')
+    ssh.close()
 
 def nat_ip(ip, prefix):
     pspl = prefix.split('.')
