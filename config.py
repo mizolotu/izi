@@ -130,8 +130,8 @@ precision_weight = 0
 obs_stack_size = 4
 train_attacks = [1]
 episode_duration = 8
-nsteps = 32
-nepisodes = 100000
+nsteps = 16
+nepisodes = 1000000
 ntests = 10
 
 # other
