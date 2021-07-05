@@ -111,7 +111,7 @@ class ReactiveDiscreteEnv():
         self.n_apps = len(applications)
         on_off_frame_shape = (self.n_apps, (self.n_ids + 1) * self.n_ids)
         self.on_off_frame = np.zeros(on_off_frame_shape)
-        obs_shape = (self.stack_size, self.n_apps, 2 + self.n_ids + on_off_frame_shape[1])
+        obs_shape = (self.stack_size, self.n_apps, 3 + self.n_ids + on_off_frame_shape[1])
         self.app_counts_stack = deque(maxlen=self.stack_size)
         self.in_samples_by_attacker_stack = deque(maxlen=self.stack_size)
         self.out_samples_by_attacker_stack = deque(maxlen=self.stack_size)
@@ -177,22 +177,27 @@ class ReactiveDiscreteEnv():
                 func(*args)
 
     def _process_app_samples(self, samples):
-        x = np.zeros((self.n_apps, 2))
+        x = np.zeros((self.n_apps, 3))
+        flow_ids = [[] for _ in applications]
         for id, features, flags in samples:
             if id is not None:
                 src_port = id[1]
                 dst_port = id[3]
+                idx = None
                 if id[4] in [1, 6, 17]:
                     proto, proto_number = ip_proto(id[4])
                     if (proto, src_port) in applications:
                         idx = applications.index((proto, src_port))
-                        x[idx, 0] += features[0]
                     elif (proto, dst_port) in applications:
                         idx = applications.index((proto, dst_port))
-                        x[idx, 0] += features[0]
                     elif (proto,) in applications:
                         idx = applications.index((proto,))
-                        x[idx, 0] += features[0]
+                    if idx is not None:
+                        if id not in flow_ids[idx]:
+                            flow_ids[idx].append(id)
+                            x[idx, 0] += 1
+                        x[idx, 1] += 1
+                        x[idx, 2] += features[0]
         return x
 
     def _process_reward_samples(self, in_samples, out_ids):
@@ -304,7 +309,6 @@ class ReactiveDiscreteEnv():
                     attack.append(blocked / b)
                 elif i == self.n_attackers:
                     normal.append(allowed / b)
-            print(a, b)
 
         if len(normal) > 0:
             normal = np.mean(normal)
@@ -618,6 +622,7 @@ class ReactiveDiscreteEnv():
         frame = np.hstack(processed_counts)
         self.app_counts_stack.append(frame)
         obs = np.array(self.app_counts_stack)
+        print(obs)
 
         # intrusions
 

@@ -604,7 +604,7 @@ class FeedForwardPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
-                layers = [64, 64]
+                layers = [256, 256]
             net_arch = [dict(vf=layers, pi=layers)]
 
         with tf.compat.v1.variable_scope("model", reuse=reuse):
