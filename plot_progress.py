@@ -15,17 +15,17 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot progress')
     parser.add_argument('-e', '--environment', help='Environment', default='ReactiveDiscreteEnv')
-    parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['Baseline', 'PPO2'])
+    parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['PPO2'])
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
-    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=train_attacks)
+    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[1])
     parser.add_argument('-n', '--ntests', help='Number of tests', default=ntests, type=int)
-    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(1e6))
+    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(3e5))
     args = parser.parse_args()
 
     # colors and labels
 
     names = [['Reward'], ['Benign traffic allowed, %'], ['Malicious traffic blocked, %'], ['Precision']]
-    fnames = ['reward', 'benign', 'malicious', 'precision']
+    fnames = [f"{item}_{','.join([str(item) for item in args.labels])}" for item in ['reward', 'benign', 'malicious', 'precision']]
     ylabels = ['Reward value', 'Benign traffic allowed, %', 'Malicious traffic blocked, %', 'Precision']
     colors = ['rgb(64,120,211)', 'rgb(0,100,80)', 'rgb(237,2,11)', 'rgb(255,165,0)', 'rgb(139,0,139)', 'rgb(0,51,102)']
 
@@ -84,7 +84,8 @@ if __name__ == '__main__':
 
         # generate scatter
 
-        traces, layout = generate_line_scatter(algorithms, d, colors, 'Time steps', y, show_legend=False, xrange=[0, args.timesteps])
+        dashes = [None for _ in algorithms]
+        traces, layout = generate_line_scatter(algorithms, d, colors, dashes, 'Time steps', y, show_legend=False, xrange=[0, args.timesteps])
 
         # save results
 

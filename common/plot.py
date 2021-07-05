@@ -12,7 +12,7 @@ def moving_average(x, step=1, window=10):
 
     return np.vstack(seq)
 
-def generate_line_scatter(names, values, colors, dashes, xlabel, ylabel, xrange, show_legend=True, yanchor='bottom', ylegend=0):
+def generate_line_scatter(names, values, colors, dashes, xlabel, ylabel, xrange, show_legend=True, yanchor='bottom', xlegend=1, ylegend=0):
 
     traces = []
 
