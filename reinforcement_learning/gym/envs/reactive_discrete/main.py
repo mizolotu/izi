@@ -622,7 +622,6 @@ class ReactiveDiscreteEnv():
         frame = np.hstack(processed_counts)
         self.app_counts_stack.append(frame)
         obs = np.array(self.app_counts_stack)
-        print(obs)
 
         # intrusions
 
