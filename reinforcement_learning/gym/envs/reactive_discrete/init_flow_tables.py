@@ -2,6 +2,7 @@ import json
 
 from common.odl import Odl
 from config import *
+from common.ovs import delete_flows
 
 def clean_ids_tables(controller, ids_nodes):
 
@@ -25,7 +26,7 @@ def clean_ids_tables(controller, ids_nodes):
                 controller.delete_config_flow(node, table, flow)
             controller.delete_config_table(node, table)
 
-def init_ovs_tables(controller, ovs_node, ovs_veths):
+def init_ovs_tables(controller, ovs_vm, ovs_node, ovs_veths):
 
     # delete flows if there are any
 
@@ -40,6 +41,8 @@ def init_ovs_tables(controller, ovs_node, ovs_veths):
         flows = controller.find_config_flows(ovs_node, table)
         for flow in flows:
             controller.delete_config_flow(ovs_node, table, flow)
+
+    delete_flows(ovs_vm)
 
     # default action flows
 
@@ -93,14 +96,12 @@ if __name__ == '__main__':
     assert len(controller_vm) == 1
     controller_name = controller_vm[0]['vm']
     controller_ip = controller_vm[0]['ip']
-
-    if controller_name == 'odl':
-        controller = Odl(controller_ip)
+    controller = Odl(controller_ip)
 
     # init tables
 
     ovs_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ovs_vm['vm']]
-    init_ovs_tables(controller, ovs_node, ovs_veths)
+    init_ovs_tables(controller, ovs_vm, ovs_node, ovs_veths)
 
     # clean ids nodes
 

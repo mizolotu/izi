@@ -128,7 +128,7 @@ precision_weight = 0
 obs_stack_size = 4
 train_attacks = [1]
 episode_duration = 16
-nsteps = 64
+nsteps = 32
 nepisodes = 100000
 ntests = 10
 

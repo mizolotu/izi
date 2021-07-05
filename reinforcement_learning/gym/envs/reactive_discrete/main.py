@@ -304,6 +304,7 @@ class ReactiveDiscreteEnv():
                     attack.append(blocked / b)
                 elif i == self.n_attackers:
                     normal.append(allowed / b)
+            print(a, b)
 
         if len(normal) > 0:
             normal = np.mean(normal)
@@ -514,7 +515,7 @@ class ReactiveDiscreteEnv():
 
         # reset tables and wait for sdn configuration to be processed
 
-        init_ovs_tables(self.controller, self.ovs_node, self.veths)
+        init_ovs_tables(self.controller, self.ovs_vm, self.ovs_node, self.veths)
         sleep(sleep_duration)
         tables = np.arange(in_table, out_table)
         ready = False
@@ -525,7 +526,7 @@ class ReactiveDiscreteEnv():
                 if len(flows) == 1:
                     count += 1
                 else:
-                    init_ovs_tables(self.controller, self.ovs_node, self.veths)
+                    init_ovs_tables(self.controller, self.ovs_vm, self.ovs_node, self.veths)
                     sleep(sleep_duration)
                     break
             if count == len(tables):
