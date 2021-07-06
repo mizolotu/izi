@@ -688,6 +688,7 @@ class ReactiveDiscreteEnv():
         for ts_i, ts_now in enumerate(state_timestamps[self.stack_size:]):
             t_ = time()
             in_idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
+            print(ts_last, ts_now, len(in_idx))
             in_samples = [in_pkts[i][1:] for i in in_idx]
             out_idx = np.where((out_pkts_timestamps > (ts_last - n_steps_backward * self.step_duration)) & (out_pkts_timestamps <= (ts_now + n_steps_forward * self.step_duration)))[0]
             out_sample_ids = [out_pkts[i][1] for i in out_idx]
