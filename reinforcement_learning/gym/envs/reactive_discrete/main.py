@@ -676,8 +676,9 @@ class ReactiveDiscreteEnv():
         in_pkts_timestamps = np.array([item[0] for item in in_pkts])
         out_pkts_timestamps = np.array([item[0] for item in out_pkts])
 
-        print(in_pkts_timestamps)
-        print(state_timestamps)
+        print(in_pkts_timestamps[0], in_pkts_timestamps[-1])
+        for t in state_timestamps:
+            print(t)
 
         print(f'Time spent to get report: {time() - t_start}')
 
