@@ -549,12 +549,6 @@ class ReactiveDiscreteEnv():
             for action in self.default_reset_actions:
                 self._take_action(action)
 
-        # generate traffic
-
-        attack_label = next(self.label)
-        for host in self.internal_hosts:
-            _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
-
         self.tstart = time()
         self.tstep = time()
 
@@ -572,6 +566,12 @@ class ReactiveDiscreteEnv():
             ])
             self.app_counts_stack.append(frame)
         obs = np.array(self.app_counts_stack)
+
+        # generate traffic
+
+        attack_label = next(self.label)
+        for host in self.internal_hosts:
+            _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
 
         #print('Reset end in', self.id)
 
