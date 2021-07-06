@@ -66,8 +66,7 @@ if __name__ == '__main__':
 
     # create environments
 
-    ai = next(attack_indexes)
-    env_fns = [make_env(env_class, env_idx, ai, args.augment, ai) for env_idx in range(nenvs)]
+    env_fns = [make_env(env_class, env_idx, next(attack_indexes), args.augment, env_idx) for env_idx in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
     # continue training
