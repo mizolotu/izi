@@ -120,23 +120,30 @@ def read_udp_packet(body):
     payload = [str(b) for b in body.body.body.body]
     return src_port, dst_port, len(payload)
 
-def read_ip_pkt(body, nflags=8):
+def read_ip_pkt(body, nflags=8, faster=False):
     src_ip = inet_ntop(AF_INET, body.src_ip_addr)
     dst_ip = inet_ntop(AF_INET, body.dst_ip_addr)
     read_size = body.read_len
     proto = body.protocol
-    if proto == 6:
-        src_port, dst_port, plen, flags, window = read_tcp_packet(body, nflags)
-    elif proto == 17:
-        src_port, dst_port, plen, = read_udp_packet(body)
-        flags = ','.join(['0'] * nflags)
-        window = 0
-    else:
-        src_port = 0
-        dst_port = 0
+    if faster:
+        src_port = body.body.body.src_port
+        dst_port = body.body.body.dst_port
         plen = 0
         flags = ','.join(['0'] * nflags)
         window = 0
+    else:
+        if proto == 6:
+            src_port, dst_port, plen, flags, window = read_tcp_packet(body, nflags)
+        elif proto == 17:
+            src_port, dst_port, plen, = read_udp_packet(body)
+            flags = ','.join(['0'] * nflags)
+            window = 0
+        else:
+            src_port = 0
+            dst_port = 0
+            plen = 0
+            flags = ','.join(['0'] * nflags)
+            window = 0
     return src_ip, dst_ip, src_port, dst_port, proto, read_size, plen, flags, window
 
 def read_pkt(raw):
@@ -157,6 +164,26 @@ def read_pkt(raw):
     except:
         pass
     return id, features, flags
+
+def read_pkt_faster(raw):
+    id = None
+    features = None
+    flags = None
+    try:
+        pkt = EthernetFrame(KaitaiStream(BytesIO(raw)))
+        if pkt.ether_type.value == 2048:
+            frame_size = len(raw)
+            src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window = read_ip_pkt(pkt.body, faster=True)
+            header_size = 14 + read_size - payload_size
+            id = [src_ip, src_port, dst_ip, dst_port, proto]
+            features = [frame_size, header_size, payload_size, window]
+            flags = [int(item) for item in flags.split(',')]
+        elif pkt.ether_type.value == 2054:
+            raise NotImplemented
+    except:
+        pass
+    return id, features, flags
+
 
 class Flow():
 

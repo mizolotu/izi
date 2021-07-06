@@ -606,8 +606,8 @@ class ReactiveDiscreteEnv():
 
         t0 = time()
         in_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-        if self.debug:
-            print('get obs', time() - t0)
+        #if self.debug:
+        print(f'Time to get obs: {time() - t0}')
         if time() - t0 > self.max_obs_time:
             self.max_obs_time = time() - t0
         samples_by_app = self._process_app_samples(in_samples)
@@ -669,15 +669,20 @@ class ReactiveDiscreteEnv():
 
         # get report
 
+        t_start = time()
+
         in_pkts, out_pkts, state_timestamps = get_flow_report(self.ovs_vm['ip'], flask_port)
         print(f'In environment {self.id}, packets in: {len(in_pkts)}, packets out: {len(out_pkts)}')
         in_pkts_timestamps = np.array([item[0] for item in in_pkts])
         out_pkts_timestamps = np.array([item[0] for item in out_pkts])
 
+        print(f'Time spent to get report: {time() - t_start}')
+
         # calculate reward
 
         ts_last = 0
         for ts_i, ts_now in enumerate(state_timestamps[self.stack_size:]):
+            t_ = time()
             in_idx = np.where((in_pkts_timestamps > ts_last) & (in_pkts_timestamps <= ts_now))[0]
             in_samples = [in_pkts[i][1:] for i in in_idx]
             out_idx = np.where((out_pkts_timestamps > (ts_last - n_steps_backward * self.step_duration)) & (out_pkts_timestamps <= (ts_now + n_steps_forward * self.step_duration)))[0]
@@ -689,5 +694,6 @@ class ReactiveDiscreteEnv():
             reward = self._calculate_reward(normal, attack, precision)
             rewards.append(reward)
             infos.append({'r': reward, 'n': normal, 'a': attack, 'p': precision})
+            print(f'Time spent to calculate reward at {ts_i}: {time() - t_}, in: {len(in_samples)}, out: {len(out_sample_ids)}')
 
         return rewards, infos
