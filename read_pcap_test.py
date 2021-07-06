@@ -46,4 +46,4 @@ if __name__ == '__main__':
 
     t0 = time()
     [read_pkt_faster(raw) for raw in pkts]
-    print(f'Time elapsed: {time() - t0}')
+    print(f'Time elapsed to process {len(pkts)} packets: {time() - t0}')
