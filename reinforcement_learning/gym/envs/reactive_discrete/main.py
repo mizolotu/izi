@@ -607,7 +607,7 @@ class ReactiveDiscreteEnv():
         t0 = time()
         in_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
         #if self.debug:
-        print(f'Time to get obs: {time() - t0}')
+        print(f'Time to get obs: {time() - t0} for {len(in_samples)} packets')
         if time() - t0 > self.max_obs_time:
             self.max_obs_time = time() - t0
         samples_by_app = self._process_app_samples(in_samples)
