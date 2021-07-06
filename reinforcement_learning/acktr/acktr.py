@@ -370,7 +370,9 @@ class ACKTR(ActorCriticRLModel):
                     logger.record_tabular("explained_variance", float(explained_var))
                     if len(self.ep_info_buf) > 0 and len(self.ep_info_buf[0]) > 0:
                         logger.logkv('ep_reward_mean', safe_mean([ep_info['r'] for ep_info in self.ep_info_buf]))
-                        #logger.logkv('ep_len_mean', safe_mean([ep_info['l'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_normal_mean', safe_mean([ep_info['n'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_attack_mean', safe_mean([ep_info['a'] for ep_info in self.ep_info_buf]))
+                        logger.logkv('ep_precision_mean', safe_mean([ep_info['p'] for ep_info in self.ep_info_buf]))
                     logger.dump_tabular()
 
             coord.request_stop()
