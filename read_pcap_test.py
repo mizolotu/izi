@@ -1,4 +1,4 @@
-import pcap
+import pcap, sys
 
 from time import time
 from common.data import read_pkt_faster
@@ -33,6 +33,8 @@ if __name__ == '__main__':
         'data/spl/172.31.69.8/cap_03202_20180215213111',
         'data/spl/172.31.69.9/cap_03343_20180215215005'
     ]
+    if len(sys.argv) == 2:
+        fnames = [sys.argv[1] + fname for fname in fnames]
 
     pkts = []
     for fname in fnames:
