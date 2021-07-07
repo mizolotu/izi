@@ -2,13 +2,13 @@ import json, logging, pcap, pandas, os
 import numpy as np
 import os.path as osp
 
-from subprocess import Popen, DEVNULL
+from subprocess import Popen, DEVNULL, PIPE
 from pathlib import Path
 from collections import deque
 from threading import Thread
 from flask import Flask, request, jsonify
 from datetime import datetime
-from common.data import read_pkt
+from common.data import read_pkt_faster
 from time import sleep
 
 app = Flask(__name__)
@@ -26,7 +26,7 @@ def seed():
     return jsonify(seed)
 
 @app.route('/replay', methods=['GET', 'POST'])
-def prepare():
+def replay():
     if request.method == 'POST':
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
@@ -104,19 +104,57 @@ def replay_pcap(fpath, iface, duration):
 def samples():
     data = request.data.decode('utf-8')
     jdata = json.loads(data)
-    vals = flow_collector.retrieve_data(jdata['window'])
+    #vals = flow_collector.retrieve_data(jdata['window'])
+    vals = flow_collector.retrieve_data(jdata['table'])
     return jsonify(vals)
 
 @app.route('/report')
 def report():
-    in_pkts = [[ts, *read_pkt(pkt)] for ts, pkt in list(flow_collector.in_pkts)]
-    out_pkts = [[ts, *read_pkt(pkt)] for ts, pkt in list(flow_collector.out_pkts)]
+    in_pkts = [[ts, *read_pkt_faster(pkt)] for ts, pkt in list(flow_collector.in_pkts)]
+    out_pkts = [[ts, *read_pkt_faster(pkt)] for ts, pkt in list(flow_collector.out_pkts)]
     return jsonify({'in_pkts': in_pkts, 'out_pkts': out_pkts, 'timestamps': list(flow_collector.state_timestamps)})
 
 @app.route('/reset')
 def reset():
     flow_collector.clear_queues()
     return jsonify('ok')
+
+def parse_app_table(table):
+    cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']
+    with Popen(cmd, stdout=PIPE) as p:
+        lines = p.stdout.readlines()
+    lines = [line.decode()[1:].strip() for line in lines]
+    apps = []
+    pkts = []
+    bts = []
+    for line in lines:
+        spl = line.split(', ')
+        if len(spl) >= 7:
+            npkts = spl[3].split('n_packets=')[1]
+            nbts = spl[4].split('n_bytes=')[1]
+            match_actions_spl = spl[6].split(' actions=')
+            match_spl = match_actions_spl[0].split(',')
+            if len(match_spl) == 2:
+                proto = match_spl[1]
+                app = (proto,)
+                apps.append(app)
+                pkts.append(npkts)
+                bts.append(nbts)
+            elif len(match_spl) == 3:
+                proto = match_spl[1]
+                port = int(match_spl[2].split('=')[1])
+                app = (proto, port)
+                if app in apps:
+                    idx = apps.index(app)
+                    pkts[idx] += npkts
+                    bts[idx] += nbts
+                else:
+                    apps.append(app)
+                    pkts.append(npkts)
+                    bts.append(nbts)
+    return apps, pkts, bts
+
+
 
 class FlowCollector():
 
@@ -149,12 +187,12 @@ class FlowCollector():
         tnow = datetime.now().timestamp()
         self.state_timestamps.appendleft(tnow)
         in_items = list(self.in_pkts)
-        samples = []
-        for item in in_items:
-            if item[0] > tnow - window:
-                samples.append(read_pkt(item[1]))
-            else:
-                break
+        samples = [read_pkt_faster(item[1]) for item in in_items if item[0] > tnow - window]
+        #for item in in_items:
+        #    if item[0] > tnow - window:
+        #        samples.append(read_pkt_faster(item[1]))
+        #    else:
+        #        break
         return samples
 
     def clear_queues(self):
@@ -167,17 +205,13 @@ if __name__ == '__main__':
     iface = 'in_br'
     home_dir = '/home/vagrant'
     data_dir = f'{home_dir}/data/spl'
-    episode_raw_dir = f'{home_dir}/episode_raw'
-    episode_mod_dir = f'{home_dir}/episode_mod'
-    if not osp.isdir(episode_raw_dir):
-        os.mkdir(episode_raw_dir)
-    if not osp.isdir(episode_mod_dir):
-        os.mkdir(episode_mod_dir)
 
     ips, profiles = calculate_probs(data_dir)
     seed = None
 
     flow_collector = FlowCollector()
     flow_collector.start()
+
+    parse_app_table(1)
 
     app.run(host='0.0.0.0')
