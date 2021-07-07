@@ -76,7 +76,9 @@ if __name__ == '__main__':
     env_idx = 0
     label = 3
     label_idx = labels.index(label)
-    ips = ['172.31.69.25', '172.31.69.28']
+    profile_files = sorted([item for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith('.csv')])
+    profiles = []
+    ips = [profile_file.split('.csv')[0] for profile_file in profile_files]
 
     with open(vms_fpath, 'r') as f:
         vms = json.load(f)

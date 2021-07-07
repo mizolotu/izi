@@ -513,7 +513,8 @@ class Runner(AbstractEnvRunner):
 
             self.obs[env_idx], rewards, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
 
-            #self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
+            self.mb_rewards[env_idx].append(rewards)
+            self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
 
             self.model.num_timesteps += 1
 
@@ -533,8 +534,8 @@ class Runner(AbstractEnvRunner):
 
         print(f'Step time in {env_idx}: {(time.time() - tstart) / self.n_steps}')
 
-        self.mb_rewards[env_idx], infos = self.env.reward_one(env_idx)
-        self.scores[env_idx] = [[info['r'], info['n'], info['a'], info['p']] for info in infos]
+        #self.mb_rewards[env_idx], infos = self.env.reward_one(env_idx)
+        #self.scores[env_idx] = [[info['r'], info['n'], info['a'], info['p']] for info in infos]
 
     def _run(self):
         """

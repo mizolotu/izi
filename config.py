@@ -106,18 +106,18 @@ attackers = [
 ]
 
 applications = [
-    ('tcp', 21),
-    ('tcp', 22),
-    ('tcp', 23),
-    ('udp', 53),
-    ('tcp', 80),
-    ('udp', 123),
-    ('tcp', 443),
-    ('tcp', 445),
-    ('tcp', 3389),
-    ('udp', 3389),
-    ('tcp', ),
-    ('udp', )
+    ['tcp', 21],
+    ['tcp', 22],
+    ['tcp', 23],
+    ['udp', 53],
+    ['tcp', 80],
+    ['udp', 123],
+    ['tcp', 443],
+    ['tcp', 445],
+    ['tcp', 3389],
+    ['udp', 3389],
+    ['tcp'],
+    ['udp']
 ]
 
 ip_proto_names = list(set([item[0] for item in applications]))
@@ -129,8 +129,8 @@ reward_min = -1.0
 precision_weight = 0
 obs_stack_size = 4
 train_attacks = [1]
-episode_duration = 16
-nsteps = 64
+episode_duration = 32
+nsteps = 128
 nepisodes = 1000000
 ntests = 10
 

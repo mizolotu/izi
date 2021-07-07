@@ -15,7 +15,7 @@ from itertools import cycle
 from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, get_flow_samples, reset_flow_collector, get_flow_report
+from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
 from reinforcement_learning.gym.envs.reactive_discrete.nfv_state import get_intrusions, get_vnf_param
 from reinforcement_learning.gym.envs.reactive_discrete.generate_traffic import set_seed, replay_ip_traffic_on_interface
 
@@ -111,7 +111,8 @@ class ReactiveDiscreteEnv():
         self.n_apps = len(applications)
         on_off_frame_shape = (self.n_apps, (self.n_ids + 1) * self.n_ids)
         self.on_off_frame = np.zeros(on_off_frame_shape)
-        obs_shape = (self.stack_size, self.n_apps, 3 + self.n_ids + on_off_frame_shape[1])
+        obs_shape = (self.stack_size, self.n_apps, 2 + self.n_ids + on_off_frame_shape[1])
+        self.samples_by_app = np.zeros((self.n_apps, 2))
         self.app_counts_stack = deque(maxlen=self.stack_size)
         self.in_samples_by_attacker_stack = deque(maxlen=self.stack_size)
         self.out_samples_by_attacker_stack = deque(maxlen=self.stack_size)
@@ -157,7 +158,8 @@ class ReactiveDiscreteEnv():
         # reward
 
         self.n_attackers = len(attackers)
-        self.precision = []
+        self.samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
+        #self.precision = []
 
         # spaces
 
@@ -238,11 +240,11 @@ class ReactiveDiscreteEnv():
                 if intrusion[4] in [1, 6, 17]:
                     proto, proto_number = ip_proto(intrusion[4])
                     if (proto, src_port) in applications:
-                        app_idx = applications.index((proto, src_port))
+                        app_idx = applications.index([proto, src_port])
                     elif (proto, dst_port) in applications:
-                        app_idx = applications.index((proto, dst_port))
+                        app_idx = applications.index([proto, dst_port])
                     else:
-                        app_idx = applications.index((proto,))
+                        app_idx = applications.index([proto])
 
                     # update recent intrusions
 
@@ -291,7 +293,8 @@ class ReactiveDiscreteEnv():
             precision = tp / (tp + fp)
         else:
             precision = np.nan
-        self.precision.append(precision)
+        #self.precision.append(precision)
+        return precision
 
     def _get_normal_attack(self, sample_counts):
 
@@ -561,16 +564,26 @@ class ReactiveDiscreteEnv():
         # calculate obs
 
         self.app_counts_stack.clear()
+        self.samples_by_app = np.zeros((self.n_apps, 2))
+        self.samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
         while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
 
-            samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-            samples_by_app = self._process_app_samples(samples)
+            #samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+            samples = get_app_counts(self.ovs_vm['ip'], flask_port, in_table + 1)
+            #samples_by_app = self._process_app_samples(samples)
+            samples_by_app = np.zeros((self.n_apps, 2))
+            for app in applications:
+                if app in samples['applications']:
+                    idx = samples['applications'].index(app)
+                    samples_by_app[idx, 0] = samples['packets'][idx]
+                    samples_by_app[idx, 1] = samples['bytes'][idx]
             frame = np.hstack([
-                samples_by_app,
+                samples_by_app - self.samples_by_app,
                 np.zeros((self.n_apps, self.n_ids)),
                 np.array(self.on_off_frame)
             ])
             self.app_counts_stack.append(frame)
+            self.samples_by_app = np.array(samples_by_app)
         obs = np.array(self.app_counts_stack)
 
         # generate traffic
@@ -578,7 +591,7 @@ class ReactiveDiscreteEnv():
         attack_label = next(self.label)
         for host in self.internal_hosts:
             _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
-            print(_)
+            #print(_)
 
         #print('Reset end in', self.id)
 
@@ -612,14 +625,21 @@ class ReactiveDiscreteEnv():
         # obs
 
         t0 = time()
-        in_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-        #if self.debug:
-        print(f'Time to get obs: {time() - t0} for {len(in_samples)} packets')
+        #in_samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+        samples = get_app_counts(self.ovs_vm['ip'], flask_port, in_table + 1)
+        if self.debug:
+            print(f'Time to get obs: {time() - t0} for {np.sum(samples["packets"])} packets')
         if time() - t0 > self.max_obs_time:
             self.max_obs_time = time() - t0
-        samples_by_app = self._process_app_samples(in_samples)
+        #samples_by_app = self._process_app_samples(samples)
+        samples_by_app = np.zeros((len(applications), 2))
+        for app in applications:
+            if app in samples['applications']:
+                idx = samples['applications'].index(app)
+                samples_by_app[idx, 0] = samples['packets'][idx]
+                samples_by_app[idx, 1] = samples['bytes'][idx]
         processed_counts = []
-        processed_counts.append(samples_by_app)
+        processed_counts.append(samples_by_app - self.samples_by_app)
         nintrusions = np.zeros((self.n_apps, self.n_ids))
         for i in range(self.n_apps):
             for j in range(self.n_ids):
@@ -627,6 +647,7 @@ class ReactiveDiscreteEnv():
         processed_counts.append(nintrusions)
         processed_counts.append(np.array(self.on_off_frame))
         frame = np.hstack(processed_counts)
+        self.samples_by_app = np.array(samples_by_app)
         self.app_counts_stack.append(frame)
         obs = np.array(self.app_counts_stack)
 
@@ -639,12 +660,25 @@ class ReactiveDiscreteEnv():
 
         # append precision
         #print(intrusion_ips)
-        self._get_precision(intrusion_ips, intrusion_numbers)
+        precision = self._get_precision(intrusion_ips, intrusion_numbers)
 
-        # fake reward and info, the real ones are calculated once the episode is over
+        # reward and info
 
-        reward = 0.0
-        info = {}
+        in_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, in_table + 2)
+        out_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, out_table - 1)
+        attackers_ = attackers + [None]
+        samples_by_attacker = np.zeros((len(attackers_), 2))
+        for attacker in attackers_:
+            if attacker in in_samples['ips']:
+                idx = in_samples['ips'].index(attacker)
+                samples_by_attacker[idx, 0] = in_samples['packets'][idx]
+            if attacker in out_samples['ips']:
+                idx = out_samples['ips'].index(attacker)
+                samples_by_attacker[idx, 1] = out_samples['packets'][idx]
+        normal, attack = self._get_normal_attack(samples_by_attacker - self.samples_by_attacker)
+        self.samples_by_attacker = np.array(samples_by_attacker)
+        reward = self._calculate_reward(normal, attack, precision)
+        info = {'n': normal, 'a': attack, 'p': precision}
         done = False
 
         #print('Step end in', self.id)
