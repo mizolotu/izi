@@ -104,9 +104,22 @@ def replay_pcap(fpath, iface, duration):
 def samples():
     data = request.data.decode('utf-8')
     jdata = json.loads(data)
-    #vals = flow_collector.retrieve_data(jdata['window'])
-    vals = flow_collector.retrieve_data(jdata['table'])
+    vals = flow_collector.retrieve_data(jdata['window'])
     return jsonify(vals)
+
+@app.route('/app_counts')
+def app_counts():
+    data = request.data.decode('utf-8')
+    jdata = json.loads(data)
+    apps, pkts, bts = flow_collector.parse_app_table(jdata['table'])
+    return jsonify({'applications': apps, 'packets': pkts, 'bytes': bts})
+
+@app.route('/ip_counts')
+def ip_counts():
+    data = request.data.decode('utf-8')
+    jdata = json.loads(data)
+    ips, pkts, bts = flow_collector.parse_ip_table(jdata['table'])
+    return jsonify({'ips': ips, 'packets': pkts, 'bytes': bts})
 
 @app.route('/report')
 def report():
@@ -118,43 +131,6 @@ def report():
 def reset():
     flow_collector.clear_queues()
     return jsonify('ok')
-
-def parse_app_table(table):
-    cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']
-    with Popen(cmd, stdout=PIPE) as p:
-        lines = p.stdout.readlines()
-    lines = [line.decode()[1:].strip() for line in lines]
-    apps = []
-    pkts = []
-    bts = []
-    for line in lines:
-        spl = line.split(', ')
-        if len(spl) >= 7:
-            npkts = spl[3].split('n_packets=')[1]
-            nbts = spl[4].split('n_bytes=')[1]
-            match_actions_spl = spl[6].split(' actions=')
-            match_spl = match_actions_spl[0].split(',')
-            if len(match_spl) == 2:
-                proto = match_spl[1]
-                app = (proto,)
-                apps.append(app)
-                pkts.append(npkts)
-                bts.append(nbts)
-            elif len(match_spl) == 3:
-                proto = match_spl[1]
-                port = int(match_spl[2].split('=')[1])
-                app = (proto, port)
-                if app in apps:
-                    idx = apps.index(app)
-                    pkts[idx] += npkts
-                    bts[idx] += nbts
-                else:
-                    apps.append(app)
-                    pkts.append(npkts)
-                    bts.append(nbts)
-    return apps, pkts, bts
-
-
 
 class FlowCollector():
 
@@ -188,17 +164,79 @@ class FlowCollector():
         self.state_timestamps.appendleft(tnow)
         in_items = list(self.in_pkts)
         samples = [read_pkt_faster(item[1]) for item in in_items if item[0] > tnow - window]
-        #for item in in_items:
-        #    if item[0] > tnow - window:
-        #        samples.append(read_pkt_faster(item[1]))
-        #    else:
-        #        break
         return samples
 
     def clear_queues(self):
         self.in_pkts.clear()
         self.out_pkts.clear()
         self.state_timestamps.clear()
+
+    def parse_app_table(self, table):
+        cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']
+        with Popen(cmd, stdout=PIPE) as p:
+            lines = p.stdout.readlines()
+        lines = [line.decode()[1:].strip() for line in lines]
+        apps = []
+        pkts = []
+        bts = []
+        for line in lines:
+            spl = line.split(', ')
+            if len(spl) >= 7:
+                npkts = int(spl[3].split('n_packets=')[1])
+                nbts = int(spl[4].split('n_bytes=')[1])
+                match_actions_spl = spl[6].split(' actions=')
+                match_spl = match_actions_spl[0].split(',')
+                if len(match_spl) == 2:
+                    proto = match_spl[1]
+                    app = (proto,)
+                    apps.append(app)
+                    pkts.append(npkts)
+                    bts.append(nbts)
+                elif len(match_spl) == 3:
+                    proto = match_spl[1]
+                    port = int(match_spl[2].split('=')[1])
+                    app = (proto, port)
+                    if app in apps:
+                        idx = apps.index(app)
+                        pkts[idx] += npkts
+                        bts[idx] += nbts
+                    else:
+                        apps.append(app)
+                        pkts.append(npkts)
+                        bts.append(nbts)
+        return apps, pkts, bts
+
+    def parse_ip_table(self, table):
+        cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']
+        with Popen(cmd, stdout=PIPE) as p:
+            lines = p.stdout.readlines()
+        lines = [line.decode()[1:].strip() for line in lines]
+        ips = []
+        pkts = []
+        bts = []
+        for line in lines:
+            spl = line.split(', ')
+            if len(spl) >= 7:
+                npkts = int(spl[3].split('n_packets=')[1])
+                nbts = int(spl[4].split('n_bytes=')[1])
+                match_actions_spl = spl[6].split(' actions=')
+                match_spl = match_actions_spl[0].split(',')
+                if len(match_spl) == 2:
+                    proto = match_spl[1]
+                    ips.append(None)
+                    pkts.append(npkts)
+                    bts.append(nbts)
+                elif len(match_spl) == 3:
+                    ip = match_spl[2].split('=')[1]
+                    if ip in ips:
+                        idx = ips.index(ip)
+                        pkts[idx] += npkts
+                        bts[idx] += nbts
+                    else:
+                        ips.append(ip)
+                        pkts.append(npkts)
+                        bts.append(nbts)
+        return ips, pkts, bts
 
 if __name__ == '__main__':
 
@@ -210,8 +248,6 @@ if __name__ == '__main__':
     seed = None
 
     flow_collector = FlowCollector()
-    flow_collector.start()
-
-    parse_app_table(1)
+    #flow_collector.start()
 
     app.run(host='0.0.0.0')
