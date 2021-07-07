@@ -226,7 +226,7 @@ class FlowCollector():
                 match_spl = match_actions_spl[0].split(',')
                 action = match_actions_spl[1]
                 if len(match_spl) == 2:
-                    ips_pass.append(None)
+                    ips_pass.append('')
                     pkts_pass.append(npkts)
                     bts_pass.append(nbts)
                 elif len(match_spl) >= 3 and action == 'drop':

@@ -665,15 +665,19 @@ class ReactiveDiscreteEnv():
         # reward and info
 
         pass_drop_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, block_table)
-        attackers_ = attackers + [None]
-        samples_by_attacker = np.zeros((len(attackers_), 2))
-        for attacker in attackers_:
-            if attacker in pass_drop_samples['ips_pass']:
-                idx = pass_drop_samples['ips_pass'].index(attacker)
-                samples_by_attacker[idx, 0] = pass_drop_samples['packets_pass'][idx]
-            if attacker in pass_drop_samples['ips_drop']:
-                idx = pass_drop_samples['ips_drop'].index(attacker)
-                samples_by_attacker[idx, 1] = pass_drop_samples['packets_drop'][idx]
+        samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
+        for ip, npkts in zip(pass_drop_samples['ips_pass'], pass_drop_samples['packets_pass']):
+            if ip in attackers:
+                idx = attackers.index(ip)
+            else:
+                idx = -1
+            samples_by_attacker[idx, 0] += npkts
+        for ip, npkts in zip(pass_drop_samples['ips_drop'], pass_drop_samples['packets_drop']):
+            if ip in attackers:
+                idx = attackers.index(ip)
+            else:
+                idx = -1
+            samples_by_attacker[idx, 1] += npkts
         normal, attack = self._get_normal_attack(samples_by_attacker - self.samples_by_attacker)
         self.samples_by_attacker = np.array(samples_by_attacker)
         reward = self._calculate_reward(normal, attack, precision)
