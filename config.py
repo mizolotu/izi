@@ -79,8 +79,9 @@ fsize_min = 100000
 ctrl_name = 'odl'
 ctrl_port = 6653
 in_table = 0
+app_table = 1
 out_table = 10
-block_table = out_table - 2
+block_table = out_table - 1
 ids_tables = [idx for idx in range(3, block_table)]
 priorities = {'lowest': 0, 'lower': 1, 'medium': 2, 'higher': 3, 'highest': 4}
 
@@ -130,7 +131,7 @@ precision_weight = 0
 obs_stack_size = 4
 train_attacks = [1]
 episode_duration = 32
-nsteps = 128
+nsteps = 64
 nepisodes = 1000000
 ntests = 10
 

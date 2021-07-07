@@ -66,10 +66,9 @@ if __name__ == '__main__':
     print('Observation:')
     for i in range(nsteps):
         tstep = time()
-        samples0 = get_app_counts(ovs_vm['mgmt'], flask_port, in_table + 1)
-        samples1 = get_ip_counts(ovs_vm['mgmt'], flask_port, in_table + 2)
-        samples2 = get_ip_counts(ovs_vm['mgmt'], flask_port, out_table - 1)
-        print(samples0, samples1, samples2)
+        samples0 = get_app_counts(ovs_vm['mgmt'], flask_port, app_table)
+        samples1 = get_ip_counts(ovs_vm['mgmt'], flask_port, block_table)
+        print(samples0, samples1)
         tdelta = time() - tstep
         if tdelta < episode_duration / nsteps:
             sleep(episode_duration / nsteps - tdelta)

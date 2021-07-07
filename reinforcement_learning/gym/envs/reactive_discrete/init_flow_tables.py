@@ -63,20 +63,16 @@ def init_ovs_tables(controller, ovs_vm, ovs_node, ovs_veths):
         if len(app) == 2:
             port = app[1]
             for dir in ['source', 'destination']:
-                controller.app_resubmit(ovs_node, in_table + 1, priorities['lower'], proto_name, proto_number, dir, port, in_table + 2)
+                controller.app_resubmit(ovs_node, app_table, priorities['lower'], proto_name, proto_number, dir, port, app_table + 1)
         elif len(app) == 1:
-            controller.proto_resubmit(ovs_node, in_table + 1, priorities['lowest'], proto_name, proto_number, in_table + 2)
+            controller.proto_resubmit(ovs_node, app_table, priorities['lowest'], proto_name, proto_number, app_table + 1)
 
-    for ip in attackers:
-        for dir in ['source', 'destination']:
-            controller.ip_resubmit(ovs_node, in_table + 2, priorities['lower'], dir, ip, ids_tables[0])
-
-    for i in range(in_table + 2, out_table):
+    for i in range(app_table + 1, out_table):
         controller.default_resubmit(ovs_node, i, priorities['lowest'], i + 1)
 
     for ip in attackers:
         for dir in ['source', 'destination']:
-            controller.ip_resubmit(ovs_node, out_table - 1, priorities['lower'], dir, ip, out_table)
+            controller.ip_resubmit(ovs_node, block_table, priorities['lower'], dir, ip, out_table)
 
     controller.default_output(ovs_node, out_table, priorities['lowest'], reward_ofport)
 

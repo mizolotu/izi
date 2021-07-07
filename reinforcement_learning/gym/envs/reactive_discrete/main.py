@@ -303,8 +303,8 @@ class ReactiveDiscreteEnv():
         attack = []
 
         for i in range(self.n_attackers + 1):
-            b = sample_counts[i, 0]
-            a = sample_counts[i, 1]
+            b = sample_counts[i, 0] + sample_counts[i, 1]  # before
+            a = sample_counts[i, 0]  # after
             if b > 0:
                 blocked = np.clip(b - a, 0, b)
                 allowed = np.clip(a, 0, b)
@@ -529,9 +529,9 @@ class ReactiveDiscreteEnv():
         while not ready:
             count = 0
             for table in tables:
-                if table == in_table + 1:
+                if table == app_table:
                     n_flows_required = 2 + (len(applications) - 2) * 2
-                elif table in [in_table + 2, out_table - 1]:
+                elif table == block_table:
                     n_flows_required = 2 * len(attackers) + 1
                 else:
                     n_flows_required = 1
@@ -664,17 +664,16 @@ class ReactiveDiscreteEnv():
 
         # reward and info
 
-        in_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, in_table + 2)
-        out_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, out_table - 1)
+        pass_drop_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, block_table)
         attackers_ = attackers + [None]
         samples_by_attacker = np.zeros((len(attackers_), 2))
         for attacker in attackers_:
-            if attacker in in_samples['ips']:
-                idx = in_samples['ips'].index(attacker)
-                samples_by_attacker[idx, 0] = in_samples['packets'][idx]
-            if attacker in out_samples['ips']:
-                idx = out_samples['ips'].index(attacker)
-                samples_by_attacker[idx, 1] = out_samples['packets'][idx]
+            if attacker in pass_drop_samples['ips_pass']:
+                idx = pass_drop_samples['ips_pass'].index(attacker)
+                samples_by_attacker[idx, 0] = pass_drop_samples['packets_pass'][idx]
+            if attacker in pass_drop_samples['ips_drop']:
+                idx = pass_drop_samples['ips_drop'].index(attacker)
+                samples_by_attacker[idx, 1] = pass_drop_samples['packets_drop'][idx]
         normal, attack = self._get_normal_attack(samples_by_attacker - self.samples_by_attacker)
         self.samples_by_attacker = np.array(samples_by_attacker)
         reward = self._calculate_reward(normal, attack, precision)
