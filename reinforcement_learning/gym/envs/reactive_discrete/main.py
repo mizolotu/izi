@@ -526,8 +526,14 @@ class ReactiveDiscreteEnv():
         while not ready:
             count = 0
             for table in tables:
+                if table == in_table + 1:
+                    n_flows_required = 2 + (len(applications) - 2) * 2
+                elif table in [in_table + 2, out_table - 1]:
+                    n_flows_required = 2 * len(attackers) + 1
+                else:
+                    n_flows_required = 1
                 flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
-                if len(flows) == 1:
+                if len(flows) == n_flows_required:
                     count += 1
                 else:
                     init_ovs_tables(self.controller, self.ovs_vm, self.ovs_node, self.veths)
