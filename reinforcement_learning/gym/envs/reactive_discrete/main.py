@@ -12,7 +12,7 @@ from common.utils import ip_proto
 from threading import Thread
 from itertools import cycle
 
-from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, init_ovs_tables
+from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, clean_ovs_tables_via_ssh, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
@@ -520,13 +520,30 @@ class ReactiveDiscreteEnv():
         self.delay = [[] for _ in range(self.n_ids)]
         self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
 
-        # reset tables and wait for sdn configuration to be processed
+        # clean tables and wait for sdn configuration to be processed
 
-        init_ovs_tables(self.controller, self.ovs_vm, self.ovs_node, self.veths)
-        sleep(sleep_duration)
         tables = np.arange(in_table, out_table)
         ready = False
         while not ready:
+            clean_ovs_tables_via_api(self.controller, self.ovs_node)
+            sleep(sleep_duration)
+            count = 0
+            for table in tables:
+                flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
+                if len(flows) == 0:
+                    count += 1
+                else:
+                    clean_ovs_tables_via_ssh(self.ovs_vm)
+                    break
+            if count == len(tables):
+                ready = True
+
+        # fill tables and wait for sdn configuration to be processed
+
+        ready = False
+        while not ready:
+            init_ovs_tables(self.controller, self.ovs_node, self.veths)
+            sleep(sleep_duration)
             count = 0
             for table in tables:
                 if table == app_table:
@@ -539,7 +556,6 @@ class ReactiveDiscreteEnv():
                 if len(flows) == n_flows_required:
                     count += 1
                 else:
-                    init_ovs_tables(self.controller, self.ovs_vm, self.ovs_node, self.veths)
                     sleep(sleep_duration)
                     break
             if count == len(tables):
