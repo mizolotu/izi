@@ -62,7 +62,6 @@ class Odl:
             code = 0
         else:
             code = 1
-            print(r.text)
         return code
 
     def delete_operational_flow(self, node_id, table_id, flow_id):
@@ -72,6 +71,7 @@ class Odl:
             code = 0
         else:
             code = 1
+            print(r.text)
         return code
 
     def find_config_tables(self, node_id):
