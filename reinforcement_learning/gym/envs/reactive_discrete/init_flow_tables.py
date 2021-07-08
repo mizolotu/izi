@@ -27,29 +27,22 @@ def clean_ids_tables(controller, ids_nodes):
                 controller.delete_config_flow(node, table, flow)
             controller.delete_config_table(node, table)
 
-def init_ovs_tables(controller, ovs_vm, ovs_node, ovs_veths):
-
-    # delete flows if there are any
-
+def clean_ovs_tables_via_api(controller, ovs_node):
     tables = controller.find_operational_tables(ovs_node)
     for table in tables:
         flows = controller.find_operational_flows(ovs_node, table)
-        print(table, 'in operational')
         for flow in flows:
-            print(flow)
             controller.delete_operational_flow(ovs_node, table, flow)
-
     tables = controller.find_config_tables(ovs_node)
     for table in tables:
         flows = controller.find_config_flows(ovs_node, table)
-        print(table, 'in config')
         for flow in flows:
-            print(flow)
             controller.delete_config_flow(ovs_node, table, flow)
 
+def clean_ovs_tables_via_ssh(ovs_vm):
     delete_flows(ovs_vm)
 
-    # default action flows
+def init_ovs_tables(controller, ovs_node, ovs_veths):
 
     in_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == traffic_generation_veth_prefix]
     assert len(in_ofports) == 1
@@ -121,7 +114,9 @@ if __name__ == '__main__':
     # init tables
 
     ovs_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ovs_vm['vm']]
-    init_ovs_tables(controller, ovs_vm, ovs_node, ovs_veths)
+    clean_ovs_tables_via_api(controller, ovs_node)
+    clean_ovs_tables_via_ssh(ovs_vm)
+    init_ovs_tables(controller, ovs_node, ovs_veths)
 
     # clean ids nodes
 
