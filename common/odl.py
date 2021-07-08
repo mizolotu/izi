@@ -71,6 +71,7 @@ class Odl:
             code = 0
         else:
             code = 1
+            print(url, self.headers, self.auth)
             print(r.text)
         return code
 
