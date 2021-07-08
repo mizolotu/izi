@@ -34,7 +34,7 @@ def init_ovs_tables(controller, ovs_vm, ovs_node, ovs_veths):
     tables = controller.find_operational_tables(ovs_node)
     for table in tables:
         flows = controller.find_operational_flows(ovs_node, table)
-        print(table)
+        print(table, 'in operational')
         for flow in flows:
             print(flow)
             controller.delete_operational_flow(ovs_node, table, flow)
@@ -42,7 +42,7 @@ def init_ovs_tables(controller, ovs_vm, ovs_node, ovs_veths):
     tables = controller.find_config_tables(ovs_node)
     for table in tables:
         flows = controller.find_config_flows(ovs_node, table)
-        print(table)
+        print(table, 'in config')
         for flow in flows:
             print(flow)
             controller.delete_config_flow(ovs_node, table, flow)
