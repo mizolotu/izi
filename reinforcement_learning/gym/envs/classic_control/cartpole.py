@@ -157,7 +157,7 @@ class CartPoleEnv():
         self.rewards.append(reward)
         self.infos.append(info)
 
-        return np.array(self.state), reward, done, {}
+        return np.array(self.state), reward, done, info
 
     def reset(self):
         self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))

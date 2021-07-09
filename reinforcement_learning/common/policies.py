@@ -806,3 +806,21 @@ def register_policy(name, policy):
         raise ValueError("Error: the name {} is alreay registered for a different policy, will not override."
                          .format(name))
     _policy_registry[sub_class][name] = policy
+
+
+class ICM():
+
+    def __init__(self, sess, ob_space, ac_space, n_batch):
+
+        with tf.compat.v1.variable_scope("input0", reuse=False):
+            self._obs_ph0, self._processed_obs0 = observation_input(ob_space, n_batch)
+        with tf.compat.v1.variable_scope("input1", reuse=False):
+            self._obs_ph1, self._processed_obs1 = observation_input(ob_space, n_batch)
+        with tf.compat.v1.variable_scope("action", reuse=False):
+            self._act_ph, self._processed_act = observation_input(ac_space, n_batch)
+
+        self.sess = sess
+        self.ob_space = ob_space
+        self.ac_space = ac_space
+
+    def inverse_model(self):
