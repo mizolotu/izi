@@ -808,19 +808,15 @@ def register_policy(name, policy):
     _policy_registry[sub_class][name] = policy
 
 
-class ICM():
+class ICMPolicy(FeedForwardPolicy):
 
-    def __init__(self, sess, ob_space, ac_space, n_batch):
+    def __init__(self, *args, **kwargs):
+        super(ICMPolicy, self).__init__(*args, **kwargs, net_arch=[256, 256], feature_extraction="mlp")
+        with tf.compat.v1.variable_scope("input_next", reuse=False):
+            self._obs_ph_next, self._processed_obs_next = observation_input(self.ob_space, self.n_batch)
 
-        with tf.compat.v1.variable_scope("input0", reuse=False):
-            self._obs_ph0, self._processed_obs0 = observation_input(ob_space, n_batch)
-        with tf.compat.v1.variable_scope("input1", reuse=False):
-            self._obs_ph1, self._processed_obs1 = observation_input(ob_space, n_batch)
-        with tf.compat.v1.variable_scope("action", reuse=False):
-            self._act_ph, self._processed_act = observation_input(ac_space, n_batch)
-
-        self.sess = sess
-        self.ob_space = ob_space
-        self.ac_space = ac_space
-
-    def inverse_model(self):
+    def inverse_model(self, obs, obs_next, net_arch=[64, 64]):
+        latent = tf.concat([obs, obs_next])
+        for idx, layer in enumerate(net_arch):
+            latent = tf.tanh(linear(latent, "shared_fc{}".format(idx), layer, init_scale=np.sqrt(2)))
+        return latent
