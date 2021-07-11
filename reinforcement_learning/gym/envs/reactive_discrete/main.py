@@ -524,6 +524,8 @@ class ReactiveDiscreteEnv():
 
         tables = np.arange(in_table, out_table)
         ready = False
+        attempt = 0
+        attempt_max = 5
         while not ready:
             clean_ovs_tables_via_api(self.controller, self.ovs_node)
             sleep(sleep_duration)
@@ -533,7 +535,9 @@ class ReactiveDiscreteEnv():
                 if len(flows) == 0:
                     count += 1
                 else:
-                    clean_ovs_tables_via_ssh(self.ovs_vm)
+                    attempt += 1
+                    if attempt >= attempt_max:
+                        clean_ovs_tables_via_ssh(self.ovs_vm)
                     break
             if count == len(tables):
                 ready = True

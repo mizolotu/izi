@@ -128,8 +128,7 @@ class BasePolicy(ABC):
 
             self._action_ph = None
             if add_action_ph:
-                self._action_ph = tf.compat.v1.placeholder(dtype=ac_space.dtype, shape=(n_batch,) + ac_space.shape,
-                                                 name="action_ph")
+                self._action_ph = tf.compat.v1.placeholder(dtype=ac_space.dtype, shape=(n_batch,) + ac_space.shape, name="action_ph")
         self.sess = sess
         self.reuse = reuse
         self.ob_space = ob_space
@@ -803,20 +802,69 @@ def register_policy(name, policy):
     if sub_class not in _policy_registry:
         _policy_registry[sub_class] = {}
     if name in _policy_registry[sub_class]:
-        raise ValueError("Error: the name {} is alreay registered for a different policy, will not override."
-                         .format(name))
+        raise ValueError("Error: the name {} is alreay registered for a different policy, will not override.".format(name))
     _policy_registry[sub_class][name] = policy
 
+def obs_autoencoder(obs, ob_space, net_arch=[64]):
+    latent = obs
+    for idx, layer in enumerate(net_arch):
+        latent = tf.nn.relu(linear(latent, f'ae{idx}', layer, init_scale=np.sqrt(2)))
+    latent = linear(latent, f'ae{idx + 1}', ob_space.shape[0], init_scale=np.sqrt(2))
+    return latent
+
+def inverse_model(obs, obs_next, ac_space, net_arch=[64]):
+    latent = tf.concat([obs, obs_next], axis=1)
+    for idx, layer in enumerate(net_arch):
+        latent = tf.nn.relu(linear(latent, f'im{idx}', layer, init_scale=np.sqrt(2)))
+    latent = tf.sigmoid(linear(latent, f'im{idx + 1}', ac_space.n, init_scale=np.sqrt(2)))
+    return latent
+
+def forward_model(obs, act, ob_space, net_arch=[64]):
+    latent = tf.concat([obs, act], axis=1)
+    for idx, layer in enumerate(net_arch):
+        latent = tf.nn.relu(linear(latent, f'fm{idx}', layer, init_scale=np.sqrt(2)))
+    latent = linear(latent, f'fm{idx + 1}', ob_space.shape[0], init_scale=np.sqrt(2))
+    return latent
 
 class ICMPolicy(FeedForwardPolicy):
 
     def __init__(self, *args, **kwargs):
         super(ICMPolicy, self).__init__(*args, **kwargs, net_arch=[256, 256], feature_extraction="mlp")
-        with tf.compat.v1.variable_scope("input_next", reuse=False):
-            self._obs_ph_next, self._processed_obs_next = observation_input(self.ob_space, self.n_batch)
+        with tf.compat.v1.variable_scope("input", reuse=False):
+            self._obs_next_ph, self._processed_obs_next = observation_input(self.ob_space, self.n_batch, name='Ob_next')
+            print('here:', self.action_ph)
+            self._processed_act = tf.cast(tf.one_hot(self.action_ph, self.ac_space.n), tf.float32)
+            print('there:', self._processed_act)
+
+        self.obs_encoded = self.obs_autoencoder(self._processed_obs)
+        with tf.compat.v1.variable_scope("obs_next"):
+            self.obs_next_encoded = self.obs_autoencoder(self._processed_obs_next)
+
+        self.act_hat = self.inverse_model(self.obs_encoded, self.obs_next_encoded)
+        self.obs_next_hat = self.forward_model(self.obs_encoded, self._processed_act)
+
+    @property
+    def obs_next_ph(self):
+        """tf.Tensor: placeholder for observations, shape (self.n_batch, ) + self.ob_space.shape."""
+        return self._obs_next_ph
+
+    def obs_autoencoder(self, obs, net_arch=[64, 64]):
+        latent = obs
+        for idx, layer in enumerate(net_arch):
+            latent = tf.nn.relu(linear(latent, f'ae{idx}', layer, init_scale=np.sqrt(2)))
+        latent = linear(latent, f'ae{idx + 1}', self.ob_space.shape[0], init_scale=np.sqrt(2))
+        return latent
 
     def inverse_model(self, obs, obs_next, net_arch=[64, 64]):
-        latent = tf.concat([obs, obs_next])
+        latent = tf.concat([obs, obs_next], axis=1)
         for idx, layer in enumerate(net_arch):
-            latent = tf.tanh(linear(latent, "shared_fc{}".format(idx), layer, init_scale=np.sqrt(2)))
+            latent = tf.nn.relu(linear(latent, f'im{idx}', layer, init_scale=np.sqrt(2)))
+        latent = tf.nn.sigmoid(linear(latent, f'im{idx + 1}', self.ac_space.n, init_scale=np.sqrt(2)))
+        return latent
+
+    def forward_model(self, obs, act, net_arch=[64, 64]):
+        latent = tf.concat([obs, act], axis=1)
+        for idx, layer in enumerate(net_arch):
+            latent = tf.nn.relu(linear(latent, f'fm{idx}', layer, init_scale=np.sqrt(2)))
+        latent = linear(latent, f'fm{idx + 1}', self.ob_space.shape[0], init_scale=np.sqrt(2))
         return latent

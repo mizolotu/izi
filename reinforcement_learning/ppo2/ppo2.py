@@ -56,7 +56,7 @@ class PPO2(ActorCriticRLModel):
     """
     def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
-                 verbose=0, tensorboard_log=None, _init_setup_model=True, policy_kwargs=None,
+                 verbose=0, tensorboard_log='./tensorboard_log', _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
 
         self.learning_rate = learning_rate
@@ -143,6 +143,9 @@ class PPO2(ActorCriticRLModel):
                     self.action_ph = train_model.pdtype.sample_placeholder([None], name="action_ph")
                     self.advs_ph = tf.compat.v1.placeholder(tf.float32, [None], name="advs_ph")
                     self.rewards_ph = tf.compat.v1.placeholder(tf.float32, [None], name="rewards_ph")
+
+                    self.true_rewards_ph = tf.compat.v1.placeholder(tf.float32, [None], name="true_rewards_ph")
+
                     self.old_neglog_pac_ph = tf.compat.v1.placeholder(tf.float32, [None], name="old_neglog_pac_ph")
                     self.old_vpred_ph = tf.compat.v1.placeholder(tf.float32, [None], name="old_vpred_ph")
                     self.learning_rate_ph = tf.compat.v1.placeholder(tf.float32, [], name="learning_rate_ph")
@@ -213,6 +216,7 @@ class PPO2(ActorCriticRLModel):
                 self.loss_names = ['policy_loss', 'value_loss', 'policy_entropy', 'approxkl', 'clipfrac']
 
                 with tf.compat.v1.variable_scope("input_info", reuse=False):
+                    tf.compat.v1.summary.scalar('true_rewards', tf.reduce_mean(input_tensor=self.true_rewards_ph))
                     tf.compat.v1.summary.scalar('discounted_rewards', tf.reduce_mean(input_tensor=self.rewards_ph))
                     tf.compat.v1.summary.scalar('learning_rate', tf.reduce_mean(input_tensor=self.learning_rate_ph))
                     tf.compat.v1.summary.scalar('advantage', tf.reduce_mean(input_tensor=self.advs_ph))
@@ -245,7 +249,7 @@ class PPO2(ActorCriticRLModel):
 
                 self.summary = tf.compat.v1.summary.merge_all()
 
-    def _train_step(self, learning_rate, cliprange, obs, returns, masks, actions, values, neglogpacs, update, writer, states=None, cliprange_vf=None):
+    def _train_step(self, learning_rate, cliprange, obs, returns, true_rewards, masks, actions, values, neglogpacs, update, writer, states=None, cliprange_vf=None):
         """
         Training of PPO2 Algorithm
 
@@ -268,7 +272,7 @@ class PPO2(ActorCriticRLModel):
         advs = (advs - advs.mean()) / (advs.std() + 1e-8)
         td_map = {
             self.train_model.obs_ph: obs, self.action_ph: actions,
-            self.advs_ph: advs, self.rewards_ph: returns,
+            self.advs_ph: advs, self.rewards_ph: returns, self.true_rewards_ph: true_rewards,
             self.learning_rate_ph: learning_rate, self.clip_range_ph: cliprange,
             self.old_neglog_pac_ph: neglogpacs, self.old_vpred_ph: values
         }
@@ -361,7 +365,7 @@ class PPO2(ActorCriticRLModel):
                                                                             self.n_batch + start) // batch_size)
                             end = start + batch_size
                             mbinds = inds[start:end]
-                            slices = (arr[mbinds] for arr in (obs, returns, masks, actions, values, neglogpacs))
+                            slices = (arr[mbinds] for arr in (obs, returns, true_reward, masks, actions, values, neglogpacs))
                             mb_loss_vals.append(self._train_step(lr_now, cliprange_now, *slices, writer=writer, update=timestep, cliprange_vf=cliprange_vf_now))
                 else:  # recurrent version
                     update_fac = max(self.n_batch // self.nminibatches // self.noptepochs // self.n_steps, 1)

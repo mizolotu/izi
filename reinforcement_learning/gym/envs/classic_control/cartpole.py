@@ -62,7 +62,7 @@ class CartPoleEnv():
         'video.frames_per_second': 50
     }
 
-    def __init__(self):
+    def __init__(self, seed):
         self.gravity = 9.8
         self.masscart = 1.0
         self.masspole = 0.1
@@ -88,7 +88,7 @@ class CartPoleEnv():
         self.action_space = spaces.Discrete(2)
         self.observation_space = spaces.Box(-high, high, dtype=np.float32)
 
-        self.seed()
+        self.seed(seed)
         self.viewer = None
         self.state = None
 
