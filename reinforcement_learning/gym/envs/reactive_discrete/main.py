@@ -613,7 +613,7 @@ class ReactiveDiscreteEnv():
             _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
             #print(_)
 
-        #print('Reset end in', self.id)
+        print('Reset complete in env', self.id)
 
         return obs
 
