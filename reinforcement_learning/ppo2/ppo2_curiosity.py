@@ -57,7 +57,7 @@ class PPO2(ActorCriticRLModel):
     def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log='./tensorboard_log', _init_setup_model=True, policy_kwargs=None,
-                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None, beta=0.2, lmd=0.1, int_coef=1.0):
+                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None, beta=0.2, lmd=0.99, int_coef=1.0):
 
         #tensorboard_log = None
 
@@ -210,13 +210,11 @@ class PPO2(ActorCriticRLModel):
                     weight_params = [v for v in self.params if '/b' not in v.name]
                     l2_loss = tf.reduce_sum([tf.nn.l2_loss(v) for v in weight_params])
 
-                    self.int_reward = 0.5 * tf.math.reduce_sum(tf.math.square(self.obs_next_encoded - self.obs_next_hat))
+                    self.int_reward = 0.5 * tf.reduce_sum(tf.math.square(self.obs_next_encoded - self.obs_next_hat))
                     self.inv_loss = - tf.reduce_sum(self.processed_act * tf.math.log(self.act_hat + tf.keras.backend.epsilon()))
                     self.int_loss = self.beta * self.int_reward + (1.0 - self.beta) * self.inv_loss
 
-                    #loss_ = - self.lmd * self.rewards_ph + self.int_loss
-                    #loss = self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef + l2_loss * L2_WEIGHT
-                    loss = self.lmd * self.pg_loss + self.int_loss
+                    loss = self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef + self.int_loss
 
                     tf.compat.v1.summary.scalar('entropy_loss', self.entropy)
                     tf.compat.v1.summary.scalar('policy_gradient_loss', self.pg_loss)
@@ -352,7 +350,7 @@ class PPO2(ActorCriticRLModel):
             policy_loss, value_loss, policy_entropy, approxkl, clipfrac, _ = self.sess.run(
                 [self.pg_loss, self.vf_loss, self.entropy, self.approxkl, self.clipfrac, self._train], td_map)
 
-        return policy_loss, value_loss, policy_entropy, approxkl, clipfrac
+        return policy_loss, value_loss, int_loss, policy_entropy, approxkl, clipfrac
 
     def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2", reset_num_timesteps=True):
 

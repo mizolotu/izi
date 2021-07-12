@@ -21,8 +21,15 @@ if __name__ == '__main__':
     env_fns = [make_env(LunarLander, seed) for seed in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
-    #model = ppo(MlpPolicy, env, n_steps=512, seed=0, verbose=1)
+    #model = ppo(MlpPolicy, env, n_steps=512, seed=0, verbose=1, ent_coef=0.0)
+    #model.learn(total_timesteps=nsteps)
+
+    #model = ppo(MlpPolicy, env, n_steps=512, seed=0, verbose=1, ent_coef=0.01)
+    #model.learn(total_timesteps=nsteps)
+
     model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1)
+    model.learn(total_timesteps=nsteps)
+
+    #model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1)
     #model = acktr(MlpPolicy, env, verbose=1)
     #model = acer(MlpPolicy, env, verbose=1)
-    model.learn(total_timesteps=nsteps)
