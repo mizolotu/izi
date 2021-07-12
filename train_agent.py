@@ -1,5 +1,7 @@
 import argparse as arp
 import os
+import pandas as pd
+import os.path as osp
 
 from reinforcement_learning.gym.envs.reactive_discrete.main import ReactiveDiscreteEnv
 from reinforcement_learning.ppo2.ppo2 import PPO2 as ppo
@@ -19,8 +21,6 @@ def make_env(env_class, *args):
 
 if __name__ == '__main__':
 
-    print('ppo' in locals())
-
     parser = arp.ArgumentParser(description='Train RL agent.')
     parser.add_argument('-e', '--environment', help='Environment name', default='ReactiveDiscreteEnv')
     parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo')
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=nenvs)
     parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
     parser.add_argument('-u', '--augment', help='Augment the data?', default=False, type=bool)
-    parser.add_argument('-c', '--checkpoint', help='Checkpoint')  # e.g. 'rl_model_384_steps.zip'
+    parser.add_argument('-t', '--timestamp', help='Checkpoint timestamp', type=int)
     args = parser.parse_args()
 
     # number of environments
@@ -56,13 +56,12 @@ if __name__ == '__main__':
     policy = MlpPolicy
     total_steps = nsteps * nepisodes
 
-    # configure logger
+    # dirs
 
     _dir = f'{env_class.__name__}/{algorithm.__name__}/{args.scenario}_{attack_str}'
     modeldir = f'{models_dir}/{_dir}'
     logdir = f'{results_dir}/{_dir}'
     format_strs = os.getenv('', 'stdout,log,csv').split(',')
-    logger.configure(os.path.abspath(logdir), format_strs)
 
     # create environments
 
@@ -72,11 +71,23 @@ if __name__ == '__main__':
     # continue training
 
     try:
-        model = algorithm.load('{0}/{1}'.format(modeldir, args.checkpoint))
+        checkpoint = f'rl_model_{args.timestamp}_steps.zip'
+        fname = osp.join(logdir, progress)
+        p = pd.read_csv(fname, delimiter=',', dtype=float)
+        logger.configure(os.path.abspath(logdir), format_strs)
+        keys = p.keys()
+        vals = p.values
+        for i in range(vals.shape[0]):
+            for j in range(len(keys)):
+                logger.logkv(keys[j], vals[i, j])
+            logger.dumpkvs()
+        model = algorithm.load(osp.join(modeldir, checkpoint))
         model.set_env(env)
-        print('Model has been loaded from {0}!'.format(args.checkpoint))
+        print('Model has been loaded from {0}!'.format(checkpoint))
     except Exception as e:
+        print(e)
         print('Could not load the model, a new model will be created!')
+        logger.configure(os.path.abspath(logdir), format_strs)
         model = algorithm(policy, env, n_steps=nsteps, verbose=1)
     finally:
         cb = CheckpointCallback(nsteps * nenvs, modeldir, verbose=1)

@@ -56,7 +56,12 @@ if __name__ == '__main__':
         n = p['ep_normal_mean'].values
         a = p['ep_attack_mean'].values
         b = p['ep_precision_mean'].values
-        x = p['total_timesteps'].values
+        tt = p['total_timesteps'].values
+        if len(tt) == len(np.unique(tt)):
+            x = tt
+        else:
+            dx = tt[0]
+            x = np.arange(len(r)) * dx
         r = moving_average(r.reshape(len(r), 1)).reshape(x.shape)
         n = moving_average(n.reshape(len(n), 1)).reshape(x.shape) * 100
         a = moving_average(a.reshape(len(a), 1)).reshape(x.shape) * 100
