@@ -14,11 +14,13 @@ def make_env(env_class, seed):
 
 if __name__ == '__main__':
 
+    env_class = LunarLander
+    #env_class = CartPoleEnv
     nenvs = 4
-    nsteps = nenvs * int(10e6)
+    nsteps = nenvs * int(1e6)
 
     set_global_seeds(seed=0)
-    env_fns = [make_env(LunarLander, seed) for seed in range(nenvs)]
+    env_fns = [make_env(env_class, seed) for seed in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
     model = ppo(MlpPolicy, env, n_steps=512, seed=0, verbose=1)
@@ -30,7 +32,10 @@ if __name__ == '__main__':
     model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1, int_coef=0.1)
     model.learn(total_timesteps=nsteps)
 
-    model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1, int_coef=10.0)
+    model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1, int_coef=0.01)
+    model.learn(total_timesteps=nsteps)
+
+    model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1, int_coef=0.001)
     model.learn(total_timesteps=nsteps)
 
     #model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1)
