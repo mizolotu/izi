@@ -4,7 +4,8 @@ import pandas as pd
 import os.path as osp
 
 from reinforcement_learning.gym.envs.reactive_discrete.main import ReactiveDiscreteEnv
-from reinforcement_learning.ppo2.ppo2 import PPO2 as ppo
+from reinforcement_learning.ppo2.ppo2 import PPO2 as ppo2
+from reinforcement_learning.ppoc.ppoc import PPOC as ppoc
 from reinforcement_learning.acer.acer_simple import ACER as acer
 from reinforcement_learning.acktr.acktr import ACKTR as acktr
 from reinforcement_learning.common.vec_env.subproc_vec_env import SubprocVecEnv
@@ -23,7 +24,7 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train RL agent.')
     parser.add_argument('-e', '--environment', help='Environment name', default='ReactiveDiscreteEnv')
-    parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo')
+    parser.add_argument('-a', '--algorithm', help='Algorithm name', default='ppo2')
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=nenvs)
     parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
