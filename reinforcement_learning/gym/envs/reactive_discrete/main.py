@@ -598,7 +598,7 @@ class ReactiveDiscreteEnv():
                     samples_by_app[idx, 0] = samples['packets'][idx]
                     samples_by_app[idx, 1] = samples['bytes'][idx]
             frame = np.hstack([
-                samples_by_app - self.samples_by_app,
+                (samples_by_app - self.samples_by_app) / (np.sum(samples_by_app, axis=0) + 1e-10),
                 np.zeros((self.n_apps, self.n_ids)),
                 np.array(self.on_off_frame)
             ])
@@ -659,7 +659,7 @@ class ReactiveDiscreteEnv():
                 samples_by_app[idx, 0] = samples['packets'][idx]
                 samples_by_app[idx, 1] = samples['bytes'][idx]
         processed_counts = []
-        processed_counts.append(samples_by_app - self.samples_by_app)
+        processed_counts.append((samples_by_app - self.samples_by_app) / (np.sum(samples_by_app, axis=0) + 1e-10))
         nintrusions = np.zeros((self.n_apps, self.n_ids))
         for i in range(self.n_apps):
             for j in range(self.n_ids):
