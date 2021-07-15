@@ -16,6 +16,13 @@ from config import *
 from common.ml import load_meta
 from itertools import cycle
 
+def find_checkpoint_with_max_step(checkpoint_dir, prefix='rl_model_'):
+    checkpoint_files = [item for item in os.listdir(checkpoint_dir) if osp.isfile(osp.join(checkpoint_dir, item)) and item.startswith(prefix) and item.endswith('.zip')]
+    spl = [item.split(prefix)[1] for item in checkpoint_files]
+    checkpoint_step_numbers = [int(item.split('_steps.zip')[0]) for item in spl]
+    idx = sorted(range(len(checkpoint_step_numbers)), key=lambda k: checkpoint_step_numbers[k])
+    return checkpoint_files[idx[-1]]
+
 def make_env(env_class, *args):
     fn = lambda: env_class(*args)
     return fn
@@ -71,8 +78,13 @@ if __name__ == '__main__':
 
     # continue training
 
-    try:
+    if args.timestamp is None:
+        checkpoint = find_checkpoint_with_max_step(modeldir)
+    else:
         checkpoint = f'rl_model_{args.timestamp}_steps.zip'
+
+    try:
+
         fname = osp.join(logdir, progress)
         p = pd.read_csv(fname, delimiter=',', dtype=float)
         logger.configure(os.path.abspath(logdir), format_strs)
