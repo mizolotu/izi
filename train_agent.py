@@ -76,14 +76,14 @@ if __name__ == '__main__':
     env_fns = [make_env(env_class, env_idx, next(attack_indexes), args.augment, env_idx) for env_idx in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
-    # continue training
-
-    if args.timestamp is None:
-        checkpoint = find_checkpoint_with_max_step(modeldir)
-    else:
-        checkpoint = f'rl_model_{args.timestamp}_steps.zip'
-
     try:
+
+        # continue training
+
+        if args.timestamp is None:
+            checkpoint = find_checkpoint_with_max_step(modeldir)
+        else:
+            checkpoint = f'rl_model_{args.timestamp}_steps.zip'
 
         fname = osp.join(logdir, progress)
         p = pd.read_csv(fname, delimiter=',', dtype=float)
