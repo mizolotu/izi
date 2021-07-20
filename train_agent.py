@@ -83,6 +83,20 @@ if __name__ == '__main__':
     else:
         checkpoint = f'rl_model_{args.timestamp}_steps.zip'
 
+    print(checkpoint)
+    fname = osp.join(logdir, progress)
+    p = pd.read_csv(fname, delimiter=',', dtype=float)
+    logger.configure(os.path.abspath(logdir), format_strs)
+    keys = p.keys()
+    vals = p.values
+    for i in range(vals.shape[0]):
+        for j in range(len(keys)):
+            logger.logkv(keys[j], vals[i, j])
+        logger.dumpkvs()
+    model = algorithm.load(osp.join(modeldir, checkpoint))
+    model.set_env(env)
+    print('Model has been loaded from {0}!'.format(checkpoint))
+
     try:
 
         fname = osp.join(logdir, progress)
