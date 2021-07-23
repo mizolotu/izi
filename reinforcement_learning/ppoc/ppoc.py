@@ -214,7 +214,7 @@ class PPOC(ActorCriticRLModel):
                     self.inv_loss = - tf.reduce_sum(self.processed_act * tf.math.log(self.act_hat + tf.keras.backend.epsilon()))
                     self.int_loss = self.beta * self.int_reward + (1.0 - self.beta) * self.inv_loss
 
-                    loss = self.lmd * (self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef) + self.int_coef * self.int_loss
+                    loss = self.lmd * (self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef) # + self.int_coef * self.int_loss
 
                     tf.compat.v1.summary.scalar('entropy_loss', self.entropy)
                     tf.compat.v1.summary.scalar('policy_gradient_loss', self.pg_loss)
