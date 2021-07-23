@@ -15,18 +15,20 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot progress')
     parser.add_argument('-e', '--environment', help='Environment', default='ReactiveDiscreteEnv')
-    parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['PPO2'])
-    parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
-    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[1])
+    parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['Baseline', 'A2C', 'PPO2'])
+    parser.add_argument('-s', '--scenario', help='Scenario name', default='anomaly_detection')
+    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[2])
+    #parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
+    #parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[1])
     parser.add_argument('-n', '--ntests', help='Number of tests', default=ntests, type=int)
-    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(1e6))
+    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(5e5))
     args = parser.parse_args()
 
     # colors and labels
 
-    names = [['Reward'], ['Benign traffic allowed, %'], ['Malicious traffic blocked, %'], ['Precision']]
+    names = [['Reward'], ['Benign traffic allowed'], ['Malicious traffic blocked'], ['Precision']]
     fnames = [f"{item}_{','.join([str(item) for item in args.labels])}" for item in ['reward', 'benign', 'malicious', 'precision']]
-    ylabels = ['Reward value', 'Benign traffic allowed, %', 'Malicious traffic blocked, %', 'Precision']
+    ylabels = ['Reward value', 'Benign traffic allowed', 'Malicious traffic blocked', 'Precision']
     colors = ['rgb(64,120,211)', 'rgb(0,100,80)', 'rgb(237,2,11)', 'rgb(255,165,0)', 'rgb(139,0,139)', 'rgb(0,51,102)']
 
     # algorithms and scenario
@@ -57,24 +59,44 @@ if __name__ == '__main__':
         a = p['ep_attack_mean'].values
         b = p['ep_precision_mean'].values
         tt = p['total_timesteps'].values
+
+        nanidx = pd.isna(np.sum(p.values, axis=1))
+        if np.sum(nanidx) > 0:
+            r = r[~nanidx]
+            n = n[~nanidx]
+            a = a[~nanidx]
+            b = b[~nanidx]
+            tt = tt[~nanidx]
+
+        dx = tt[0]
         if len(tt) == len(np.unique(tt)):
             x = tt
         else:
-            dx = tt[0]
             x = np.arange(len(r)) * dx
         r = moving_average(r.reshape(len(r), 1)).reshape(x.shape)
-        n = moving_average(n.reshape(len(n), 1)).reshape(x.shape) * 100
-        a = moving_average(a.reshape(len(a), 1)).reshape(x.shape) * 100
+        n = moving_average(n.reshape(len(n), 1)).reshape(x.shape)
+        a = moving_average(a.reshape(len(a), 1)).reshape(x.shape)
         p = moving_average(b.reshape(len(a), 1)).reshape(x.shape)
 
         # baseline
 
-        if len(r) <= args.ntests:
+        n1 = len(r) * dx // args.timesteps
+
+        #if len(r) <= args.ntests:
+        print(algorithm, len(r) * dx)
+        if n1 == 0:
             x = np.arange(1, args.timesteps // nsteps) * x[0]
             r = np.ones(args.timesteps // nsteps) * np.nanmean(r)
             n = np.ones(args.timesteps // nsteps) * np.nanmean(n)
             a = np.ones(args.timesteps // nsteps) * np.nanmean(a)
             p = np.ones(args.timesteps // nsteps) * np.nanmean(p)
+        else:
+            idx = np.arange(0, len(r), n1).astype(int)
+            x = x[idx] // n1
+            r = r[idx]
+            n = n[idx]
+            a = a[idx]
+            p = p[idx]
 
         # append to lists
 
@@ -89,8 +111,8 @@ if __name__ == '__main__':
 
         # generate scatter
 
-        dashes = [None for _ in algorithms]
-        traces, layout = generate_line_scatter(algorithms, d, colors, dashes, 'Time steps', y, show_legend=False, xrange=[0, args.timesteps])
+        dashes = [None, 'dash', 'dot', 'dashdot']
+        traces, layout = generate_line_scatter(algorithms, d, colors, dashes, 'Time steps', y, show_legend=True, xrange=[0, args.timesteps], yrange=None)
 
         # save results
 
