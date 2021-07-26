@@ -3,7 +3,8 @@ import json
 from common.odl import Odl
 from config import *
 from common.ovs import delete_flows
-from common.utils import ip_proto
+from common.utils import ip_proto, ssh_restart_service
+from time import sleep
 
 def clean_ids_tables(controller, ids_nodes):
 
@@ -41,6 +42,14 @@ def clean_ovs_tables_via_api(controller, ovs_node):
 
 def clean_ovs_tables_via_ssh(ovs_vm):
     delete_flows(ovs_vm)
+
+def restart_sdn(controller_vm, controller_obj, service='odl', sleep_interval=3):
+    ssh_restart_service(controller_vm, service)
+    ready = False
+    while not ready:
+        ready = controller_obj.check_restconf()
+        print('Controller is not ready!')
+        sleep(sleep_interval)
 
 def init_ovs_tables(controller, ovs_node, ovs_veths):
 

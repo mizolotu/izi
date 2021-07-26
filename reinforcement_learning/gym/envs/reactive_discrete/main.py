@@ -12,7 +12,7 @@ from common.utils import ip_proto
 from threading import Thread
 from itertools import cycle
 
-from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, clean_ovs_tables_via_ssh, init_ovs_tables
+from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, clean_ovs_tables_via_ssh, init_ovs_tables, restart_sdn
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
@@ -83,8 +83,8 @@ class ReactiveDiscreteEnv():
 
         controller_vm = [vm for vm in self.vms if vm['role'] == 'sdn']
         assert len(controller_vm) == 1
-        controller_ip = controller_vm[0]['ip']
-        self.controller = Odl(controller_ip)
+        self.controller_vm = controller_vm[0]
+        self.controller = Odl(self.controller_vm['ip'])
 
         # tables and tunnels
 
@@ -525,7 +525,8 @@ class ReactiveDiscreteEnv():
         tables = np.arange(in_table, out_table)
         ready = False
         attempt = 0
-        attempt_max = 5
+        attempt_max_1 = 5
+        attempt_max_2 = 0
         while not ready:
             clean_ovs_tables_via_api(self.controller, self.ovs_node)
             sleep(sleep_duration)
@@ -536,8 +537,10 @@ class ReactiveDiscreteEnv():
                     count += 1
                 else:
                     attempt += 1
-                    if attempt >= attempt_max:
+                    if attempt >= attempt_max_1:
                         clean_ovs_tables_via_ssh(self.ovs_vm)
+                    elif attempt >= attempt_max_2:
+                        restart_sdn(self.controller_vm, self.controller)
                     break
             if count == len(tables):
                 ready = True
@@ -545,6 +548,7 @@ class ReactiveDiscreteEnv():
         # fill tables and wait for sdn configuration to be processed
 
         ready = False
+        attempt = 0
         while not ready:
             init_ovs_tables(self.controller, self.ovs_node, self.veths)
             sleep(sleep_duration)
@@ -560,6 +564,11 @@ class ReactiveDiscreteEnv():
                 if len(flows) == n_flows_required:
                     count += 1
                 else:
+                    attempt += 1
+                    if attempt >= attempt_max_1:
+                        clean_ovs_tables_via_ssh(self.ovs_vm)
+                    elif attempt >= attempt_max_2:
+                        restart_sdn(self.controller_vm, self.controller)
                     sleep(sleep_duration)
                     break
             if count == len(tables):
