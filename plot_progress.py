@@ -21,7 +21,7 @@ if __name__ == '__main__':
     #parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
     #parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[1])
     parser.add_argument('-n', '--ntests', help='Number of tests', default=ntests, type=int)
-    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(5e5))
+    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(4.5e5))
     args = parser.parse_args()
 
     # colors and labels

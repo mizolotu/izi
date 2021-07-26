@@ -17,7 +17,7 @@ if __name__ == '__main__':
     env_class = LunarLander
     #env_class = CartPoleEnv
     nenvs = 4
-    nsteps = nenvs * int(9e6)
+    nsteps = nenvs * int(10e6)
 
     set_global_seeds(seed=0)
     env_fns = [make_env(env_class, seed) for seed in range(nenvs)]
@@ -33,6 +33,12 @@ if __name__ == '__main__':
     model.learn(total_timesteps=nsteps)
 
     model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1, lmd=0.01)
+    model.learn(total_timesteps=nsteps)
+
+    model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1, lmd=10.0)
+    model.learn(total_timesteps=nsteps)
+
+    model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1, lmd=100.0)
     model.learn(total_timesteps=nsteps)
 
     #model = ppo_c(MlpPolicy, env, n_steps=512, seed=0, verbose=1)

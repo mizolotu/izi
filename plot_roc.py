@@ -11,8 +11,8 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot ROC')
-    #parser.add_argument('-l', '--labels', help='Labels used for training', nargs='+', default=['1', '2', '3', '4', '1,2,3,4'])
-    parser.add_argument('-l', '--labels', help='Labels used for training', nargs='+', default=['2,3,4', '1,3,4', '1,2,4', '1,2,3'])
+    parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['ae', 'som', 'mlp'])
+    parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['2,3,4', '1,3,4', '1,2,4', '1,2,3'])
     parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['1', '2', '3', '4'])
     args = parser.parse_args()
 
@@ -53,32 +53,35 @@ if __name__ == '__main__':
 
                 if train_labels in args.labels:
 
-                    m_type = spl[0].upper()
+                    m_type = spl[0]
+                    if m_type in args.models:
 
-                    models_.append(m)
-                    if train_labels in model_attacks.keys():
-                        a_type = model_attacks[train_labels]
-                    else:
-                        a_type = None
-                    ma_type = f'{m_type}_{a_type}'
-                    if ma_type not in ls:
-                        ls.append(ma_type)
-                    a_idx = ls.index(ma_type)
-                    cs.append(colors[a_idx])
+                        m_type = m_type.upper()
 
-                    w_size = spl[-1]
-                    if w_size not in ws:
-                        ws.append(w_size)
-                    w_idx = ws.index(w_size)
-                    ds.append(dashes[w_idx])
+                        models_.append(m)
+                        if train_labels in model_attacks.keys():
+                            a_type = model_attacks[train_labels]
+                        else:
+                            a_type = None
+                        ma_type = f'{m_type}_{a_type}'
+                        if ma_type not in ls:
+                            ls.append(ma_type)
+                        a_idx = ls.index(ma_type)
+                        cs.append(colors[a_idx])
 
-                    if a_type is not None:
-                        model_name = f'{a_type} {m_type}, {w_size} sec.'
-                    else:
-                        model_name = f'{m_type}, {w_size} sec.'
-                    model_names.append(model_name)
-                    if train_labels not in attack_labels_str:
-                        attack_labels_str.append(train_labels)
+                        w_size = spl[-1]
+                        if w_size not in ws:
+                            ws.append(w_size)
+                        w_idx = ws.index(w_size)
+                        ds.append(dashes[w_idx])
+
+                        if a_type is not None:
+                            model_name = f'{a_type} {m_type}, {w_size} sec.'
+                        else:
+                            model_name = f'{m_type}, {w_size} sec.'
+                        model_names.append(model_name)
+                        if train_labels not in attack_labels_str:
+                            attack_labels_str.append(train_labels)
 
             m_idx = sorted(range(len(model_names)), key=lambda k: model_names[k])
             for idx in m_idx:
@@ -95,7 +98,7 @@ if __name__ == '__main__':
 
             # generate layout and traces
 
-            traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yanchor='top', ylegend=1)
+            traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 0.8])
 
             # save results
 
