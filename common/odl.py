@@ -25,17 +25,6 @@ class Odl:
         self.op = 'http://' + ip + ':' + str(port) + '/restconf/operational/opendaylight-inventory:nodes'
         self.cfg = 'http://' + ip + ':' + str(port) + '/restconf/config/opendaylight-inventory:nodes'
 
-    def check_restconf(self):
-        online = False
-        try:
-            r = requests.get(self.op, auth=self.auth, headers=self.headers, stream=True)
-            print(r.text)
-            if r.status_code == 200:
-                online = True
-        except Exception as e:
-            print(e)
-        return online
-
     def get_flow_statistics(self, node_id, table_id, count_type):
         url = '{0}/node/{1}/table/{2}'.format(self.op, node_id, table_id)
         req = requests.get(url, auth=self.auth, headers=self.headers, stream=True)

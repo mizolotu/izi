@@ -12,7 +12,7 @@ from common.utils import ip_proto
 from threading import Thread
 from itertools import cycle
 
-from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables
+from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
@@ -527,7 +527,7 @@ class ReactiveDiscreteEnv():
         tables = np.arange(in_table, out_table)
         ready = False
         attempt = 0
-        attempt_max = 0
+        attempt_max = 5
         while not ready:
             clean_ovs_tables_via_api(self.controller, self.ovs_node)
             sleep(sleep_duration)
@@ -537,6 +537,7 @@ class ReactiveDiscreteEnv():
                 if len(flows) == 0:
                     count += 1
                 else:
+                    print(f'Problem with table {table}: {len(flows)} flow(s) found: {flows}')
                     attempt += 1
                     if attempt >= attempt_max:
                         sdn_restart_required = True
@@ -546,7 +547,8 @@ class ReactiveDiscreteEnv():
             if sdn_restart_required:
                 break
 
-        print('Flow tables are cleared in env', self.id)
+        if not sdn_restart_required:
+            print('Flow tables are cleared in env', self.id)
 
         # fill tables and wait for sdn configuration to be processed
 
@@ -568,14 +570,18 @@ class ReactiveDiscreteEnv():
                     if len(flows) == n_flows_required:
                         count += 1
                     else:
+                        print(f'Problem with table {table}: {n_flows_required} required, but {len(flows)} flow(s) found: {flows}')
                         attempt += 1
                         if attempt >= attempt_max:
                             sdn_restart_required = True
+                        clean_ovs_tables_via_ssh(self.ovs_vm)
                         break
                 if count == len(tables):
                     ready = True
                 if sdn_restart_required:
                     break
+
+        print('sdn restart required:', sdn_restart_required)
 
         if not sdn_restart_required:
 

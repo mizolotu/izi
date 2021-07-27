@@ -14,6 +14,9 @@ from reinforcement_learning.common.schedules import get_schedule_fn
 from reinforcement_learning.common.tf_util import total_episode_reward_logger
 from reinforcement_learning.common.math_util import safe_mean
 
+from common.utils import ssh_restart_service, http_check_url
+from common.ovs import delete_flows
+
 #L2_WEIGHT = .1
 L2_WEIGHT = 0.0
 
@@ -566,12 +569,23 @@ class Runner(AbstractEnvRunner):
         self.scores = [[] for _ in range(self.n_envs)]
 
         ep_infos = []
+        self.obs[:] = self.env.reset()
+        controller = self.env.get_attr('controller', [0])[0]
+        switches = self.env.get_attr('ovs_vm')
 
-        ready = False
-        while not ready:
-            #self.obs = []
+        while np.isnan(np.sum(self.obs)):
+            ssh_restart_service(self.env.get_attr('controller_vm', [0])[0], 'odl')
+            ready = False
+            while not ready:
+                op_online = http_check_url(controller.op, auth=controller.auth, headers=controller.headers)
+                cfg_online = http_check_url(controller.cfg, auth=controller.auth, headers=controller.headers)
+                if op_online and cfg_online:
+                    for switch in switches:
+                        delete_flows(switch)
+                    ready = True
+                else:
+                    time.sleep(1)
             self.obs[:] = self.env.reset()
-            print(self.obs)
 
         # run steps in different threads
 

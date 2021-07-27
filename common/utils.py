@@ -147,6 +147,17 @@ def ssh_restart_service(vm, service):
     _ = ssh_command(ssh, f'sudo service {service} restart')
     ssh.close()
 
+def http_check_url(url, auth=None, headers=None, stream=True):
+    online = False
+    try:
+        r = requests.get(url, auth=auth, headers=headers, stream=stream)
+        if r.status_code == 200:
+            online = True
+    except Exception as e:
+        pass
+        #print(e)
+    return online
+
 def nat_ip(ip, prefix):
     pspl = prefix.split('.')
     l = len(pspl)

@@ -92,7 +92,9 @@ def delete_flows(vm):
     mgmt = vm['mgmt']
     keyfile = vm['key']
     ssh = ssh_connect(mgmt, keyfile)
-    ssh_command(ssh, 'sudo ovs-ofctl del-flows br')
+    lines = ssh_command(ssh, 'sudo ovs-ofctl del-flows br')
+    for line in lines:
+        print(line)
 
 def get_node_id(vm):
     mgmt = vm['mgmt']
