@@ -12,7 +12,7 @@ from common.utils import ip_proto
 from threading import Thread
 from itertools import cycle
 
-from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, clean_ovs_tables_via_ssh, init_ovs_tables, restart_sdn
+from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
 from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
@@ -520,13 +520,14 @@ class ReactiveDiscreteEnv():
         self.delay = [[] for _ in range(self.n_ids)]
         self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
 
+        sdn_restart_required = False
+
         # clean tables and wait for sdn configuration to be processed
 
         tables = np.arange(in_table, out_table)
         ready = False
         attempt = 0
-        attempt_max_1 = 5
-        attempt_max_2 = 0
+        attempt_max = 0
         while not ready:
             clean_ovs_tables_via_api(self.controller, self.ovs_node)
             sleep(sleep_duration)
@@ -537,92 +538,100 @@ class ReactiveDiscreteEnv():
                     count += 1
                 else:
                     attempt += 1
-                    if attempt >= attempt_max_1:
-                        clean_ovs_tables_via_ssh(self.ovs_vm)
-                    elif attempt >= attempt_max_2:
-                        restart_sdn(self.controller_vm, self.controller)
+                    if attempt >= attempt_max:
+                        sdn_restart_required = True
                     break
             if count == len(tables):
                 ready = True
+            if sdn_restart_required:
+                break
+
+        print('Flow tables are cleared in env', self.id)
 
         # fill tables and wait for sdn configuration to be processed
 
-        ready = False
-        attempt = 0
-        while not ready:
-            init_ovs_tables(self.controller, self.ovs_node, self.veths)
-            sleep(sleep_duration)
-            count = 0
-            for table in tables:
-                if table == app_table:
-                    n_flows_required = 2 + (len(applications) - 2) * 2
-                elif table == block_table:
-                    n_flows_required = 2 * len(attackers) + 1
-                else:
-                    n_flows_required = 1
-                flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
-                if len(flows) == n_flows_required:
-                    count += 1
-                else:
-                    attempt += 1
-                    if attempt >= attempt_max_1:
-                        clean_ovs_tables_via_ssh(self.ovs_vm)
-                    elif attempt >= attempt_max_2:
-                        restart_sdn(self.controller_vm, self.controller)
-                    sleep(sleep_duration)
+        if not sdn_restart_required:
+            ready = False
+            attempt = 0
+            while not ready:
+                init_ovs_tables(self.controller, self.ovs_node, self.veths)
+                sleep(sleep_duration)
+                count = 0
+                for table in tables:
+                    if table == app_table:
+                        n_flows_required = 2 + (len(applications) - 2) * 2
+                    elif table == block_table:
+                        n_flows_required = 2 * len(attackers) + 1
+                    else:
+                        n_flows_required = 1
+                    flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
+                    if len(flows) == n_flows_required:
+                        count += 1
+                    else:
+                        attempt += 1
+                        if attempt >= attempt_max:
+                            sdn_restart_required = True
+                        break
+                if count == len(tables):
+                    ready = True
+                if sdn_restart_required:
                     break
-            if count == len(tables):
-                ready = True
 
-        # set time
+        if not sdn_restart_required:
 
-        if self.tstart is not None:
-            tnow = time()
-            if (tnow - self.tstart) < episode_duration:
-                sleep(episode_duration - (tnow - self.tstart))
+            # set time
 
-        # default reset actions
+            if self.tstart is not None:
+                tnow = time()
+                if (tnow - self.tstart) < episode_duration:
+                    sleep(episode_duration - (tnow - self.tstart))
 
-        if self.default_reset_actions is not None:
-            for action in self.default_reset_actions:
-                self._take_action(action)
+            # default reset actions
 
-        self.tstart = time()
-        self.tstep = time()
+            if self.default_reset_actions is not None:
+                for action in self.default_reset_actions:
+                    self._take_action(action)
 
-        # calculate obs
+            self.tstart = time()
+            self.tstep = time()
 
-        self.app_counts_stack.clear()
-        self.samples_by_app = np.zeros((self.n_apps, 2))
-        self.samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
-        while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
+            # calculate obs
 
-            #samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-            samples = get_app_counts(self.ovs_vm['ip'], flask_port, in_table + 1)
-            #samples_by_app = self._process_app_samples(samples)
-            samples_by_app = np.zeros((self.n_apps, 2))
-            for app in applications:
-                if app in samples['applications']:
-                    idx = samples['applications'].index(app)
-                    samples_by_app[idx, 0] = samples['packets'][idx]
-                    samples_by_app[idx, 1] = samples['bytes'][idx]
-            frame = np.hstack([
-                (samples_by_app - self.samples_by_app) / (np.sum(samples_by_app, axis=0) + 1e-10),
-                np.zeros((self.n_apps, self.n_ids)),
-                np.array(self.on_off_frame)
-            ])
-            self.app_counts_stack.append(frame)
-            self.samples_by_app = np.array(samples_by_app)
-        obs = np.array(self.app_counts_stack)
+            self.app_counts_stack.clear()
+            self.samples_by_app = np.zeros((self.n_apps, 2))
+            self.samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
+            while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
 
-        # generate traffic
+                # samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
+                samples = get_app_counts(self.ovs_vm['ip'], flask_port, in_table + 1)
+                # samples_by_app = self._process_app_samples(samples)
+                samples_by_app = np.zeros((self.n_apps, 2))
+                for app in applications:
+                    if app in samples['applications']:
+                        idx = samples['applications'].index(app)
+                        samples_by_app[idx, 0] = samples['packets'][idx]
+                        samples_by_app[idx, 1] = samples['bytes'][idx]
+                frame = np.hstack([
+                    (samples_by_app - self.samples_by_app) / (np.sum(samples_by_app, axis=0) + 1e-10),
+                    np.zeros((self.n_apps, self.n_ids)),
+                    np.array(self.on_off_frame)
+                ])
+                self.app_counts_stack.append(frame)
+                self.samples_by_app = np.array(samples_by_app)
+            obs = np.array(self.app_counts_stack)
 
-        attack_label = next(self.label)
-        for host in self.internal_hosts:
-            _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
-            #print(_)
+            # generate traffic
 
-        print('Reset complete in env', self.id)
+            attack_label = next(self.label)
+            for host in self.internal_hosts:
+                _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
+                # print(_)
+
+            print('Reset complete in env', self.id)
+
+        else:
+
+            obs = None
 
         return obs
 

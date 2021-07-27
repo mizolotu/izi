@@ -567,7 +567,11 @@ class Runner(AbstractEnvRunner):
 
         ep_infos = []
 
-        self.obs[:] = self.env.reset()
+        ready = False
+        while not ready:
+            #self.obs = []
+            self.obs[:] = self.env.reset()
+            print(self.obs)
 
         # run steps in different threads
 

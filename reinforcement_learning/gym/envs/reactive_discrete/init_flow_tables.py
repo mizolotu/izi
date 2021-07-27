@@ -44,11 +44,14 @@ def clean_ovs_tables_via_ssh(ovs_vm):
     delete_flows(ovs_vm)
 
 def restart_sdn(controller_vm, controller_obj, service='odl', sleep_interval=3):
-    ssh_restart_service(controller_vm, service)
+    if controller_vm is not None:
+        print('Restarting controller?')
+        ssh_restart_service(controller_vm, service)
+        print('Controller restarted!')
     ready = False
     while not ready:
         ready = controller_obj.check_restconf()
-        print('Controller is not ready!')
+        print('Controller is not ready!', ready)
         sleep(sleep_interval)
 
 def init_ovs_tables(controller, ovs_node, ovs_veths):
