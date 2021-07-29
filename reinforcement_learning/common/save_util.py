@@ -39,6 +39,7 @@ def data_to_json(data):
     serializable_data = {}
     for data_key, data_item in data.items():
         # See if object is JSON serializable
+        print(data_key, data_item, is_json_serializable(data_item))
         if is_json_serializable(data_item):
             # All good, store as it is
             serializable_data[data_key] = data_item

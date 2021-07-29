@@ -537,7 +537,7 @@ class ReactiveDiscreteEnv():
                 if len(flows) == 0:
                     count += 1
                 else:
-                    print(f'Problem with table {table}: {len(flows)} flow(s) found: {flows}')
+                    print(f'Problem with table {table}: {len(flows)} flow(s) found')
                     attempt += 1
                     if attempt >= attempt_max:
                         sdn_restart_required = True
@@ -570,7 +570,7 @@ class ReactiveDiscreteEnv():
                     if len(flows) == n_flows_required:
                         count += 1
                     else:
-                        print(f'Problem with table {table}: {n_flows_required} required, but {len(flows)} flow(s) found: {flows}')
+                        print(f'Problem with table {table}: {n_flows_required} required, but {len(flows)} flow(s) found')
                         attempt += 1
                         if attempt >= attempt_max:
                             sdn_restart_required = True

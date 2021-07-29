@@ -440,6 +440,7 @@ class PPO2(ActorCriticRLModel):
         return episode_reward, normal_passed, attack_blocked, ids_precision
 
     def save(self, save_path, cloudpickle=False):
+        print(self.policy)
         data = {
             "gamma": self.gamma,
             "n_steps": self.n_steps,
@@ -570,10 +571,10 @@ class Runner(AbstractEnvRunner):
 
         ep_infos = []
         self.obs[:] = self.env.reset()
-        controller = self.env.get_attr('controller', [0])[0]
-        switches = self.env.get_attr('ovs_vm')
 
         while np.isnan(np.sum(self.obs)):
+            controller = self.env.get_attr('controller', [0])[0]
+            switches = self.env.get_attr('ovs_vm')
             ssh_restart_service(self.env.get_attr('controller_vm', [0])[0], 'odl')
             ready = False
             while not ready:
