@@ -872,7 +872,10 @@ class _Runner(AbstractEnvRunner):
             # Clip the actions to avoid out of bound error
             if isinstance(self.env.action_space, Box):
                 clipped_actions = np.clip(actions, self.env.action_space.low, self.env.action_space.high)
-            obs, rewards, dones, _ = self.env.step_one(env_idx, clipped_actions)
+            obs, rewards, dones, infos = self.env.step_one(env_idx, clipped_actions)
+
+            self.mb_rewards[env_idx].append(rewards)
+            self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
 
             self.model.num_timesteps += self.n_envs
 
@@ -895,5 +898,5 @@ class _Runner(AbstractEnvRunner):
         self.mb_obs[env_idx].append(np.copy(self.obs.copy()[env_idx]))
         self.mb_dones[env_idx].append(self.dones[env_idx])
 
-        self.mb_rewards[env_idx], infos = self.env.reward_one(env_idx)
-        self.scores[env_idx] = [[info['r'], info['n'], info['a'], info['p']] for info in infos]
+        #self.mb_rewards[env_idx], infos = self.env.reward_one(env_idx)
+        #self.scores[env_idx] = [[info['r'], info['n'], info['a'], info['p']] for info in infos]

@@ -8,6 +8,7 @@ from reinforcement_learning.ppo2.ppo2 import PPO2 as ppo2
 from reinforcement_learning.ppoc.ppoc import PPOC as ppoc
 from reinforcement_learning.acer.acer_simple import ACER as acer
 from reinforcement_learning.acktr.acktr import ACKTR as acktr
+from reinforcement_learning.a2c.a2c import A2C as a2c
 from reinforcement_learning.common.vec_env.subproc_vec_env import SubprocVecEnv
 from reinforcement_learning.common.policies import MlpPolicy
 from reinforcement_learning import logger
