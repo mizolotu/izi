@@ -706,7 +706,7 @@ class _Runner(AbstractEnvRunner):
             obs_height, obs_width, obs_num_channels = env.observation_space.shape
             self.batch_ob_shape = (n_env * (n_steps + 1), obs_height, obs_width, obs_num_channels)
             self.obs_dtype = np.uint8
-            self.obs = np.zeros((n_env, obs_height, obs_width, obs_num_channels), dtype=self.obs_dtype)
+            #self.obs = np.zeros((n_env, obs_height, obs_width, obs_num_channels), dtype=self.obs_dtype)
             self.num_channels = obs_num_channels
         else:
             if len(env.observation_space.shape) == 1:
@@ -798,10 +798,8 @@ class _Runner(AbstractEnvRunner):
 
         ep_infos = []
 
-        tmp = self.env.reset()
-        print(tmp)
-        self.obs[:] = tmp
-
+        self.obs[:] = self.env.reset()
+        
         while np.isnan(np.sum(self.obs)):
             controller = self.env.get_attr('controller', [0])[0]
             switches = self.env.get_attr('ovs_vm')
