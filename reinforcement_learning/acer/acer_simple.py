@@ -16,6 +16,9 @@ from reinforcement_learning.common.policies import ActorCriticPolicy, RecurrentA
 from threading import Thread
 from reinforcement_learning.common.math_util import safe_mean
 
+from common.utils import ssh_restart_service, http_check_url
+from common.ovs import delete_flows
+
 # For ACER
 def get_by_index(input_tensor, idx):
     """
@@ -796,6 +799,22 @@ class _Runner(AbstractEnvRunner):
         ep_infos = []
 
         self.obs[:] = self.env.reset()
+
+        while np.isnan(np.sum(self.obs)):
+            controller = self.env.get_attr('controller', [0])[0]
+            switches = self.env.get_attr('ovs_vm')
+            ssh_restart_service(self.env.get_attr('controller_vm', [0])[0], 'odl')
+            ready = False
+            while not ready:
+                op_online = http_check_url(controller.op, auth=controller.auth, headers=controller.headers)
+                cfg_online = http_check_url(controller.cfg, auth=controller.auth, headers=controller.headers)
+                if op_online and cfg_online:
+                    for switch in switches:
+                        delete_flows(switch)
+                    ready = True
+                else:
+                    time.sleep(1)
+            self.obs[:] = self.env.reset()
 
         # run steps in different threads
 
