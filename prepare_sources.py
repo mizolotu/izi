@@ -12,8 +12,8 @@ if __name__ == '__main__':
     # parse args
 
     parser = arp.ArgumentParser(description='Prepare resources')
-    parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=1)
-    parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int, default=1)
+    parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=nenvs)
+    parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int, default=env_vms['ids']['n'])
     parser.add_argument('-l', '--labels', help='Model labels to compile', nargs='+', default=['1', '2', '3', '4', '1,2,3,4'])
     parser.add_argument('-e', '--exclude', help='Model labels to avoid', nargs='+', default=[])
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')

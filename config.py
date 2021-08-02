@@ -52,16 +52,25 @@ env_vms = {
     },
     'ids': {
         'unique': False,
-        'n': 1,
+        'n': 0,
         'cpus': 2,
         'ips': ['192.168.254.60'],
         'sources': [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']],
         'script': 'scripts/ids.sh',
         'mount': None
     },
+    'ips': {
+        'unique': False,
+        'n': 1,
+        'cpus': 2,
+        'ips': ['192.168.254.70'],
+        'sources': [['./sources/ips.service', '/home/vagrant/'], ['./sources/ips', '/home/vagrant/']],
+        'script': 'scripts/ips.sh',
+        'mount': None
+    },
 }
 
-# ids
+# ids and ips
 
 seed = 0
 batch_size = 1024  # batch size will actually be double that
