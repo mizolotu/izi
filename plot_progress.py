@@ -16,10 +16,10 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Plot progress')
     parser.add_argument('-e', '--environment', help='Environment', default='ReactiveDiscreteEnv')
     parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['Baseline', 'ACER', 'ACKTR', 'PPO2'])
-    parser.add_argument('-s', '--scenario', help='Scenario name', default='anomaly_detection')
-    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[2])
-    #parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
-    #parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[1])
+    #parser.add_argument('-s', '--scenario', help='Scenario name', default='anomaly_detection')
+    #parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[2])
+    parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
+    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[1])
     parser.add_argument('-n', '--ntests', help='Number of tests', default=ntests, type=int)
     parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(5e5))
     args = parser.parse_args()
@@ -60,6 +60,8 @@ if __name__ == '__main__':
         b = p['ep_precision_mean'].values
         tt = p['total_timesteps'].values
 
+        dx = tt[0]
+
         nanidx = pd.isna(np.sum(p.values, axis=1))
         if np.sum(nanidx) > 0:
             r = r[~nanidx]
@@ -68,7 +70,6 @@ if __name__ == '__main__':
             b = b[~nanidx]
             tt = tt[~nanidx]
 
-        dx = tt[0]
         if len(tt) == len(np.unique(tt)):
             x = tt
         else:
@@ -82,8 +83,6 @@ if __name__ == '__main__':
 
         n1 = len(r) * dx // args.timesteps
 
-        #if len(r) <= args.ntests:
-        print(algorithm, len(r) * dx)
         if n1 == 0:
             x = np.arange(1, args.timesteps // nsteps) * x[0]
             r = np.ones(args.timesteps // nsteps) * np.nanmean(r)

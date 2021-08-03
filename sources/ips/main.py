@@ -5,6 +5,7 @@ from common.data import *
 from flask import Flask, request, jsonify
 from threading import Thread
 from collections import deque
+from netfilterqueue import NetfilterQueue
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -230,9 +231,12 @@ if __name__ == "__main__":
 
     fname = inspect.getframeinfo(inspect.currentframe()).filename
     model_path = os.path.dirname(os.path.abspath(fname))
-    iface = 'vxlan_sys_4789'
 
-    interceptor = Interceptor(iface, model_path)
+    interceptor = Interceptor(model_path)
+    nfqueue = NetfilterQueue()
+    nfqueue.bind(0, interceptor.intercept)
+
+
     intercept_thread = Thread(target=interceptor.start, daemon=True)
     intercept_thread.start()
     app.run(host='0.0.0.0')

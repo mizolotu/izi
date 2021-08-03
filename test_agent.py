@@ -5,6 +5,7 @@ import pandas as pd
 import os.path as osp
 
 from reinforcement_learning.gym.envs.reactive_discrete.main import ReactiveDiscreteEnv
+from reinforcement_learning.gym.envs.reactive_mixed.main import ReactiveMixedEnv
 from reinforcement_learning.ppo2.ppo2 import PPO2 as ppo
 from reinforcement_learning.common.vec_env.subproc_vec_env import SubprocVecEnv
 from reinforcement_learning.common.policies import MlpPolicy

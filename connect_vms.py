@@ -14,30 +14,32 @@ if __name__ == '__main__':
 
     ovs_vms = [vm for vm in vms if vm['role'] == 'ovs']
     ids_vms = [vm for vm in vms if vm['role'] == 'ids']
+    ips_vms = [vm for vm in vms if vm['role'] == 'ips']
     odl_vms = [vm for vm in vms if vm['role'] == 'sdn']
     assert len(odl_vms) == 1
     odl_vm = odl_vms[0]
+    node_vms = ovs_vms + ids_vms + ips_vms
 
     # connect ovs and ids vms to odl
 
-    for vm in ovs_vms + ids_vms:
+    for vm in node_vms:
         connect_to_controller(vm, bridge_name, odl_vm['ip'], ctrl_port)
 
     # obtain node ids
 
     nodes = {}
-    for n_vm in ovs_vms + ids_vms:
+    for n_vm in node_vms:
         node_id = get_node_id(n_vm)
         nodes[n_vm['vm']] = node_id
 
     # delete default flows from all the switches
 
-    for vm in ovs_vms + ids_vms:
+    for vm in node_vms:
         delete_flows(vm)
 
     # clean bridge ports
 
-    for vm in ovs_vms + ids_vms:
+    for vm in node_vms:
         clean_tunnel_ports(vm)
 
     # delete ovs veth pairs
@@ -47,21 +49,21 @@ if __name__ == '__main__':
         delete_veth_pair(ovs_vm, bridge_name, obs_bridge_veth_prefix)
         delete_veth_pair(ovs_vm, bridge_name, reward_bridge_veth_prefix)
 
-    # connect switches to ids ones
+    # connect switches to ids and ips
 
     tunnels = []
     for vm1 in ovs_vms:
         ovs_name = vm1['vm']
         spl = ovs_name.split('_')
         env_idx = spl[1]
-        for vm2 in ids_vms:
-            ids_name = vm2['vm']
-            spl = ids_name.split('_')
+        for vm2 in ids_vms + ips_vms:
+            _name = vm2['vm']
+            spl = _name.split('_')
             if spl[1] == env_idx:
-                vxlan = 's{0}_i{1}'.format(vm1['vm'].split('ovs')[1], vm2['vm'].split('ids')[1])
+                vxlan = 's{0}_{1}'.format(vm1['vm'].split('ovs')[1], _name)
                 ofport = create_vxlan_tunnel(vm1, vxlan, vm2['ip'])
                 tunnels.append({'vm': vm1['vm'], 'remote': vm2['vm'], 'ofport': ofport, 'type': 'vxlan'})
-                vxlan = 'i{0}_s{1}'.format(vm2['vm'].split('ids')[1], vm1['vm'].split('ovs')[1])
+                vxlan = '{0}_s{1}'.format(_name, vm1['vm'].split('ovs')[1])
                 ofport = create_vxlan_tunnel(vm2, vxlan, vm1['ip'])
                 tunnels.append({'vm': vm2['vm'], 'remote': vm1['vm'], 'ofport': ofport, 'type': 'vxlan'})
 
