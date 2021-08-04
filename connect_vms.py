@@ -49,6 +49,13 @@ if __name__ == '__main__':
         delete_veth_pair(ovs_vm, bridge_name, obs_bridge_veth_prefix)
         delete_veth_pair(ovs_vm, bridge_name, reward_bridge_veth_prefix)
 
+    # delete ips veth pairs
+
+    for ips_vm in ips_vms:
+        delete_veth_pair(ips_vm, bridge_name, ips_rcv_veth_prefix)
+        delete_veth_pair(ips_vm, bridge_name, ips_normal_veth_prefix)
+        delete_veth_pair(ips_vm, bridge_name, ips_attack_veth_prefix)
+
     # connect switches to ids and ips
 
     tunnels = []
@@ -77,6 +84,16 @@ if __name__ == '__main__':
         veths.append({'vm': ovs_vm['vm'], 'tag': obs_bridge_veth_prefix, 'ofport': ofport, 'type': 'veth'})
         ofport = create_veth_pair(ovs_vm, bridge_name, reward_bridge_veth_prefix)
         veths.append({'vm': ovs_vm['vm'], 'tag': reward_bridge_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+
+    # create veth pairs on ips
+
+    for ips_vm in ips_vms:
+        ofport = create_veth_pair(ips_vm, bridge_name, ips_rcv_veth_prefix)
+        veths.append({'vm': ips_vm['vm'], 'tag': ips_rcv_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+        ofport = create_veth_pair(ips_vm, bridge_name, ips_normal_veth_prefix)
+        veths.append({'vm': ips_vm['vm'], 'tag': ips_normal_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+        ofport = create_veth_pair(ips_vm, bridge_name, ips_attack_veth_prefix)
+        veths.append({'vm': ips_vm['vm'], 'tag': ips_attack_veth_prefix, 'ofport': ofport, 'type': 'veth'})
 
     # save nodes
 

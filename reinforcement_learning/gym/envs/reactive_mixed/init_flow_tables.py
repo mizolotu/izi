@@ -6,27 +6,41 @@ from common.ovs import delete_flows
 from common.utils import ip_proto, ssh_restart_service
 from time import sleep
 
-def clean_ids_tables(controller, ids_nodes):
+def clean_ips_tables(controller, node):
 
     # delete op flows and tables if there are any
 
-    for node in ids_nodes:
-        tables = controller.find_operational_tables(node)
-        for table in tables:
-            flows = controller.find_operational_flows(node, table)
-            for flow in flows:
-                controller.delete_operational_flow(node, table, flow)
-            controller.delete_operational_table(node, table)
+    tables = controller.find_operational_tables(node)
+    for table in tables:
+        flows = controller.find_operational_flows(node, table)
+        for flow in flows:
+            controller.delete_operational_flow(node, table, flow)
+        controller.delete_operational_table(node, table)
 
     # delete cfg flows and tables if there are any
 
-    for node in ids_nodes:
-        tables = controller.find_config_tables(node)
-        for table in tables:
-            flows = controller.find_config_flows(node, table)
-            for flow in flows:
-                controller.delete_config_flow(node, table, flow)
-            controller.delete_config_table(node, table)
+    tables = controller.find_config_tables(node)
+    for table in tables:
+        flows = controller.find_config_flows(node, table)
+        for flow in flows:
+            controller.delete_config_flow(node, table, flow)
+        controller.delete_config_table(node, table)
+
+
+def init_ips_tables(controller, ips_node, ips_vxlan, ips_veths):
+    vxlan_ofport = ips_vxlan['ofport']
+    in_ofports = [item['ofport'] for item in ips_veths if item['tag'] == ips_rcv_veth_prefix]
+    assert len(in_ofports) == 1
+    in_ofport = in_ofports[0]
+    nrm_ofports = [item['ofport'] for item in ips_veths if item['tag'] == ips_normal_veth_prefix]
+    assert len(nrm_ofports) == 1
+    nrm_ofport = nrm_ofports[0]
+    att_ofports = [item['ofport'] for item in ips_veths if item['tag'] == ips_attack_veth_prefix]
+    assert len(att_ofports) == 1
+    att_ofport = att_ofports[0]
+    controller.input_output(ips_node, in_table, priorities['lower'], vxlan_ofport, in_ofport)
+    controller.input_output(ips_node, in_table, priorities['lowest'], nrm_ofport, vxlan_ofport)
+    controller.input_output(ips_node, in_table, priorities['lowest'], att_ofport, vxlan_ofport)
 
 def clean_ovs_tables_via_api(controller, ovs_node):
     tables = controller.find_operational_tables(ovs_node)
@@ -109,11 +123,11 @@ if __name__ == '__main__':
     ovs_vm = ovs_vms[0]
     ovs_node = nodes[ovs_vm['vm']]
 
-    # ids vms
+    # ips vms
 
-    ids_vms = [vm for vm in vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == env_idx]
-    ids_nodes = [nodes[vm['vm']] for vm in ids_vms]
-    assert (len(ids_nodes) + 2) <= out_table
+    ips_vms = [vm for vm in vms if vm['role'] == 'ips' and int(vm['vm'].split('_')[1]) == env_idx]
+    ips_nodes = [nodes[vm['vm']] for vm in ips_vms]
+    assert (len(ips_nodes) + 2) <= out_table
 
     # controller
 
@@ -123,13 +137,19 @@ if __name__ == '__main__':
     controller_ip = controller_vm[0]['ip']
     controller = Odl(controller_ip)
 
-    # init tables
+    # clean and init ovs tables
 
     ovs_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ovs_vm['vm']]
     clean_ovs_tables_via_api(controller, ovs_node)
     clean_ovs_tables_via_ssh(ovs_vm)
     init_ovs_tables(controller, ovs_node, ovs_veths)
 
-    # clean ids nodes
+    # clean and init ips tables
 
-    clean_ids_tables(controller, ids_nodes)
+    for ips_vm, ips_node in zip(ips_vms, ips_nodes):
+        ips_vxlan = [item for item in ofports if item['type'] == 'vxlan' and item['vm'] == ips_vm['vm']]
+        assert len(ips_vxlan) == 1
+        ips_vxlan = ips_vxlan[0]
+        ips_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ips_vm['vm']]
+        clean_ips_tables(controller, ips_node)
+        init_ips_tables(controller, ips_node, ips_vxlan, ips_veths)

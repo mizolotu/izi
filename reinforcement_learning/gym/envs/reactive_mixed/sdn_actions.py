@@ -186,8 +186,8 @@ if __name__ == '__main__':
     # params
 
     env_idx = 0
-    ids_id = 0
-    ids_name = 'ids_{0}_{1}'.format(env_idx, ids_id)
+    ips_id = 0
+    ips_name = 'ips_{0}_{1}'.format(env_idx, ips_id)
     remote_ips = ['18.219.211.138']
     app1 = ('tcp', 8080)
     app2 = ('udp',)
@@ -211,10 +211,10 @@ if __name__ == '__main__':
     ovs_vm = ovs_vms[0]
     ovs_node = nodes[ovs_vm['vm']]
 
-    # ids vms
+    # ips vms
 
-    ids_vms = [vm for vm in vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == env_idx]
-    ids_nodes = [nodes[vm['vm']] for vm in ids_vms]
+    ips_vms = [vm for vm in vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == env_idx]
+    ips_nodes = [nodes[vm['vm']] for vm in ips_vms]
 
     # controller
 
@@ -225,11 +225,11 @@ if __name__ == '__main__':
     controller = Odl(controller_ip)
 
     # action test
-    #
-    mirror_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['lower'], priorities['medium'], app1, ovs_vm['vm'], ids_name, tunnels)
-    mirror_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['lower'], priorities['medium'], app2, ovs_vm['vm'], ids_name, tunnels)
-    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['higher'], priorities['highest'], remote_ips, app1, ovs_vm['vm'], ids_name, tunnels)
-    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ids_id], priorities['higher'], priorities['highest'], remote_ips, app2, ovs_vm['vm'], ids_name, tunnels)
+
+    mirror_app_to_ids(controller, ovs_node, ids_tables[ips_id], priorities['lower'], priorities['medium'], app1, ovs_vm['vm'], ips_name, tunnels)
+    mirror_app_to_ids(controller, ovs_node, ids_tables[ips_id], priorities['lower'], priorities['medium'], app2, ovs_vm['vm'], ips_name, tunnels)
+    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ips_id], priorities['higher'], priorities['highest'], remote_ips, app1, ovs_vm['vm'], ips_name, tunnels)
+    mirror_ip_app_to_ids(controller, ovs_node, ids_tables[ips_id], priorities['higher'], priorities['highest'], remote_ips, app2, ovs_vm['vm'], ips_name, tunnels)
     block_ip_app(controller, ovs_node, block_table, priorities['higher'], priorities['highest'], remote_ips, app1)
     block_ip_app(controller, ovs_node, block_table, priorities['higher'], priorities['highest'], remote_ips, app2)
 
@@ -237,9 +237,9 @@ if __name__ == '__main__':
     print(f'Sleeping for {sleep_time} seconds...')
     sleep(sleep_time)
 
-    unmirror_app_from_ids(controller, ovs_node, ids_tables[ids_id], app1)
-    unmirror_app_from_ids(controller, ovs_node, ids_tables[ids_id], app2)
-    unmirror_ip_app_from_ids(controller, ovs_node, ids_tables[ids_id], remote_ips, app1)
-    unmirror_ip_app_from_ids(controller, ovs_node, ids_tables[ids_id], remote_ips, app2)
+    unmirror_app_from_ids(controller, ovs_node, ids_tables[ips_id], app1)
+    unmirror_app_from_ids(controller, ovs_node, ids_tables[ips_id], app2)
+    unmirror_ip_app_from_ids(controller, ovs_node, ids_tables[ips_id], remote_ips, app1)
+    unmirror_ip_app_from_ids(controller, ovs_node, ids_tables[ips_id], remote_ips, app2)
     unblock_ip_app(controller, ovs_node, block_table, remote_ips, app1)
     unblock_ip_app(controller, ovs_node, block_table, remote_ips, app2)

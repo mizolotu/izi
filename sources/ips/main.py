@@ -5,7 +5,7 @@ from common.data import *
 from flask import Flask, request, jsonify
 from threading import Thread
 from collections import deque
-from netfilterqueue import NetfilterQueue
+from socket import socket, AF_PACKET, SOCK_RAW, SOL_IP
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -76,39 +76,38 @@ class Interceptor:
     dst_port_idx = 3
     proto_idx = 4
 
-    def __init__(self, iface, main_path, model_idx=0, step_idx=0, thr_idx=0, qsize=10000):
+    def __init__(self, iface_in, iface_nrm, iface_att, main_path, model_idx=0, step_idx=0, thr_idx=0, qsize=10000):
 
-        self.iface = iface
+        self.iface_in = iface_in
+        self.iface_nrm = iface_nrm
+        self.iface_att = iface_att
         self.flows = []
         self.flow_ids = []
         self.intrusion_ids = deque(maxlen=qsize)
         self.model_path = osp.join(main_path, 'weights')
-        self.thr_path = osp.join(main_path, 'thresholds')
         self.model_labels = sorted(list(set(['_'.join(item.split('.tflite')[0].split('_')[:-1]) for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
-        self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[-1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
         with open(osp.join(main_path, 'metainfo.json'), 'r') as f:
             meta = json.load(f)
         self.xmin = np.array(meta['xmin'])
         self.xmax = np.array(meta['xmax'])
+        self.sock_nrm = socket(AF_PACKET, SOCK_RAW)
+        self.sock_nrm.bind((self.iface_nrm, 0))
+        self.sock_att = socket(AF_PACKET, SOCK_RAW)
+        self.sock_att.bind((self.iface_att, 0))
         self.model_idx = model_idx
-        self.step_idx = step_idx
-        self.thr_idx = thr_idx
         self.set_model(model_idx)
-        self.set_step(step_idx)
-        self.set_threshold(thr_idx)
         self.to_be_reset = False
         self.delay = 0
 
-    def load_model(self, model_label, model_step):
-        self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_label, model_step)))
+    def load_model(self, model_label):
+        self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, f'{model_label}_{1}.tflite'))
         self.model_type = model_label.split('_')[0]
-        self.thrs = [float(item) for item in open(osp.join(self.thr_path, f'{model_label}_{model_step}.thr')).readline().strip().split(',')]
 
     def set_model(self, idx):
         model_label = self.model_labels[idx]
-        model_step = self.model_steps[self.step_idx]
-        self.load_model(model_label, model_step)
+        self.load_model(model_label)
         self.model_idx = idx
+        self.sock_att.setsockopt(socket.SOL_IP, socket.IP_TOS, 0x01)
 
     def set_step(self, idx):
         model_step = self.model_steps[idx]
@@ -130,9 +129,12 @@ class Interceptor:
         tstart = datetime.now().timestamp()
         step = float(self.model_steps[self.step_idx])
         try:
-            reader = pcap.pcap(name=self.iface)
+            reader = pcap.pcap(name=self.iface_in)
             while True:
                 timestamp, raw = next(reader)
+
+                self.sock.send(raw)
+
                 id, features, flags = read_pkt(raw)
                 if id is not None:
 
@@ -231,12 +233,11 @@ if __name__ == "__main__":
 
     fname = inspect.getframeinfo(inspect.currentframe()).filename
     model_path = os.path.dirname(os.path.abspath(fname))
+    iface_in = 'in_br'
+    iface_out_normal = 'nrm_br'
+    iface_out_attack = 'att_br'
 
-    interceptor = Interceptor(model_path)
-    nfqueue = NetfilterQueue()
-    nfqueue.bind(0, interceptor.intercept)
-
-
+    interceptor = Interceptor(iface_in, iface_out_normal, iface_out_attack, model_path)
     intercept_thread = Thread(target=interceptor.start, daemon=True)
     intercept_thread.start()
     app.run(host='0.0.0.0')
