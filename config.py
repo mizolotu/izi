@@ -96,6 +96,8 @@ priorities = {'lowest': 0, 'lower': 1, 'medium': 2, 'higher': 3, 'highest': 4}
 
 # traffic
 
+subnets = ['172.31.69.0']
+
 attackers = [
     '18.218.115.60',
     '18.219.9.1',

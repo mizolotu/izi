@@ -799,7 +799,7 @@ class _Runner(AbstractEnvRunner):
         ep_infos = []
 
         self.obs[:] = self.env.reset()
-        
+
         while np.isnan(np.sum(self.obs)):
             controller = self.env.get_attr('controller', [0])[0]
             switches = self.env.get_attr('ovs_vm')
