@@ -14,11 +14,10 @@ if __name__ == '__main__':
 
     ovs_vms = [vm for vm in vms if vm['role'] == 'ovs']
     ids_vms = [vm for vm in vms if vm['role'] == 'ids']
-    ips_vms = [vm for vm in vms if vm['role'] == 'ips']
     odl_vms = [vm for vm in vms if vm['role'] == 'sdn']
     assert len(odl_vms) == 1
     odl_vm = odl_vms[0]
-    node_vms = ovs_vms + ids_vms + ips_vms
+    node_vms = ovs_vms + ids_vms
 
     # connect ovs and ids vms to odl
 
@@ -45,32 +44,30 @@ if __name__ == '__main__':
     # delete ovs veth pairs
 
     for ovs_vm in ovs_vms:
-        delete_veth_pair(ovs_vm, bridge_name, traffic_generation_veth_prefix)
-        delete_veth_pair(ovs_vm, bridge_name, obs_bridge_veth_prefix)
-        delete_veth_pair(ovs_vm, bridge_name, reward_bridge_veth_prefix)
+        delete_veth_pair(ovs_vm, bridge_name, in_veth_prefix)
+        delete_veth_pair(ovs_vm, bridge_name, out_veth_prefix)
 
-    # delete ips veth pairs
+    # delete ids veth pairs
 
-    for ips_vm in ips_vms:
-        delete_veth_pair(ips_vm, bridge_name, ips_rcv_veth_prefix)
-        delete_veth_pair(ips_vm, bridge_name, ips_normal_veth_prefix)
-        delete_veth_pair(ips_vm, bridge_name, ips_attack_veth_prefix)
+    for ids_vm in ids_vms:
+        delete_veth_pair(ids_vm, bridge_name, in_veth_prefix)
+        delete_veth_pair(ids_vm, bridge_name, out_veth_prefix)
 
-    # connect switches to ids and ips
+    # connect switches to ids
 
     tunnels = []
     for vm1 in ovs_vms:
         ovs_name = vm1['vm']
         spl = ovs_name.split('_')
         env_idx = spl[1]
-        for vm2 in ids_vms + ips_vms:
+        for vm2 in ids_vms:
             _name = vm2['vm']
             spl = _name.split('_')
             if spl[1] == env_idx:
-                vxlan = 's{0}_{1}'.format(vm1['vm'].split('ovs')[1], _name)
+                vxlan = 's{0}_i{1}'.format(vm1['vm'].split('ovs')[1], vm2['vm'].split('ids')[1])
                 ofport = create_vxlan_tunnel(vm1, vxlan, vm2['ip'])
                 tunnels.append({'vm': vm1['vm'], 'remote': vm2['vm'], 'ofport': ofport, 'type': 'vxlan'})
-                vxlan = '{0}_s{1}'.format(_name, vm1['vm'].split('ovs')[1])
+                vxlan = 'i{0}_s{1}'.format(vm2['vm'].split('ids')[1], vm1['vm'].split('ovs')[1])
                 ofport = create_vxlan_tunnel(vm2, vxlan, vm1['ip'])
                 tunnels.append({'vm': vm2['vm'], 'remote': vm1['vm'], 'ofport': ofport, 'type': 'vxlan'})
 
@@ -78,22 +75,18 @@ if __name__ == '__main__':
 
     veths = []
     for ovs_vm in ovs_vms:
-        ofport = create_veth_pair(ovs_vm, bridge_name, traffic_generation_veth_prefix)
-        veths.append({'vm': ovs_vm['vm'], 'tag': traffic_generation_veth_prefix, 'ofport': ofport, 'type': 'veth'})
-        ofport = create_veth_pair(ovs_vm, bridge_name, obs_bridge_veth_prefix)
-        veths.append({'vm': ovs_vm['vm'], 'tag': obs_bridge_veth_prefix, 'ofport': ofport, 'type': 'veth'})
-        ofport = create_veth_pair(ovs_vm, bridge_name, reward_bridge_veth_prefix)
-        veths.append({'vm': ovs_vm['vm'], 'tag': reward_bridge_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+        ofport = create_veth_pair(ovs_vm, bridge_name, in_veth_prefix)
+        veths.append({'vm': ovs_vm['vm'], 'tag': in_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+        ofport = create_veth_pair(ovs_vm, bridge_name, out_veth_prefix)
+        veths.append({'vm': ovs_vm['vm'], 'tag': out_veth_prefix, 'ofport': ofport, 'type': 'veth'})
 
-    # create veth pairs on ips
+    # create veth pairs on ids
 
-    for ips_vm in ips_vms:
-        ofport = create_veth_pair(ips_vm, bridge_name, ips_rcv_veth_prefix)
-        veths.append({'vm': ips_vm['vm'], 'tag': ips_rcv_veth_prefix, 'ofport': ofport, 'type': 'veth'})
-        ofport = create_veth_pair(ips_vm, bridge_name, ips_normal_veth_prefix)
-        veths.append({'vm': ips_vm['vm'], 'tag': ips_normal_veth_prefix, 'ofport': ofport, 'type': 'veth'})
-        ofport = create_veth_pair(ips_vm, bridge_name, ips_attack_veth_prefix)
-        veths.append({'vm': ips_vm['vm'], 'tag': ips_attack_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+    for ids_vm in ids_vms:
+        ofport = create_veth_pair(ids_vm, bridge_name, in_veth_prefix)
+        veths.append({'vm': ids_vm['vm'], 'tag': in_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+        ofport = create_veth_pair(ids_vm, bridge_name, out_veth_prefix)
+        veths.append({'vm': ids_vm['vm'], 'tag': out_veth_prefix, 'ofport': ofport, 'type': 'veth'})
 
     # save nodes
 

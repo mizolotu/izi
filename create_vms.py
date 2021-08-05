@@ -44,8 +44,6 @@ if __name__ == '__main__':
     for vm in vms:
         if vm.startswith('ids'):
             roles.append('ids')
-        elif vm.startswith('ips'):
-            roles.append('ips')
         elif vm.startswith('ovs'):
             roles.append('ovs')
         elif vm.startswith(ctrl_name):

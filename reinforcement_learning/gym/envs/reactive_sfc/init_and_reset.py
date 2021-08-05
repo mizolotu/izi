@@ -28,6 +28,17 @@ def clean_ids_tables(controller, ids_nodes):
                 controller.delete_config_flow(node, table, flow)
             controller.delete_config_table(node, table)
 
+def init_ids_tables(controller, ids_node, ids_vxlan, ids_veths):
+    vxlan_ofport = ids_vxlan['ofport']
+    in_ofports = [item['ofport'] for item in ids_veths if item['tag'] == in_veth_prefix]
+    assert len(in_ofports) == 1
+    in_ofport = in_ofports[0]
+    out_ofports = [item['ofport'] for item in ids_veths if item['tag'] == out_veth_prefix]
+    assert len(out_ofports) == 1
+    out_ofport = out_ofports[0]
+    controller.input_output(ids_node, in_table, priorities['lower'], vxlan_ofport, in_ofport)
+    controller.input_output(ids_node, in_table, priorities['lowest'], out_ofport, vxlan_ofport)
+
 def clean_ovs_tables_via_api(controller, ovs_node):
     tables = controller.find_operational_tables(ovs_node)
     for table in tables:
@@ -56,16 +67,13 @@ def restart_sdn(controller_vm, controller_obj, service='odl', sleep_interval=3):
 
 def init_ovs_tables(controller, ovs_node, ovs_veths):
 
-    in_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == traffic_generation_veth_prefix]
+    in_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == in_veth_prefix]
     assert len(in_ofports) == 1
     in_ofport = in_ofports[0]
-    obs_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == obs_bridge_veth_prefix]
-    assert len(obs_ofports) == 1
-    obs_ofport = obs_ofports[0]
-    reward_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == reward_bridge_veth_prefix]
-    assert len(reward_ofports) == 1
-    reward_ofport = reward_ofports[0]
-    controller.default_input_output_and_resubmit(ovs_node, in_table, priorities['lowest'], in_ofport, obs_ofport, in_table + 1)
+    out_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == out_veth_prefix]
+    assert len(out_ofports) == 1
+    out_ofport = out_ofports[0]
+    controller.input_resubmit(ovs_node, in_table, priorities['lowest'], in_ofport, in_table + 1)
 
     for app in applications:
         proto_name, proto_number = ip_proto(app[0])
@@ -77,13 +85,13 @@ def init_ovs_tables(controller, ovs_node, ovs_veths):
             controller.proto_resubmit(ovs_node, app_table, priorities['lowest'], proto_name, proto_number, app_table + 1)
 
     for i in range(app_table + 1, out_table):
-        controller.default_resubmit(ovs_node, i, priorities['lowest'], i + 1)
+        controller.resubmit(ovs_node, i, priorities['lowest'], i + 1)
 
     for ip in attackers:
         for dir in ['source', 'destination']:
             controller.ip_resubmit(ovs_node, block_table, priorities['lower'], dir, ip, out_table)
 
-    controller.default_output(ovs_node, out_table, priorities['lowest'], reward_ofport)
+    controller.output(ovs_node, out_table, priorities['lowest'], out_ofport)
 
 if __name__ == '__main__':
 
@@ -123,13 +131,19 @@ if __name__ == '__main__':
     controller_ip = controller_vm[0]['ip']
     controller = Odl(controller_ip)
 
-    # init tables
+    # clean and init ovs tables
 
     ovs_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ovs_vm['vm']]
     clean_ovs_tables_via_api(controller, ovs_node)
     clean_ovs_tables_via_ssh(ovs_vm)
     init_ovs_tables(controller, ovs_node, ovs_veths)
 
-    # clean ids nodes
+    # clean and init ids tables
 
-    clean_ids_tables(controller, ids_nodes)
+    for ids_vm, ids_node in zip(ids_vms, ids_nodes):
+        ids_vxlan = [item for item in ofports if item['type'] == 'vxlan' and item['vm'] == ids_vm['vm']]
+        assert len(ids_vxlan) == 1
+        ids_vxlan = ids_vxlan[0]
+        ids_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ids_vm['vm']]
+        clean_ids_tables(controller, ids_node)
+        init_ids_tables(controller, ids_node, ids_vxlan, ids_veths)

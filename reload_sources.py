@@ -26,7 +26,5 @@ if __name__ == '__main__':
     # copy ids files and restart service
 
     for vm in ovs_vms:
-        ssh_clear(vm, ids_remote_weights_dir)
-        ssh_clear(vm, ids_remote_thresholds_dir)
         ssh_copy(vm, ovs_sources_dir, ovs_remote_dir)
         ssh_restart_service(vm, 'ovs')

@@ -12,12 +12,12 @@ from common.utils import ip_proto
 from threading import Thread
 from itertools import cycle
 
-from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh
-from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
-from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
-from reinforcement_learning.gym.envs.reactive_discrete.nfv_state import get_intrusions, get_vnf_param
-from reinforcement_learning.gym.envs.reactive_discrete.generate_traffic import set_seed, replay_ip_traffic_on_interface
+from reinforcement_learning.gym.envs.reactive_sfc.init_and_reset import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh
+from reinforcement_learning.gym.envs.reactive_sfc.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_param, reset_ids
+from reinforcement_learning.gym.envs.reactive_sfc.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_state import get_intrusions, get_vnf_param
+from reinforcement_learning.gym.envs.reactive_sfc.generate_traffic import set_seed, replay_ip_traffic_on_interface
 
 class ReactiveMixedEnv():
 

@@ -52,22 +52,13 @@ env_vms = {
     },
     'ids': {
         'unique': False,
-        'n': 0,
+        'n': 1,
         'cpus': 2,
         'ips': ['192.168.254.60'],
         'sources': [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']],
         'script': 'scripts/ids.sh',
         'mount': None
-    },
-    'ips': {
-        'unique': False,
-        'n': 1,
-        'cpus': 2,
-        'ips': ['192.168.254.70'],
-        'sources': [['./sources/ips.service', '/home/vagrant/'], ['./sources/ips', '/home/vagrant/']],
-        'script': 'scripts/ips.sh',
-        'mount': None
-    },
+    }
 }
 
 # ids and ips
@@ -149,12 +140,8 @@ ntests = 10
 # other
 
 bridge_name = 'br'
-traffic_generation_veth_prefix = 'in'
-obs_bridge_veth_prefix = 'obs'
-reward_bridge_veth_prefix = 'rew'
-ips_rcv_veth_prefix = 'in'
-ips_normal_veth_prefix = 'nrm'
-ips_attack_veth_prefix = 'att'
+in_veth_prefix = 'in'
+out_veth_prefix = 'out'
 csv_postfix = '.csv'
 aug_postfix = '_aug'
 flask_port = 5000

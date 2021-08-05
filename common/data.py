@@ -125,6 +125,8 @@ def read_ip_pkt(body, nflags=8, faster=False):
     dst_ip = inet_ntop(AF_INET, body.dst_ip_addr)
     read_size = body.read_len
     proto = body.protocol
+    tos = body.b2
+    print(tos)
     if faster:
         src_port = body.body.body.src_port
         dst_port = body.body.body.dst_port
@@ -144,17 +146,18 @@ def read_ip_pkt(body, nflags=8, faster=False):
             plen = 0
             flags = ','.join(['0'] * nflags)
             window = 0
-    return src_ip, dst_ip, src_port, dst_port, proto, read_size, plen, flags, window
+    return src_ip, dst_ip, src_port, dst_port, proto, read_size, plen, flags, window, tos
 
 def read_pkt(raw):
     id = None
     features = None
     flags = None
+    tos = None
     try:
         pkt = EthernetFrame(KaitaiStream(BytesIO(raw)))
         if pkt.ether_type.value == 2048:
             frame_size = len(raw)
-            src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window = read_ip_pkt(pkt.body)
+            src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window, tos = read_ip_pkt(pkt.body)
             header_size = 14 + read_size - payload_size
             id = [src_ip, src_port, dst_ip, dst_port, proto]
             features = [frame_size, header_size, payload_size, window]
@@ -163,17 +166,18 @@ def read_pkt(raw):
             raise NotImplemented
     except:
         pass
-    return id, features, flags
+    return id, features, flags, tos
 
 def read_pkt_faster(raw):
     id = None
     features = None
     flags = None
+    tos = None
     try:
         pkt = EthernetFrame(KaitaiStream(BytesIO(raw)))
         if pkt.ether_type.value == 2048:
             frame_size = len(raw)
-            src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window = read_ip_pkt(pkt.body, faster=True)
+            src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window, tos = read_ip_pkt(pkt.body, faster=True)
             header_size = 14 + read_size - payload_size
             id = [src_ip, src_port, dst_ip, dst_port, proto]
             features = [frame_size, header_size, payload_size, window]
@@ -182,7 +186,7 @@ def read_pkt_faster(raw):
             raise NotImplemented
     except:
         pass
-    return id, features, flags
+    return id, features, flags, tos
 
 
 class Flow():
@@ -493,7 +497,7 @@ def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
-            id, features, flags = read_pkt(raw)
+            id, features, flags, tos = read_pkt(raw)
             if id is not None:
                 if tstart is None:
                     tstart = int(timestamp)
@@ -622,7 +626,7 @@ def count_ports(input, ports):
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
-            id, features, flags = read_pkt(raw)
+            id, features, flags, tos = read_pkt(raw)
             if id is not None:
                 if id[1] in ports:
                     idx = ports.index(id[1])
@@ -647,7 +651,7 @@ def count_labels(input, output, labels, labeler):
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
-            id, features, flags = read_pkt(raw)
+            id, features, flags, tos = read_pkt(raw)
             if id is not None:
                 label, description = labeler(timestamp, id[0], id[2], id[1], id[3])
                 idx = labels.index(label)

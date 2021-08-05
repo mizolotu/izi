@@ -12,12 +12,12 @@ from common.utils import ip_proto
 from threading import Thread
 from itertools import cycle
 
-from reinforcement_learning.gym.envs.reactive_discrete.init_flow_tables import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh
-from reinforcement_learning.gym.envs.reactive_discrete.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
-from reinforcement_learning.gym.envs.reactive_discrete.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive_discrete.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
-from reinforcement_learning.gym.envs.reactive_discrete.nfv_state import get_intrusions, get_vnf_param
-from reinforcement_learning.gym.envs.reactive_discrete.generate_traffic import set_seed, replay_ip_traffic_on_interface
+from reinforcement_learning.gym.envs.reactive_sfc.init_and_reset import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh, init_ids_tables
+from reinforcement_learning.gym.envs.reactive_sfc.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_param, reset_ids
+from reinforcement_learning.gym.envs.reactive_sfc.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_state import get_intrusions, get_vnf_param
+from reinforcement_learning.gym.envs.reactive_sfc.generate_traffic import set_seed, replay_ip_traffic_on_interface
 
 class ReactiveDiscreteEnv():
 
@@ -89,9 +89,21 @@ class ReactiveDiscreteEnv():
         # tables and tunnels
 
         self.internal_hosts = sorted([item.split(csv_postfix)[0] for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith(csv_postfix)])
-        clean_ids_tables(self.controller, self.ids_nodes)
         self.tunnels = [item for item in self.ofports if item['type'] == 'vxlan' and int(item['vm'].split('_')[1]) == self.id]
-        self.veths = [item for item in self.ofports if item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
+        self.ovs_veths = [item for item in self.ofports if item['vm'].startswith('ovs') and item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
+        self.ids_veths = [item for item in self.ofports if item['vm'].startswith('ids') and item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
+
+        # configure ids
+
+        for ids_vm, ids_node in zip(self.ids_vms, self.ids_nodes):
+            ids_vxlan = [item for item in self.ofports if item['type'] == 'vxlan' and item['vm'] == ids_vm['vm']]
+            assert len(ids_vxlan) == 1
+            ids_vxlan = ids_vxlan[0]
+            ids_veths = [item for item in self.ofports if item['type'] == 'veth' and item['vm'] == ids_vm['vm']]
+            clean_ids_tables(self.controller, ids_node)
+            init_ids_tables(self.controller, ids_node, ids_vxlan, ids_veths)
+            idx = int(ids_vm['vm'].split('_')[2])
+            set_vnf_param(ids_vm['ip'], flask_port, 'dcsp', idx)
 
         # time
 
@@ -159,7 +171,6 @@ class ReactiveDiscreteEnv():
 
         self.n_attackers = len(attackers)
         self.samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
-        #self.precision = []
 
         # spaces
 
@@ -556,7 +567,7 @@ class ReactiveDiscreteEnv():
             ready = False
             attempt = 0
             while not ready:
-                init_ovs_tables(self.controller, self.ovs_node, self.veths)
+                init_ovs_tables(self.controller, self.ovs_node, self.ovs_veths)
                 sleep(sleep_duration)
                 count = 0
                 for table in tables:
@@ -643,8 +654,6 @@ class ReactiveDiscreteEnv():
 
     def step(self, action):
 
-        #print('Step start in', self.id)
-
         # step count
 
         self.step_count += 1
@@ -675,7 +684,6 @@ class ReactiveDiscreteEnv():
             print(f'Time to get obs: {time() - t0} for {np.sum(samples["packets"])} packets')
         if time() - t0 > self.max_obs_time:
             self.max_obs_time = time() - t0
-        #samples_by_app = self._process_app_samples(samples)
         samples_by_app = np.zeros((len(applications), 2))
         for app in applications:
             if app in samples['applications']:
@@ -703,7 +711,7 @@ class ReactiveDiscreteEnv():
             print(f'Delays: {[np.mean(item) for item in self.delay]}')
 
         # append precision
-        #print(intrusion_ips)
+
         precision = self._get_precision(intrusion_ips, intrusion_numbers)
 
         # reward and info
@@ -727,8 +735,6 @@ class ReactiveDiscreteEnv():
         reward = self._calculate_reward(normal, attack, precision)
         info = {'n': normal, 'a': attack, 'p': precision}
         done = False
-
-        #print('Step end in', self.id)
 
         return obs, reward, done, info
 

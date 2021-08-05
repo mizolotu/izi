@@ -152,7 +152,7 @@ class Odl:
         return result
 
     def input_output(self, node_id, table_id, priority, input, output):
-        flow_id = f'{input}_{output}'
+        flow_id = f'i_{input}_o_{output}'
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.in_port(input), Flow.ethernet_type(2048)])
         flow.instructions([
@@ -167,8 +167,8 @@ class Odl:
             pushed_flow = {}
         return pushed_flow
 
-    def default_input_output_and_resubmit(self, node_id, table_id, priority, input, output, goto_table):
-        flow_id = 'def'
+    def input_output_and_resubmit(self, node_id, table_id, priority, input, output, goto_table):
+        flow_id = f'i_{input}_o_{output}_t_{goto_table}'
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.in_port(input), Flow.ethernet_type(2048)])
         flow.instructions([
@@ -184,8 +184,8 @@ class Odl:
             pushed_flow = {}
         return pushed_flow
 
-    def default_resubmit(self, node_id, table_id, priority, goto_table):
-        flow_id = 'def'
+    def resubmit(self, node_id, table_id, priority, goto_table):
+        flow_id = f't_{goto_table}'
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.ethernet_type(2048)])
         flow.instructions([Flow.go_to_table(goto_table)], [0])
@@ -196,8 +196,22 @@ class Odl:
             pushed_flow = {}
         return pushed_flow
 
-    def default_output(self, node_id, table_id, priority, output):
-        flow_id = 'def'
+    def input_resubmit(self, node_id, table_id, priority, input, goto_table):
+        flow_id = f'i_{input}_t_{goto_table}'
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.in_port(input), Flow.ethernet_type(2048)])
+        flow.instructions([
+            Flow.go_to_table(goto_table),
+        ], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def output(self, node_id, table_id, priority, output):
+        flow_id = f'o_{output}'
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.ethernet_type(2048)])
         flow.instructions([

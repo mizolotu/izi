@@ -6,6 +6,8 @@ from flask import Flask, request, jsonify
 from threading import Thread
 from collections import deque
 
+from socket import socket, AF_PACKET, SOCK_RAW, SOL_IP, IP_TOS
+
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -14,7 +16,24 @@ log.setLevel(logging.ERROR)
 def info():
     return jsonify({'nlabels': len(interceptor.model_labels), 'nsteps': len(interceptor.model_steps)})
 
-@app.route('/reset')
+@app.route('/network')
+def set_hosts_and_apps():
+    if request.method == 'POST':
+        data = request.data.decode('utf-8')
+        jdata = json.loads(data)
+        interceptor.set_hosts(jdata['hosts'])
+        interceptor.set_apps(jdata['applications'])
+    return jsonify({'hosts': interceptor.hosts, 'applications': interceptor.apps})
+
+@app.route('/dcsp', methods=['GET', 'POST'])
+def set_label():
+    if request.method == 'POST':
+        data = request.data.decode('utf-8')
+        jdata = json.loads(data)
+        interceptor.set_dcsp(jdata['dcsp'])
+    return jsonify({'dcsp': interceptor.dcsp})
+
+@app.route('/reset', methods=['GET', 'POST'])
 def restart():
     interceptor.reset()
     return jsonify('ok')
@@ -75,9 +94,10 @@ class Interceptor:
     dst_port_idx = 3
     proto_idx = 4
 
-    def __init__(self, iface, main_path, model_idx=0, step_idx=0, thr_idx=0, qsize=10000):
+    def __init__(self, iface_in, iface_out, main_path, model_idx=0, step_idx=0, thr_idx=0, qsize=10000):
 
-        self.iface = iface
+        self.iface_in = iface_in
+        self.iface_out = iface_out
         self.flows = []
         self.flow_ids = []
         self.intrusion_ids = deque(maxlen=qsize)
@@ -85,18 +105,27 @@ class Interceptor:
         self.thr_path = osp.join(main_path, 'thresholds')
         self.model_labels = sorted(list(set(['_'.join(item.split('.tflite')[0].split('_')[:-1]) for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
         self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[-1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
+
         with open(osp.join(main_path, 'metainfo.json'), 'r') as f:
             meta = json.load(f)
         self.xmin = np.array(meta['xmin'])
         self.xmax = np.array(meta['xmax'])
+
+        self.sock = socket(AF_PACKET, SOCK_RAW)
+        self.sock.bind((self.iface_out, 0))
+
         self.model_idx = model_idx
         self.step_idx = step_idx
         self.thr_idx = thr_idx
         self.set_model(model_idx)
         self.set_step(step_idx)
         self.set_threshold(thr_idx)
+
         self.to_be_reset = False
         self.delay = 0
+        self.dcsp = None
+        self.hosts = []
+        self.apps = []
 
     def load_model(self, model_label, model_step):
         self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_label, model_step)))
@@ -118,6 +147,9 @@ class Interceptor:
     def set_threshold(self, idx):
         self.thr_idx = idx
 
+    def set_dcsp(self, dcsp):
+        self.dcsp = dcsp
+
     def reset(self):
         step_idx = 0
         model_idx = 0
@@ -129,11 +161,20 @@ class Interceptor:
         tstart = datetime.now().timestamp()
         step = float(self.model_steps[self.step_idx])
         try:
-            reader = pcap.pcap(name=self.iface)
+            reader = pcap.pcap(name=self.iface_in)
             while True:
                 timestamp, raw = next(reader)
-                id, features, flags = read_pkt(raw)
+                id, features, flags, tos = read_pkt(raw)
                 if id is not None:
+                    print(self.dcsp)
+                    if self.dcsp is not None:
+                        label = 1 << (2 + self.dcsp)
+                        self.sock.setsockopt(SOL_IP, IP_TOS, tos | label)
+                        try:
+                            self.sock.send(raw)
+                        except Exception as e:
+                            print(e)
+                            print(id, tos)
 
                     # add packets to flows
 
@@ -230,9 +271,10 @@ if __name__ == "__main__":
 
     fname = inspect.getframeinfo(inspect.currentframe()).filename
     model_path = os.path.dirname(os.path.abspath(fname))
-    iface = 'vxlan_sys_4789'
+    iface_in = 'in_br'
+    iface_out = 'out_br'
 
-    interceptor = Interceptor(iface, model_path)
+    interceptor = Interceptor(iface_in, iface_out, model_path)
     intercept_thread = Thread(target=interceptor.start, daemon=True)
     intercept_thread.start()
     app.run(host='0.0.0.0')
