@@ -314,6 +314,7 @@ class Flow():
 
         self.is_active = True
         self.nnewpkts = 0
+        self.lasttime = ts
 
     def append(self, ts, features, flags, direction):
         self.pkts.append([ts, *features])
@@ -322,6 +323,7 @@ class Flow():
         if flags[0] == 1 or flags[2] == 1:
             self.is_active = False
         self.nnewpkts += 1
+        self.lasttime = ts
 
     def get_features(self):
 
@@ -507,7 +509,7 @@ class Flow():
             self.idl_min  # 64
         ])
 
-def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages, splits):
+def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages, splits, nnewpkts_min=0, lasttime_min=1.0):
 
     src_ip_idx = 0
     src_port_idx = 1
@@ -569,12 +571,13 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
                     # calculate_features
 
                     flow_features_t = []
-                    for i, o, l in zip(flow_ids, flow_objects, flow_labels):
-                        t_calc_start = time()
-                        o_features = o.get_features()
-                        ttotal += time() - t_calc_start
-                        ntotal += 1
-                        flow_features_t.append([*o_features, l])
+                    for flow_id, flow_object, flow_label in zip(flow_ids, flow_objects, flow_labels):
+                        if flow_object.nnewpkts > nnewpkts_min or (timestamp - flow_object.lasttime) > lasttime_min:
+                            t_calc_start = time()
+                            _features = flow_object.get_features()
+                            ttotal += time() - t_calc_start
+                            ntotal += 1
+                            flow_features_t.append([*_features, flow_label])
                     flow_features.extend(flow_features_t)
 
                     # update time
