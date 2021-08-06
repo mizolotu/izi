@@ -4,6 +4,7 @@ import os.path as osp
 
 from datetime import datetime
 from collections import deque
+from time import time
 
 from pypacker import ppcap
 from pypacker.layer12 import ethernet
@@ -101,7 +102,20 @@ def label_cicids17(timestamp, src_ip, dst_ip, src_port=None, dst_port=None):
 
     return label, description
 
-def split_by_label(input, labeler, nulify_dscp=True):
+def split_by_label(input, labeler, meta_fpath, nulify_dscp=True):
+
+    # meta
+
+    try:
+        with open(meta_fpath, 'r') as jf:
+            meta = json.load(jf)
+            if 'labels' not in meta.keys():
+                meta['labels'] = []
+    except:
+        meta = {'labels': []}
+
+    # read and write
+
     labels = []
     pwriters = []
     try:
@@ -136,6 +150,12 @@ def split_by_label(input, labeler, nulify_dscp=True):
     os.remove(input)
     for pwriter in pwriters:
         pwriter.close()
+
+    meta['labels'] += labels
+    meta['labels'] = np.unique(meta['labels']).tolist()
+
+    with open(meta_fpath, 'w') as jf:
+        json.dump(meta, jf)
 
 def decode_tcp_flags_value(value, nflags):
     b = '{0:b}'.format(value)[::-1]
@@ -293,6 +313,7 @@ class Flow():
         # is active
 
         self.is_active = True
+        self.nnewpkts = 0
 
     def append(self, ts, features, flags, direction):
         self.pkts.append([ts, *features])
@@ -300,6 +321,7 @@ class Flow():
         self.directions.append(direction)
         if flags[0] == 1 or flags[2] == 1:
             self.is_active = False
+        self.nnewpkts += 1
 
     def get_features(self):
 
@@ -419,6 +441,8 @@ class Flow():
         self.fw_act_pkt = len([pkt for pkt in fw_pkts if self.is_tcp == 1 and pkt[1] > pkt[2]])
         self.fw_seg_min = np.min(fw_pkts[:, 2]) if len(fw_pkts) > 0 else 0
 
+        self.nnewpkts = 0
+
         return np.array([
             self.is_tcp,  # 0
             self.is_udp,  # 1
@@ -483,7 +507,7 @@ class Flow():
             self.idl_min  # 64
         ])
 
-def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 3), stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
+def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages, splits):
 
     src_ip_idx = 0
     src_port_idx = 1
@@ -498,9 +522,13 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
 
     tstart = None
     label = int(label)
+    ttotal = 0
+    ntotal = 0
+
+    npkts = 0
 
     if type(tstep) == tuple or type(tstep) == list:
-        assert len(tstep) == 4, 'There should be 4 parameters: mean, std, min and max'
+        assert len(tstep) == 4, 'There should be 4 parameters: mu, std, min and max'
         get_next_tstep = lambda: np.clip(np.abs(tstep[0] + np.random.rand() * tstep[1]), tstep[2], tstep[3])
         tstep_str = '-'.join([str(item) for item in tstep])
     else:
@@ -542,7 +570,10 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
 
                     flow_features_t = []
                     for i, o, l in zip(flow_ids, flow_objects, flow_labels):
+                        t_calc_start = time()
                         o_features = o.get_features()
+                        ttotal += time() - t_calc_start
+                        ntotal += 1
                         flow_features_t.append([*o_features, l])
                     flow_features.extend(flow_features_t)
 
@@ -565,39 +596,39 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
                     flow_objects.append(Flow(timestamp, id, features, flags))
                     flow_labels.append(label)
 
+                npkts += 1
+
         # lists to arrays
 
         flow_features = np.array(flow_features, dtype=np.float)
 
         # load meta
 
+        with open(meta_fpath, 'r') as jf:
+            meta = json.load(jf)
         try:
-            with open(meta_fname, 'r') as jf:
-                meta = json.load(jf)
-                labels = meta['labels']
-                nfeatures = meta['nfeatures']
-                xmin = meta['xmin']
-                xmax = meta['xmax']
+            nfeatures = meta['nfeatures']
+            xmin = meta['xmin']
+            xmax = meta['xmax']
         except:
             nfeatures = None
+            xmin = None
+            xmax = None
 
         # update meta
 
         nvectors = flow_features.shape[0]
         if nvectors > 0:
             if nfeatures is None:
-                labels = [label]
                 nfeatures = flow_features.shape[1]
                 xmin = np.min(flow_features[:, :-1], axis=0)
                 xmax = np.max(flow_features[:, :-1], axis=0)
             else:
                 assert nfeatures == flow_features.shape[1]
-                if label not in labels:
-                    labels.append(label)
                 xmin = np.min(np.vstack([xmin, flow_features[:, :-1]]), axis=0)
                 xmax = np.max(np.vstack([xmax, flow_features[:, :-1]]), axis=0)
 
-            # split and save data
+            # split and save features
 
             ls = flow_features[:, -1]
             idx = np.where(ls == label)[0]
@@ -615,15 +646,26 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
                     fname = '{0}_{1}_{2}'.format(output, tstep_str, stage)
                     pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
 
+            # save stats
+
+            spl = input.split('_')
+            cap_name = '_'.join(spl[:-1])
+            pandas.DataFrame([[cap_name] + [npkts, nvectors]]).to_csv(stats, header=False, mode='a', index=False)
+
             # save meta
 
-            with open(meta_fname, 'w') as jf:
-                json.dump({'labels': labels, 'nfeatures': nfeatures, 'xmin': xmin.tolist(), 'xmax': xmax.tolist()}, jf)
+            meta['nfeatures'] = nfeatures
+            meta['xmin'] = xmin.tolist()
+            meta['xmax'] = xmax.tolist()
+            with open(meta_fpath, 'w') as jf:
+                json.dump(meta, jf)
 
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(e, fname, exc_tb.tb_lineno)
+
+    return ttotal / ntotal if ntotal > 0 else None
 
 def count_ports(input, ports):
     counts = np.zeros(len(ports) + 1)

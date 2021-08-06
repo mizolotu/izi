@@ -3,7 +3,8 @@
 data_dir = 'data'
 raw_dir = '{0}/raw'.format(data_dir)
 spl_dir = '{0}/spl'.format(data_dir)
-feature_dir = '{0}/features'.format(data_dir)
+features_dir = '{0}/features'.format(data_dir)
+stats_dir = '{0}/stats'.format(data_dir)
 log_dir = 'logs'
 vms_fpath = '{0}/vms.json'.format(log_dir)
 ofports_fpath = '{0}/ofports.json'.format(log_dir)
@@ -63,6 +64,8 @@ env_vms = {
 
 # ids and ips
 
+stages = ['train', 'validate', 'test']
+splits = [0.5, 0.2]
 seed = 0
 batch_size = 1024  # batch size will actually be double that
 patience = 10
@@ -148,3 +151,4 @@ flask_port = 5000
 flow_window = 1
 baseline = 'Baseline'
 progress = 'progress.csv'
+meta_fname = 'metainfo.json'

@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     # labels
 
-    meta = load_meta(feature_dir)
+    meta = load_meta(data_dir)
     labels = sorted(meta['labels'])
 
     # process data
