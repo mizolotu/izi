@@ -1,7 +1,7 @@
 import tflite_runtime.interpreter as tflite
 import logging, pcap, inspect
 
-from common.data import *
+from common.data_old import *
 from flask import Flask, request, jsonify
 from threading import Thread
 from collections import deque

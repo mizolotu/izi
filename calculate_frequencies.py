@@ -1,8 +1,8 @@
 import argparse as arp
 import os.path as osp
 
-from common import data
-from common.data import find_data_files, count_labels
+from common import data_old
+from common.data_old import find_data_files, count_labels
 from common.ml import load_meta
 from pathlib import Path
 from config import *
@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     # import labeler
 
-    labeler = getattr(data, args.labeler)
+    labeler = getattr(data_old, args.labeler)
 
     # input data
 

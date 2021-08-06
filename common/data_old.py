@@ -3,12 +3,11 @@ import numpy as np
 import os.path as osp
 
 from datetime import datetime
+from socket import inet_ntop, AF_INET
+from kaitaistruct import KaitaiStream, BytesIO
+from common.pcap import EthernetFrame
+from scapy.all import rdpcap, wrpcap, Ether, IP, TCP, UDP, Raw, Padding
 from collections import deque
-
-from pypacker import ppcap
-from pypacker.layer12 import ethernet
-from pypacker.layer3 import ip
-from pypacker.layer4 import tcp, udp
 
 def find_data_files(dir):
     data_files = []
@@ -101,42 +100,6 @@ def label_cicids17(timestamp, src_ip, dst_ip, src_port=None, dst_port=None):
 
     return label, description
 
-def split_by_label(input, labeler, nulify_dscp=True):
-    labels = []
-    pwriters = []
-    try:
-        reader = pcap.pcap(input)
-        for ts, raw in reader:
-            eth = ethernet.Ethernet(raw)
-            if eth[ethernet.Ethernet, ip.IP] is not None:
-                src = eth[ip.IP].src_s
-                dst = eth[ip.IP].dst_s
-                if eth[tcp.TCP] is not None:
-                    sport = eth[tcp.TCP].sport
-                    dport = eth[tcp.TCP].dport
-                elif eth[udp.UDP] is not None:
-                    sport = eth[udp.UDP].sport
-                    dport = eth[udp.UDP].dport
-                else:
-                    sport = 0
-                    dport = 0
-                label, description = labeler(ts, src, dst, sport, dport)
-                if label in labels:
-                    idx = labels.index(label)
-                else:
-                    labels.append(label)
-                    pwriters.append(ppcap.Writer(filename=f'{input}_label:{label}'))
-                    idx = -1
-                if nulify_dscp:
-                    eth[ip.IP].tos = 0
-                pwriters[idx].write(eth.bin(), ts=ts*1e9)
-    except Exception as e:
-        print(e)
-
-    os.remove(input)
-    for pwriter in pwriters:
-        pwriter.close()
-
 def decode_tcp_flags_value(value, nflags):
     b = '{0:b}'.format(value)[::-1]
     l = len(b)
@@ -144,38 +107,46 @@ def decode_tcp_flags_value(value, nflags):
     return ','.join(positions)
 
 def read_tcp_packet(body, nflags):
-    src_port = body.sport
-    dst_port = body.dport
-    payload_size = len(body.body_bytes)
-    flags = body.flags
-    window = body.win
-    return src_port, dst_port, payload_size, decode_tcp_flags_value(flags, nflags), window
+    src_port = body.body.body.src_port
+    dst_port = body.body.body.dst_port
+    payload = [str(b) for b in body.body.body.body]
+    flags = body.body.body.b13
+    window = body.body.body.window_size
+    return src_port, dst_port, len(payload), decode_tcp_flags_value(flags, nflags), window
 
 def read_udp_packet(body):
-    src_port = body.sport
-    dst_port = body.dport
-    payload_size = len(body.body_bytes)
-    return src_port, dst_port, payload_size
+    src_port = body.body.body.src_port
+    dst_port = body.body.body.dst_port
+    payload = [str(b) for b in body.body.body.body]
+    return src_port, dst_port, len(payload)
 
-def read_ip_pkt(body, nflags=8):
-    src_ip = body.src_s
-    dst_ip = body.dst_s
-    ip_header_size = body.header_len
-    proto = body.p
-    tos = body.tos
-    if proto == 6:
-        src_port, dst_port, plen, flags, window = read_tcp_packet(body[tcp.TCP], nflags)
-    elif proto == 17:
-        src_port, dst_port, plen, = read_udp_packet(body[udp.UDP])
-        flags = ','.join(['0'] * nflags)
-        window = 0
-    else:
-        src_port = 0
-        dst_port = 0
+def read_ip_pkt(body, nflags=8, faster=False):
+    src_ip = inet_ntop(AF_INET, body.src_ip_addr)
+    dst_ip = inet_ntop(AF_INET, body.dst_ip_addr)
+    read_size = body.read_len
+    proto = body.protocol
+    tos = body.b2
+    print(tos)
+    if faster:
+        src_port = body.body.body.src_port
+        dst_port = body.body.body.dst_port
         plen = 0
         flags = ','.join(['0'] * nflags)
         window = 0
-    return src_ip, dst_ip, src_port, dst_port, proto, ip_header_size, plen, flags, window, tos
+    else:
+        if proto == 6:
+            src_port, dst_port, plen, flags, window = read_tcp_packet(body, nflags)
+        elif proto == 17:
+            src_port, dst_port, plen, = read_udp_packet(body)
+            flags = ','.join(['0'] * nflags)
+            window = 0
+        else:
+            src_port = 0
+            dst_port = 0
+            plen = 0
+            flags = ','.join(['0'] * nflags)
+            window = 0
+    return src_ip, dst_ip, src_port, dst_port, proto, read_size, plen, flags, window, tos
 
 def read_pkt(raw):
     id = None
@@ -183,16 +154,40 @@ def read_pkt(raw):
     flags = None
     tos = None
     try:
-        pkt = ethernet.Ethernet(raw)
-        if pkt[ip.IP] is not None:
+        pkt = EthernetFrame(KaitaiStream(BytesIO(raw)))
+        if pkt.ether_type.value == 2048:
             frame_size = len(raw)
-            src_ip, dst_ip, src_port, dst_port, proto, header_size, payload_size, flags, window, tos = read_ip_pkt(pkt[ip.IP])
+            src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window, tos = read_ip_pkt(pkt.body)
+            header_size = 14 + read_size - payload_size
             id = [src_ip, src_port, dst_ip, dst_port, proto]
             features = [frame_size, header_size, payload_size, window]
             flags = [int(item) for item in flags.split(',')]
-    except Exception as e:
-        print(e)
+        elif pkt.ether_type.value == 2054:
+            raise NotImplemented
+    except:
+        pass
     return id, features, flags, tos
+
+def read_pkt_faster(raw):
+    id = None
+    features = None
+    flags = None
+    tos = None
+    try:
+        pkt = EthernetFrame(KaitaiStream(BytesIO(raw)))
+        if pkt.ether_type.value == 2048:
+            frame_size = len(raw)
+            src_ip, dst_ip, src_port, dst_port, proto, read_size, payload_size, flags, window, tos = read_ip_pkt(pkt.body, faster=True)
+            header_size = 14 + read_size - payload_size
+            id = [src_ip, src_port, dst_ip, dst_port, proto]
+            features = [frame_size, header_size, payload_size, window]
+            flags = [int(item) for item in flags.split(',')]
+        elif pkt.ether_type.value == 2054:
+            raise NotImplemented
+    except:
+        pass
+    return id, features, flags, tos
+
 
 class Flow():
 
@@ -483,7 +478,7 @@ class Flow():
             self.idl_min  # 64
         ])
 
-def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 3), stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
+def extract_flow_features(input, output, meta_fname, labeler, tstep=1, stages=['train', 'validate', 'test'], splits=[0.5, 0.2]):
 
     src_ip_idx = 0
     src_port_idx = 1
@@ -496,27 +491,18 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
     flow_labels = []
     flow_features = []
 
+    ulabels = []
     tstart = None
-    label = int(label)
-
-    if type(tstep) == tuple or type(tstep) == list:
-        assert len(tstep) == 4, 'There should be 4 parameters: mean, std, min and max'
-        get_next_tstep = lambda: np.clip(np.abs(tstep[0] + np.random.rand() * tstep[1]), tstep[2], tstep[3])
-        tstep_str = '-'.join([str(item) for item in tstep])
-    else:
-        get_next_tstep = lambda: tstep
-        tstep_str = str(tstep)
 
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
             id, features, flags, tos = read_pkt(raw)
-            if tos >= 4:
-                print(f'Flow {id} has high tos!!!')
             if id is not None:
                 if tstart is None:
                     tstart = int(timestamp)
-                    seconds = get_next_tstep()
+                    nsteps = 1
+                    seconds = nsteps * tstep
 
                 # add packets to flows
 
@@ -548,7 +534,8 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
 
                     # update time
 
-                    seconds += get_next_tstep()
+                    nsteps += 1
+                    seconds = nsteps * tstep
 
                 # add packets
 
@@ -561,13 +548,18 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
                     idx = flow_ids.index(reverse_id)
                     flow_objects[idx].append(timestamp, features, flags, direction)
                 else:
+                    label, description = labeler(timestamp, id[src_ip_idx], id[dst_ip_idx], id[src_port_idx], id[dst_port_idx])
                     flow_ids.append(id)
                     flow_objects.append(Flow(timestamp, id, features, flags))
                     flow_labels.append(label)
+                    if label not in ulabels:
+                        ulabels.append(label)
 
         # lists to arrays
 
-        flow_features = np.array(flow_features, dtype=np.float)
+        #for i in range(len(flow_features)):
+        #    flow_features[i] = np.array(flow_features[i])
+        flow_features = np.array(flow_features)
 
         # load meta
 
@@ -586,34 +578,37 @@ def extract_flow_features(input, output, meta_fname, label, tstep=(0, 1, 0.001, 
         nvectors = flow_features.shape[0]
         if nvectors > 0:
             if nfeatures is None:
-                labels = [label]
+                labels = ulabels
                 nfeatures = flow_features.shape[1]
                 xmin = np.min(flow_features[:, :-1], axis=0)
                 xmax = np.max(flow_features[:, :-1], axis=0)
             else:
                 assert nfeatures == flow_features.shape[1]
-                if label not in labels:
-                    labels.append(label)
+                labels = list(set(labels + ulabels))
                 xmin = np.min(np.vstack([xmin, flow_features[:, :-1]]), axis=0)
                 xmax = np.max(np.vstack([xmax, flow_features[:, :-1]]), axis=0)
 
             # split and save data
 
-            ls = flow_features[:, -1]
-            idx = np.where(ls == label)[0]
-            if len(idx) > 0:
-                values_l = flow_features[idx, :]
-                inds = np.arange(len(values_l))
-                inds_splitted = [[] for _ in stages]
-                np.random.shuffle(inds)
-                val, remaining = np.split(inds, [int(splits[1] * len(inds))])
-                tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
-                inds_splitted[0] = tr
-                inds_splitted[1] = te
-                inds_splitted[2] = val
-                for fi, stage in enumerate(stages):
-                    fname = '{0}_{1}_{2}'.format(output, tstep_str, stage)
-                    pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
+            for l in ulabels:
+                fname_ = output.format(int(l))
+                if not osp.isdir(osp.dirname(fname_)):
+                    os.mkdir(osp.dirname(fname_))
+                ls = flow_features[:, -1]
+                idx = np.where(ls == l)[0]
+                if len(idx) > 0:
+                    values_l = flow_features[idx, :]
+                    inds = np.arange(len(values_l))
+                    inds_splitted = [[] for _ in stages]
+                    np.random.shuffle(inds)
+                    val, remaining = np.split(inds, [int(splits[1] * len(inds))])
+                    tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
+                    inds_splitted[0] = tr
+                    inds_splitted[1] = te
+                    inds_splitted[2] = val
+                    for fi, stage in enumerate(stages):
+                        fname = '{0}_{1}_{2}'.format(fname_, tstep, stage)
+                        pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
 
             # save meta
 

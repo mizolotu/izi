@@ -1,7 +1,7 @@
 import pcap, sys
 
 from time import time
-from common.data import read_pkt_faster
+from common.data_old import read_pkt_faster
 
 if __name__ == '__main__':
     fnames = [
