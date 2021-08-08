@@ -51,14 +51,14 @@ if __name__ == '__main__':
     tstart = time()
 
     dcount = 0
-    ttotal = 0
-    ntotal = 0
     for dname, fname_list in zip(dnames, fnames):
         dcount += 1
         idfs = [osp.join(dname, fname) for fname in fname_list]
         input_fnames = [osp.join(spl_dir, input_fname) for input_fname in idfs]
         input_fnames = [item for item in input_fnames if item.split('_')[-1].split(':')[0] == 'label' and isint(item.split('_')[-1].split(':')[1])]
         fcount = 0
+        ntotal = 0
+        ttotal = 0
         for input_f in input_fnames:
             fcount += 1
             label = input_f.split('_')[-1].split(':')[1]
@@ -70,14 +70,14 @@ if __name__ == '__main__':
             output_f = osp.join(features_label_dir, dname)
             stats_f = osp.join(stats_label_dir, dname)
             fsize = Path(input_f).stat().st_size
-            telapsed = extract_flow_features(input_f, output_f, stats_f, meta_f, label=label, tstep=step, stages=stages, splits=splits)
-            if telapsed is not None:
-                ttotal += telapsed
-                ntotal += 1
-                print('Directory: {0}/{1}, file: {2}/{3}, size: {4}, input: {5}, time per flow: {6}'.format(
-                    dcount, len(dnames), fcount, len(input_fnames), fsize, input_f, ttotal / ntotal)
-                )
+            nv, tt = extract_flow_features(input_f, output_f, stats_f, meta_f, label=label, tstep=step, stages=stages, splits=splits)
+            if nv > 0 and tt > 0:
+                ttotal += tt
+                ntotal += nv
+        print('Extracted features from {0} files of directory {1}/{2}: {3}, feature vectors: {4}, time per vector: {5}'.format(
+            len(input_fnames), dcount, len(dnames), dname, ntotal, ttotal / ntotal)
+        )
 
     # print time elapsed
 
-    print(f'\nCompleted in {time() - tstart // 60} minutes!')
+    print(f'\nCompleted in {(time() - tstart) / 3600} hours!')

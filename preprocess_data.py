@@ -66,11 +66,12 @@ if __name__ == '__main__':
     dcount = 0
     for dname, fname_list in zip(dnames, fnames):
         dcount += 1
+        print('Splitting files in directory {0}/{1}: {2}'.format(dcount, len(dnames), dname))
         idfs = [osp.join(dname, fname) for fname in fname_list]
         input_fnames = [osp.join(spl_dir, df) for df in idfs]
         for input_f in input_fnames:
-            split_by_label(input_f, labeler, meta_f)
+            split_by_label(input_f, labeler, meta_f, nulify_dscp=True)
 
     # print time elapsed
 
-    print(f'\nCompleted in {time() - tstart // 60} minutes!')
+    print(f'\nCompleted in {(time() - tstart) // 3600} hours!')

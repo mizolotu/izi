@@ -141,8 +141,7 @@ class ReactiveDiscreteEnv():
         self.n_block_actions = self.n_apps * self.n_ids
         self.n_unblock_actions = self.n_apps * self.n_ids
         self.n_ids_actions = (self.n_models + self.n_steps + self.n_thrs) * self.n_ids
-        act_dim = self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + \
-                  self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
+        act_dim = self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
         self.actions_queue = deque()
 
         # start acting

@@ -183,9 +183,9 @@ def read_ip_pkt(body, nflags=8):
     ip_header_size = body.header_len
     proto = body.p
     tos = body.tos
-    if proto == 6:
+    if proto == 6 and body[tcp.TCP] is not None:
         src_port, dst_port, plen, flags, window = read_tcp_packet(body[tcp.TCP], nflags)
-    elif proto == 17:
+    elif proto == 17 and body[udp.UDP] is not None:
         src_port, dst_port, plen, = read_udp_packet(body[udp.UDP])
         flags = ','.join(['0'] * nflags)
         window = 0
@@ -525,9 +525,9 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
     tstart = None
     label = int(label)
     ttotal = 0
-    ntotal = 0
-
     npkts = 0
+    nflows = 0
+    nvectors = 0
 
     if type(tstep) == tuple or type(tstep) == list:
         assert len(tstep) == 4, 'There should be 4 parameters: mu, std, min and max'
@@ -541,9 +541,9 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
             id, features, flags, tos = read_pkt(raw)
-            if tos >= 4:
-                print(f'Flow {id} has high tos!!!')
             if id is not None:
+                if tos >= 4:
+                    print(f'Flow {id} has high tos!!!')
                 if tstart is None:
                     tstart = int(timestamp)
                     seconds = get_next_tstep()
@@ -576,7 +576,6 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
                             t_calc_start = time()
                             _features = flow_object.get_features()
                             ttotal += time() - t_calc_start
-                            ntotal += 1
                             flow_features_t.append([*_features, flow_label])
                     flow_features.extend(flow_features_t)
 
@@ -598,6 +597,7 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
                     flow_ids.append(id)
                     flow_objects.append(Flow(timestamp, id, features, flags))
                     flow_labels.append(label)
+                    nflows += 1
 
                 npkts += 1
 
@@ -653,7 +653,7 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
 
             spl = input.split('_')
             cap_name = '_'.join(spl[:-1])
-            pandas.DataFrame([[cap_name] + [npkts, nvectors]]).to_csv(stats, header=False, mode='a', index=False)
+            pandas.DataFrame([[cap_name] + [nflows, npkts]]).to_csv(stats, header=False, mode='a', index=False)
 
             # save meta
 
@@ -668,7 +668,7 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(e, fname, exc_tb.tb_lineno)
 
-    return ttotal / ntotal if ntotal > 0 else None
+    return nvectors, ttotal
 
 def count_ports(input, ports):
     counts = np.zeros(len(ports) + 1)

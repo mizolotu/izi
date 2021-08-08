@@ -42,20 +42,20 @@ def anomaly_detection_mapper(features, label, xmin, xmax, eps=1e-10):
     features_with_labels = tf.concat([features, tf.reshape(label, (-1, 1))], axis=1)
     return features, features_with_labels
 
-def mlp(nfeatures, nl, nh, dropout=0.5, batchnorm=False, lr=5e-5):
+def mlp(nfeatures, layers, dropout=0.5, batchnorm=False, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
     else:
         hidden = inputs
-    for _ in range(nl):
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
+    for layer in layers:
+        hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.BinaryAccuracy(name='accuracy'), tf.keras.metrics.Precision(name='precision')])
-    return model, 'mlp_{0}_{1}'.format(nl, nh)
+    return model, 'mlp_{0}'.format('_'.join([str(item) for item in layers])), 'cl'
 
 def identity_block(x, nhidden):  # h = f(x) + x
     h = tf.keras.layers.Dense(nhidden)(x)
@@ -263,26 +263,26 @@ class ReconstructionAccuracy(tf.keras.metrics.Metric):
         self.reconstruction_errors.assign([])
         self.true_labels.assign([])
 
-def ae(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
+def ae(nfeatures, layers, dropout=0.5, batchnorm=True, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
     if batchnorm:
         norm = tf.keras.layers.BatchNormalization()
         hidden = norm(inputs)
     else:
         hidden = inputs
-    for i in range(nl):
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
+    for layer in layers:
+        hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     hidden = tf.keras.layers.Dense(nfeatures - 1, activation='relu')(hidden)
-    for _ in range(nl):
-        hidden = tf.keras.layers.Dense(nh, activation='relu')(hidden)
+    for _ in range(layer):
+        hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
         model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr))
-    return model, 'ae_{0}_{1}'.format(nl, nh)
+    return model, 'ae_{0}'.format('_'.join([str(item) for item in layers])), 'ad'
 
 class Sampling(tf.keras.layers.Layer):
 
@@ -430,7 +430,7 @@ class SOMLayer(tf.keras.layers.Layer):
             kwargs['input_shape'] = (kwargs.pop('latent_dim'),)
         super(SOMLayer, self).__init__(**kwargs)
         self.map_size = map_size
-        self.nprototypes = map_size[0] * map_size[1]
+        self.nprototypes = np.prod(map_size)
         self.initial_prototypes = prototypes
         self.input_spec = tf.keras.layers.InputSpec(ndim=2)
         self.prototypes = None
@@ -464,11 +464,15 @@ def som_loss(weights, distances):
 
 class DSOM(tf.keras.models.Model):
 
-    def __init__(self, nlayers, nhidden, map_size, dropout, batchnorm, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
+    def __init__(self, map_size, batchnorm, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
         super(DSOM, self).__init__()
         self.map_size = map_size
-        self.nprototypes = map_size[0] * map_size[1]
-        self.mlp_layer = MLPLayer(nlayers, nhidden, dropout, batchnorm)
+        self.nprototypes = np.prod(map_size)
+        ranges = [np.arange(m) for m in map_size]
+        mg = np.meshgrid(*ranges, indexing='ij')
+        self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
+        print(self.prototype_coordinates)
+        self.bn_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
         self.som_layer = SOMLayer(map_size, name='SOM')
         self.T_min = T_min
         self.T_max = T_max
@@ -482,18 +486,21 @@ class DSOM(tf.keras.models.Model):
         return self.som_layer.get_weights()[0]
 
     def call(self, x):
-        x = self.mlp_layer(x)
-        d = self.som_layer(x)
-        s = tf.sort(d, axis=1)
+        x = self.bn_layer(x)
+        x = self.som_layer(x)
+        s = tf.sort(x, axis=1)
         spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
         return tf.reduce_mean(spl[0], axis=1)  # tf.math.argmin(d, axis=1)
 
     def map_dist(self, y_pred):
-        labels = np.arange(self.nprototypes)
-        tmp = tf.expand_dims(y_pred, axis=1)
-        d_row = tf.math.abs(tmp - labels) // self.map_size[1]
-        d_col = tf.math.abs(tmp % self.map_size[1] - labels % self.map_size[1])
-        return tf.cast(d_row + d_col, tf.float32)
+        #labels = np.arange(self.nprototypes)
+        #tmp = tf.expand_dims(y_pred, axis=1)
+        #d_row = tf.math.abs(tmp - labels) // self.map_size[1]
+        #d_col = tf.math.abs(tmp % self.map_size[1] - labels % self.map_size[1])
+        #return tf.cast(d_row + d_col, tf.float32)
+        labels = tf.gather(self.prototype_coordinates, y_pred)
+        mh = tf.reduce_sum(tf.math.abs(tf.expand_dims(labels, 1) - tf.expand_dims(self.prototype_coordinates, 0)), axis=-1)
+        return tf.cast(mh, tf.float32)
 
     @staticmethod
     def neighborhood_function(d, T):
@@ -505,7 +512,7 @@ class DSOM(tf.keras.models.Model):
 
             # Compute cluster assignments for batches
 
-            inputs = self.mlp_layer(inputs)
+            inputs = self.bn_layer(inputs)
             d = self.som_layer(inputs)
             y_pred = tf.math.argmin(d, axis=1)
 
@@ -536,7 +543,7 @@ class DSOM(tf.keras.models.Model):
 
         # Compute cluster assignments for batches
 
-        inputs = self.mlp_layer(inputs)
+        inputs = self.bn_layer(inputs)
         d = self.som_layer(inputs)
         y_pred = tf.math.argmin(d, axis=1)
         w_batch = self.neighborhood_function(self.map_dist(y_pred), self.T)
@@ -546,10 +553,8 @@ class DSOM(tf.keras.models.Model):
             "total_loss": self.total_loss_tracker.result()
         }
 
-def som(nfeatures, nl, nh, dropout=0.5, batchnorm=True, lr=5e-5):
-    msize = np.int(np.sqrt(nh)) + 1
-    map_size = [msize, msize]
-    model = DSOM(nl, nh, map_size, dropout, batchnorm)
+def som(nfeatures, layers, dropout=0.5, batchnorm=True, lr=5e-5):
+    model = DSOM(layers, dropout, batchnorm)
     model.build(input_shape=(None, nfeatures - 1))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
-    return model, 'som_{0}_{1}'.format(nl, nh)
+    return model, 'som_{0}'.format('_'.join([str(item) for item in layers])), 'ad'

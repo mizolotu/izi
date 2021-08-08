@@ -8,7 +8,7 @@ from collections import deque
 from threading import Thread
 from flask import Flask, request, jsonify
 from datetime import datetime
-from common.data import read_pkt_faster
+from common.data_old import read_pkt_faster
 from time import sleep
 
 app = Flask(__name__)

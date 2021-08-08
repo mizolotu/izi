@@ -11,7 +11,7 @@ ofports_fpath = '{0}/ofports.json'.format(log_dir)
 nodes_fpath = '{0}/nodes.json'.format(log_dir)
 actions_fpath = '{0}/actions.csv'.format(log_dir)
 ids_models_dir = 'models/ids'
-ids_results_dir = '{0}/results'.format(ids_models_dir)
+ids_results_dir = 'results/ids'
 sources_dir = 'sources'
 ovs_sources_dir = f'{sources_dir}/ovs/'
 ids_sources_dir = f'{sources_dir}/ids/'
@@ -64,18 +64,17 @@ env_vms = {
 
 # ids and ips
 
-stages = ['train', 'validate', 'test']
+stages = ['train', 'validate', 'inference']
 splits = [0.5, 0.2]
 seed = 0
-batch_size = 1024  # batch size will actually be double that
+batch_size = 20 # 48
 patience = 10
-epochs = 100
-steps_per_epoch = 2500
+epochs = 10 # 00
+steps_per_epoch = 25 # 00
 ds_params = ['nflows', 'delay']
 n_ds_params = len(ds_params)
 roc_fname = 'roc.csv'
-fpr_levels = [0.1, 0.01, 0.001, 0.0001]
-fsize_min = 100000
+fpr_levels = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
 
 # sdn
 
@@ -128,6 +127,8 @@ applications = [
 
 ip_proto_names = list(set([item[0] for item in applications]))
 directions = ['source', 'destination']
+nflows_min = 1000
+npkts_min = 1000
 
 # rl
 
