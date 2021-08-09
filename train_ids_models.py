@@ -224,8 +224,9 @@ if __name__ == '__main__':
                             new_probs = np.linalg.norm(predictions - y[:, :-1], axis=1)
                         elif args.model == 'som':
                             new_probs = predictions
+                        y = y[:, -1]
                     probs = np.hstack([probs, new_probs])
-                    testy = np.concatenate([testy, y[:, -1]])
+                    testy = np.concatenate([testy, y])
                 ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
                 for fpr_level in fpr_levels:
                     idx = np.where(ns_fpr <= fpr_level)[0][-1]
