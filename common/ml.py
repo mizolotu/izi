@@ -471,7 +471,6 @@ class DSOM(tf.keras.models.Model):
         ranges = [np.arange(m) for m in map_size]
         mg = np.meshgrid(*ranges, indexing='ij')
         self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
-        print(self.prototype_coordinates)
         self.bn_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
         self.som_layer = SOMLayer(map_size, name='SOM')
         self.T_min = T_min
