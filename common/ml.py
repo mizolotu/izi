@@ -55,7 +55,7 @@ def mlp(nfeatures, layers, dropout=0.5, batchnorm=False, lr=5e-5):
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.BinaryAccuracy(name='accuracy'), tf.keras.metrics.Precision(name='precision')])
-    return model, 'mlp_{0}'.format('_'.join([str(item) for item in layers])), 'cl'
+    return model, 'mlp_{0}'.format('-'.join([str(item) for item in layers])), 'cl'
 
 def identity_block(x, nhidden):  # h = f(x) + x
     h = tf.keras.layers.Dense(nhidden)(x)
@@ -282,7 +282,7 @@ def ae(nfeatures, layers, dropout=0.5, batchnorm=True, lr=5e-5):
         outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
         model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
         model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr))
-    return model, 'ae_{0}'.format('_'.join([str(item) for item in layers])), 'ad'
+    return model, 'ae_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
 
 class Sampling(tf.keras.layers.Layer):
 
@@ -557,4 +557,4 @@ def som(nfeatures, layers, dropout=0.5, batchnorm=True, lr=5e-5):
     model = DSOM(layers, dropout, batchnorm)
     model.build(input_shape=(None, nfeatures - 1))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
-    return model, 'som_{0}'.format('_'.join([str(item) for item in layers])), 'ad'
+    return model, 'som_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
