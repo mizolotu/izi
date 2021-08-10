@@ -202,12 +202,31 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         if self.metric == 'auc':
             self.current = roc_auc_score(testy, probs)
         elif self.metric == 'acc':
-            acc = np.zeros_like(probs)
-            for i, prob in enumerate(probs):
-                predy = np.zeros_like(probs)
-                predy[np.where(probs > prob)[0]] = 1
-                acc[i] = accuracy_score(testy, predy)
+            n = len(testy)
+            p0 = probs[np.where(testy == 0)[0]]
+            p1 = probs[np.where(testy == 1)[0]]
+            p0si = np.argsort(p0)
+            p1si = np.argsort(p1)
+            p0s = p0[p0si]
+            p1s = p1[p1si]
+            n0 = len(p0s)
+            n1 = len(p1s)
+            if p1s[0] > p0s[-1]:
+                acc = [1]
+            else:
+                idx = np.where(p0s > p1s[0])[0]
+                acc = [float(len(p0s) - len(idx) + len(p1s)) / n, *np.zeros(len(idx))]
+                h = n0 - len(idx)
+                n10 = 0
+                for i, j in enumerate(idx):
+                    thr = p0s[j]
+                    thridx = np.where(p1s[n10:] < thr)[0]
+                    n10 += len(thridx)
+                    h += 1
+                    acc[i + 1] = (h - n10 + n1) / n
             self.current = np.max(acc)
+        else:
+            raise NotImplemented
         print(f'\nValidation {self.metric}:', self.current)
 
 
