@@ -8,7 +8,7 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, classification_mapper, anomaly_detection_mapper, load_meta, EarlyStoppingAtMaxAuc
+from common.ml import set_seeds, load_batches, classification_mapper, anomaly_detection_mapper, load_meta, EarlyStoppingAtMaxMetric
 from config import *
 
 if __name__ == '__main__':
@@ -16,6 +16,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'ae', 'som'])
     parser.add_argument('-l', '--layers', help='Number of layers', default=[512, 512], type=int, nargs='+')
+    parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
     parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,2,4'])
     parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,2,4'])
     parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,2,4'])
@@ -179,9 +180,9 @@ if __name__ == '__main__':
                 print('Training model {0}'.format(model_name))
 
                 if detection_type == 'cl':
-                    cb = tf.keras.callbacks.EarlyStopping(monitor='val_auc', verbose=0, patience=patience, mode='max', restore_best_weights=True)
+                    cb = tf.keras.callbacks.EarlyStopping(monitor=f'val_{args.earlystopping}', verbose=0, patience=patience, mode='max', restore_best_weights=True)
                 elif detection_type == 'ad':
-                    cb = EarlyStoppingAtMaxAuc(validation_data=batches['validate'], model_type=args.model)
+                    cb = EarlyStoppingAtMaxMetric(validation_data=batches['validate'], metric=args.earlystopping, model_type=args.model)
 
                 model.fit(
                     batches['train'],

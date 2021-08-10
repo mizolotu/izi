@@ -3,7 +3,7 @@ import os.path as osp
 import tensorflow as tf
 import numpy as np
 
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, accuracy_score
 
 def load_batches(path, batch_size, nfeatures):
     batches = tf.data.experimental.make_csv_dataset(
@@ -54,7 +54,7 @@ def mlp(nfeatures, layers, dropout=0.5, batchnorm=False, lr=5e-5):
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
     outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.BinaryAccuracy(name='accuracy'), tf.keras.metrics.Precision(name='precision')])
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.BinaryAccuracy(name='acc'), tf.keras.metrics.Precision(name='pre')])
     return model, 'mlp_{0}'.format('-'.join([str(item) for item in layers])), 'cl'
 
 def identity_block(x, nhidden):  # h = f(x) + x
@@ -157,12 +157,13 @@ class ToggleMetrics(tf.keras.callbacks.Callback):
             if 'auc' in metric.name:
                 metric.update_metric.assign(False)
 
-class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
+class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
 
-    def __init__(self, validation_data, patience=10, model_type='ae'):
-        super(EarlyStoppingAtMaxAuc, self).__init__()
+    def __init__(self, validation_data, metric, patience=10, model_type='ae'):
+        super(EarlyStoppingAtMaxMetric, self).__init__()
         self.patience = patience
         self.best_weights = None
+        self.metric = metric
         self.validation_data = validation_data
         self.current = -np.Inf
         self.model_type = model_type
@@ -198,8 +199,17 @@ class EarlyStoppingAtMaxAuc(tf.keras.callbacks.Callback):
                 raise NotImplemented
             probs = np.hstack([probs, new_probs])
             testy = np.hstack([testy, y_labels])
-        self.current = roc_auc_score(testy, probs)
-        print('\nValidation AUC:', self.current)
+        if self.metric == 'auc':
+            self.current = roc_auc_score(testy, probs)
+        elif self.metric == 'acc':
+            acc = np.zeros_like(probs)
+            for i, prob in enumerate(probs):
+                predy = np.zeros_like(probs)
+                predy[np.where(probs > prob)[0]] = 1
+                acc[i] = accuracy_score(testy, predy)
+            self.current = np.max(acc)
+        print(f'\nValidation {self.metric}:', self.current)
+
 
 class ReconstructionPrecision(tf.keras.metrics.Metric):
 
