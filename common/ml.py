@@ -303,14 +303,9 @@ def ae(nfeatures, layers, dropout=0.5, batchnorm=True, lr=5e-5):
         hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    hidden = tf.keras.layers.Dense(nfeatures - 1, activation='relu')(hidden)
-    for _ in range(layer):
-        hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-        outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
-        model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-        model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr))
+    outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'ae_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
 
 class Sampling(tf.keras.layers.Layer):
