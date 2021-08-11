@@ -14,10 +14,10 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'ae', 'som'])
-    parser.add_argument('-l', '--layers', help='Number of layers', default=[512, 512], type=int, nargs='+')
+    parser.add_argument('-m', '--model', help='Model', default='ae', choices=['mlp', 'ae', 'som'])
+    parser.add_argument('-l', '--layers', help='Number of layers', default=[512, 192, 512], type=int, nargs='+')
     parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
-    parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,2,4'])
+    parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0'])
     parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,2,4'])
     parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,2,4'])
     parser.add_argument('-s', '--steps', help='Polling step', nargs='+', default=['0.0-1.0-0.001-3.0'])
