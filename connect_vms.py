@@ -75,10 +75,15 @@ if __name__ == '__main__':
 
     veths = []
     for ovs_vm in ovs_vms:
+
+        # normal traffic
+
         ofport = create_veth_pair(ovs_vm, bridge_name, in_veth_prefix)
         veths.append({'vm': ovs_vm['vm'], 'tag': in_veth_prefix, 'ofport': ofport, 'type': 'veth'})
         ofport = create_veth_pair(ovs_vm, bridge_name, out_veth_prefix)
         veths.append({'vm': ovs_vm['vm'], 'tag': out_veth_prefix, 'ofport': ofport, 'type': 'veth'})
+
+        # malicious traffic
 
     # create veth pairs on ids
 

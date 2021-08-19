@@ -7,22 +7,27 @@ from config import *
 from common.ml import load_meta
 from time import sleep
 from pathlib import Path
+from common.utils import isint
 
-def calculate_probs(samples_dir, fsize_min=100000):
-    profile_files = sorted([osp.join(samples_dir, item) for item in os.listdir(samples_dir) if osp.isfile(osp.join(samples_dir, item)) and item.endswith(csv_postfix)])
+def calculate_probs(samples_dir, labels):
+    label_dirs = sorted([item for item in os.listdir(samples_dir) if osp.isdir(osp.join(samples_dir, item)) and isint(item) and int(item) in labels])
     profiles = []
+    ips = []
     for profile_file in profile_files:
-        vals = pandas.read_csv(profile_file, header=None).values
+        ip = profile_file.split('.csv')[0]
+        fpath = osp.join(samples_dir, profile_file)
+        vals = pandas.read_csv(fpath, header=None).values
         fnames = vals[:, 0]
-        fsizes = np.array([Path(f).stat().st_size for f in fnames])
+        fsizes = np.array([Path(osp.join(home_dir, f)).stat().st_size for f in fnames])
         freqs = vals[:, 1:]
-        freqs0 = vals[:, 1]
-        probs = np.zeros_like(freqs, dtype=float)
-        nlabels = freqs.shape[1]
+        freqs0 = freqs[:, 0]
+        freqs1 = freqs[:, 1:]
+        probs = np.zeros_like(freqs1, dtype=float)
+        nlabels = freqs1.shape[1]
         for i in range(nlabels):
-            s = np.sum(freqs[:, i])
+            s = np.sum(freqs1[:, i])
             if s == 0:
-                probs1 = np.sum(freqs[:, 1:], axis=1)  # sum of frequencies of files with malicious traffic
+                probs1 = np.sum(freqs1, axis=1)  # sum of frequencies of files with malicious traffic
                 idx0 = np.where((probs1 == 0) & (fsizes > fsize_min))[0]  # index of files with no malicious traffic
                 counts0 = np.zeros_like(freqs0)
                 counts0[idx0] = freqs0[idx0]
@@ -31,15 +36,17 @@ def calculate_probs(samples_dir, fsize_min=100000):
             else:
                 idx1 = np.where(fsizes > fsize_min)[0]
                 if len(idx1) > 0:
-                    counts1 = np.zeros_like(freqs[:, i])
-                    counts1[idx1] = freqs[idx1, i]
+                    counts1 = np.zeros_like(freqs1[:, i])
+                    counts1[idx1] = freqs1[idx1, i]
                     s1 = np.sum(counts1)
                     probs[:, i] = counts1 / s1
                 else:
-                    s1 = np.sum(freqs[:, i])
-                    probs[:, i] = freqs[:, i] / s1
-        profiles.append({'fpath': profile_file, 'fnames': fnames, 'probs': probs})
-    return profiles
+                    s1 = np.sum(freqs1[:, i])
+                    probs[:, i] = freqs1[:, i] / s1
+
+        profiles.append({'fpath': fpath, 'fnames': fnames, 'probs': probs})
+        ips.append(ip)
+    return ips, profiles
 
 def select_file(profile, label):
     fnames = profile['fnames']
@@ -71,7 +78,7 @@ def replay_ip_traffic_on_interface(ovs_ip, ovs_port, ip, label_idx, duration, au
 
 if __name__ == '__main__':
 
-    meta = load_meta(feature_dir)
+    meta = load_meta(data_dir)
     labels = meta['labels']
     env_idx = 0
     label = 3
@@ -79,6 +86,8 @@ if __name__ == '__main__':
     profile_files = sorted([item for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith('.csv')])
     profiles = []
     ips = [profile_file.split('.csv')[0] for profile_file in profile_files]
+
+    calculate_probs(stats_dir, labels)
 
     with open(vms_fpath, 'r') as f:
         vms = json.load(f)

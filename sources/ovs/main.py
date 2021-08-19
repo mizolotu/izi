@@ -257,9 +257,6 @@ if __name__ == '__main__':
     home_dir = '/home/vagrant'
     data_dir = f'{home_dir}/data/spl'
 
-    ips, profiles = calculate_probs(data_dir)
-    seed = None
-
     flow_collector = FlowCollector()
     #flow_collector.start()
 
