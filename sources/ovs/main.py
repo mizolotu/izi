@@ -30,13 +30,13 @@ def replay():
     if request.method == 'POST':
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
-        label = jdata['label']
         ip = jdata['ip']
+        fname = jdata['fname']
+        label = jdata['label']
         duration = jdata['duration']
-        aug = jdata['aug']
-        ipidx = ips.index(ip)
-        profile = profiles[ipidx]
-        fpath = select_file(profile, label, aug)
+        if label > 0:
+            fname1 = f'{fname}_label:{label}'
+        fpath = osp.join(data_dir, )
         replay_pcap(fpath, iface, duration)
     return jsonify(fpath)
 

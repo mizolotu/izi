@@ -9,44 +9,28 @@ from time import sleep
 from pathlib import Path
 from common.utils import isint
 
-def calculate_probs(samples_dir, labels):
-    label_dirs = sorted([item for item in os.listdir(samples_dir) if osp.isdir(osp.join(samples_dir, item)) and isint(item) and int(item) in labels])
-    profiles = []
-    ips = []
-    for profile_file in profile_files:
-        ip = profile_file.split('.csv')[0]
-        fpath = osp.join(samples_dir, profile_file)
-        vals = pandas.read_csv(fpath, header=None).values
-        fnames = vals[:, 0]
-        fsizes = np.array([Path(osp.join(home_dir, f)).stat().st_size for f in fnames])
-        freqs = vals[:, 1:]
-        freqs0 = freqs[:, 0]
-        freqs1 = freqs[:, 1:]
-        probs = np.zeros_like(freqs1, dtype=float)
-        nlabels = freqs1.shape[1]
-        for i in range(nlabels):
-            s = np.sum(freqs1[:, i])
-            if s == 0:
-                probs1 = np.sum(freqs1, axis=1)  # sum of frequencies of files with malicious traffic
-                idx0 = np.where((probs1 == 0) & (fsizes > fsize_min))[0]  # index of files with no malicious traffic
-                counts0 = np.zeros_like(freqs0)
-                counts0[idx0] = freqs0[idx0]
-                s0 = np.sum(counts0)
-                probs[:, i] = counts0 / s0
-            else:
-                idx1 = np.where(fsizes > fsize_min)[0]
-                if len(idx1) > 0:
-                    counts1 = np.zeros_like(freqs1[:, i])
-                    counts1[idx1] = freqs1[idx1, i]
-                    s1 = np.sum(counts1)
-                    probs[:, i] = counts1 / s1
-                else:
-                    s1 = np.sum(freqs1[:, i])
-                    probs[:, i] = freqs1[:, i] / s1
-
-        profiles.append({'fpath': fpath, 'fnames': fnames, 'probs': probs})
-        ips.append(ip)
-    return ips, profiles
+def calculate_probs(samples_dir, labels, criteria='flows'):
+    label_dirs = []
+    labels_selected = []
+    for label in labels:
+        if osp.isdir(osp.join(samples_dir, str(label))):
+            label_dirs.append(osp.join(samples_dir, str(label)))
+            labels_selected.append(label)
+    profiles = {}
+    for label, label_dir in zip(labels_selected, label_dirs):
+        profiles[label] = {}
+        for stats_file in os.listdir(label_dir):
+            fpath = osp.join(label_dir, stats_file)
+            vals = pandas.read_csv(fpath, header=None).values
+            idx = np.where(vals[:, 2] >= npkts_min)[0]
+            assert len(idx) > 0
+            fnames = vals[idx, 0]
+            if criteria == 'flows':
+                probs = vals[idx, 1] / np.sum(vals[idx, 1])
+            elif criteria == 'packets':
+                probs = vals[idx, 2] / np.sum(vals[idx, 2])
+            profiles[label][stats_file] = [fnames, probs.astype(dtype=float)]
+    return profiles
 
 def select_file(profile, label):
     fnames = profile['fnames']
@@ -71,9 +55,9 @@ def replay_traffic_on_interface(ovs_ip, ovs_port, duration):
     url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
     requests.post(url, json={'duration': duration})
 
-def replay_ip_traffic_on_interface(ovs_ip, ovs_port, ip, label_idx, duration, aug=True):
+def replay_ip_traffic_on_interface(ovs_ip, ovs_port, ip, fname, label, duration):
     url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
-    r = requests.post(url, json={'ip': ip, 'label': label_idx, 'duration': duration, 'aug': aug})
+    r = requests.post(url, json={'ip': ip, 'fname': fname, 'label': label, 'duration': duration})
     return r.json()
 
 if __name__ == '__main__':
@@ -81,13 +65,8 @@ if __name__ == '__main__':
     meta = load_meta(data_dir)
     labels = meta['labels']
     env_idx = 0
-    label = 3
-    label_idx = labels.index(label)
-    profile_files = sorted([item for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith('.csv')])
-    profiles = []
-    ips = [profile_file.split('.csv')[0] for profile_file in profile_files]
-
-    calculate_probs(stats_dir, labels)
+    label = 4
+    profiles = calculate_probs(stats_dir, labels)
 
     with open(vms_fpath, 'r') as f:
         vms = json.load(f)
@@ -95,8 +74,14 @@ if __name__ == '__main__':
     assert len(ovs_vms) == 1
     ovs_vm = ovs_vms[0]
 
+    ips = sorted([item for item in os.listdir(spl_dir) if osp.isdir(osp.join(spl_dir, item))])
     for ip in ips:
-        replay_ip_traffic_on_interface(ovs_vm['mgmt'], flask_port, ip, label_idx, episode_duration, False)
-
+        if ip in profiles[label].keys():
+        else:
+        profile = profiles[label][ip]
+        probs = profile[1]
+        idx = np.random.choice(np.arange(len(probs)), p=probs)
+        fname = profile[0][idx]
+        replay_ip_traffic_on_interface(ovs_vm['mgmt'], flask_port, ip, fname, label, episode_duration)
     sleep(episode_duration)
-    print('Passed!')
+    print('Done!')

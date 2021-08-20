@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
     # label names
 
-    meta = load_meta(feature_dir)
+    meta = load_meta(data_dir)
     label_names = [str(item) for item in sorted(meta['labels'])]
     non_zero_label_names = [str(item) for item in sorted(meta['labels']) if item > 0]
 
@@ -139,4 +139,4 @@ if __name__ == '__main__':
 
     # copy meta for ids and ads
 
-    shutil.copy('{0}/metainfo.json'.format(feature_dir), ids_sources_dir)
+    shutil.copy('{0}/metainfo.json'.format(data_dir), ids_sources_dir)

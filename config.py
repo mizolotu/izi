@@ -29,7 +29,7 @@ progress_dir = '{0}/progress'.format(figures_dir)
 
 # vagrantfile
 
-ubuntu_version = '1804'
+ubuntu_version = '2004'
 nenvs = 1
 mgmt_network = '192.168.122.0/24'
 env_vms = {
@@ -127,8 +127,8 @@ applications = [
 
 ip_proto_names = list(set([item[0] for item in applications]))
 directions = ['source', 'destination']
-nflows_min = 1000
-npkts_min = 1000
+
+npkts_min = 100
 
 # rl
 
