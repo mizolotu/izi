@@ -2,12 +2,9 @@ import os, pandas, requests, json
 import os.path as osp
 import numpy as np
 
-from subprocess import Popen
 from config import *
 from common.ml import load_meta
 from time import sleep
-from pathlib import Path
-from common.utils import isint
 
 def calculate_probs(samples_dir, labels, criteria='flows'):
     label_dirs = []
@@ -32,32 +29,18 @@ def calculate_probs(samples_dir, labels, criteria='flows'):
             profiles[label][stats_file] = [fnames, probs.astype(dtype=float)]
     return profiles
 
-def select_file(profile, label):
-    fnames = profile['fnames']
-    probs = profile['probs'][:, label]
-    idx = np.random.choice(np.arange(len(fnames)), p = probs)
-    return fnames[idx]
-
-def replay_pcap(fpath, iface):
-    print('Replaying: {0}'.format(fpath))
-    p = Popen(['tcpreplay', '-i', iface, '--duration', str(episode_duration), fpath]) #, stdout=DEVNULL, stderr=DEVNULL)
-    return p
-
 def set_seed(tgu_mgmt_ip, tgu_port, seed):
     url = 'http://{0}:{1}/seed'.format(tgu_mgmt_ip, tgu_port)
     requests.post(url, json={'seed': seed})
 
-def prepare_traffic_on_interface(ovs_ip, ovs_port, ips, label_idx, duration):
-    url = 'http://{0}:{1}/prepare'.format(ovs_ip, ovs_port)
-    requests.post(url, json={'ips': ips, 'label': label_idx, 'duration': duration})
+def prepare_traffic_on_interface(ovs_ip, ovs_port, fname, augment=False):
+    url = 'http://{0}:{1}/readpcap'.format(ovs_ip, ovs_port)
+    r = requests.post(url, json={'ip': ip, 'fname': fname, 'augment': augment})
+    return r.json()
 
 def replay_traffic_on_interface(ovs_ip, ovs_port, duration):
     url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
-    requests.post(url, json={'duration': duration})
-
-def replay_ip_traffic_on_interface(ovs_ip, ovs_port, ip, fname, label, duration):
-    url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
-    r = requests.post(url, json={'ip': ip, 'fname': fname, 'label': label, 'duration': duration})
+    r = requests.post(url, json={'duration': duration})
     return r.json()
 
 if __name__ == '__main__':
@@ -74,14 +57,28 @@ if __name__ == '__main__':
     assert len(ovs_vms) == 1
     ovs_vm = ovs_vms[0]
 
+    # prepare traffic
+
     ips = sorted([item for item in os.listdir(spl_dir) if osp.isdir(osp.join(spl_dir, item))])
     for ip in ips:
         if ip in profiles[label].keys():
+            prob_idx = label
+            aug = True
         else:
-        profile = profiles[label][ip]
-        probs = profile[1]
-        idx = np.random.choice(np.arange(len(probs)), p=probs)
-        fname = profile[0][idx]
-        replay_ip_traffic_on_interface(ovs_vm['mgmt'], flask_port, ip, fname, label, episode_duration)
+            prob_idx = 0
+            aug =False
+        fname_idx = np.random.choice(np.arange(len(profiles[prob_idx][ip][1])), p=profiles[prob_idx][ip][1])
+        fnames = [f'{profiles[prob_idx][ip][0][fname_idx]}_label:{prob_idx}']
+        augments = [aug]
+        if prob_idx > 0:
+            fnames.append(f'{profiles[prob_idx][ip][0][fname_idx]}_label:{0}')
+            augments.append(False)
+        for fname, aug in zip(fnames, augments):
+            prepare_traffic_on_interface(ovs_vm['mgmt'], flask_port, fname, augment=aug)
+
+    # replay
+
+    replay_traffic_on_interface(ovs_vm['mgmt'], flask_port, episode_duration)
+
     sleep(episode_duration)
     print('Done!')
