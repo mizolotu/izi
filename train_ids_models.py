@@ -14,13 +14,13 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-f', '--features', help='Feature extractor', default='dns', choices=['dns', 'cnn', 'att'])
-    parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'ae', 'som', 'gan'])  # TO DO gan
+    parser.add_argument('-f', '--features', help='Feature extractor', default='att', choices=['dns', 'cnn', 'att'])
+    parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'aen', 'som', 'gan'])  # TO DO gan
     parser.add_argument('-l', '--layers', help='Number of layers', default=[512, 512], type=int, nargs='+')
     parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
-    parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,3'])
-    parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,3'])
-    parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,3'])
+    parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,2,3'])
+    parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,2,3'])
+    parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,2,3'])
     parser.add_argument('-s', '--steps', help='Polling step value or distribution', nargs='+', default=['0.0-1.0-0.001-3.0'])
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
 
@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
             fe_type = getattr(models, args.features)
             model_type = getattr(models, args.model)
-            model_inputs, model_hidden = fe_type(nwindows, nfeatures)
+            model_inputs, model_hidden, att_name = fe_type(nwindows, nfeatures)
             model, model_name, detection_type = model_type(model_inputs, model_hidden, args.layers)
             model.summary()
 
@@ -167,7 +167,7 @@ if __name__ == '__main__':
 
             # create model and results directories
 
-            m_path = osp.join(ids_models_dir, '{0}_{1}_{2}_{3}'.format(args.features, model_name, train_labels_str, step))
+            m_path = osp.join(ids_models_dir, '{0}_{1}_{2}_{3}'.format(att_name, model_name, train_labels_str, step))
             if not osp.isdir(m_path):
                 os.mkdir(m_path)
 
@@ -275,7 +275,7 @@ if __name__ == '__main__':
 
             results = [str(sk_auc)]
 
-            r_path = osp.join(foutput, '{0}_{1}_{2}_{3}'.format(args.features, model_name, inf_labels_str, step))
+            r_path = osp.join(foutput, '{0}_{1}_{2}_{3}'.format(att_name, model_name, inf_labels_str, step))
             if not osp.isdir(r_path):
                 os.mkdir(r_path)
             stats_path = osp.join(r_path, 'stats.csv')

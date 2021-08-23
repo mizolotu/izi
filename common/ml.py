@@ -47,7 +47,7 @@ def anomaly_detection_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps
     features_with_labels = tf.concat([features_with_labels, tf.reshape(label, (-1, 1))], axis=1)
     return features, features_with_labels
 
-def dns(nsteps, nfeatures, batchnorm=False, nhidden=512):
+def dns(nsteps, nfeatures, nhidden=1024, batchnorm=False):
     inputs = tf.keras.layers.Input(shape=(nsteps, nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
@@ -55,9 +55,38 @@ def dns(nsteps, nfeatures, batchnorm=False, nhidden=512):
         hidden = inputs
     hidden = tf.keras.layers.Flatten()(hidden)
     hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
-    return inputs, hidden
+    return inputs, hidden, f'dns_{nhidden}'
 
-def mlp(inputs, hidden, layers, dropout=0.5, lr=5e-5):
+def cnn(nsteps, nfeatures, nfilters=512, kernel_size=2, batchnorm=True):
+    inputs = tf.keras.layers.Input(shape=(nsteps, nfeatures,))
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs)
+    else:
+        hidden = inputs
+    hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    return inputs, hidden, f'cnn_{nfilters}'
+
+def attention_block(x, nh):
+    q = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    k = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    v = tf.keras.layers.Dense(nh, use_bias=False)(x)
+    a = tf.keras.layers.Multiply()([q, k])
+    a = tf.keras.layers.Softmax(axis=-1)(a)
+    h = tf.keras.layers.Multiply()([a, v])
+    return h
+
+def att(nsteps, nfeatures, asize=384, batchnorm=True):
+    inputs = tf.keras.layers.Input(shape=(nsteps, nfeatures,))
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs)
+    else:
+        hidden = inputs
+    hidden = attention_block(hidden, asize)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    return inputs, hidden, f'att_{asize}'
+
+def mlp(inputs, hidden, layers=[512, 512], dropout=0.5, lr=5e-5):
     for layer in layers:
         hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
         if dropout is not None:
@@ -95,30 +124,6 @@ def res(nfeatures, nb, nh, dropout=0.5, lr=5e-5):
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
     return model, 'resnet_{0}_{1}'.format(nb, nh)
-
-def attention_block(x, nh):
-    q = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    k = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    v = tf.keras.layers.Dense(nh, use_bias=False)(x)
-    a = tf.keras.layers.Multiply()([q, k])
-    a = tf.keras.layers.Softmax(axis=-1)(a)
-    h = tf.keras.layers.Multiply()([a, v])
-    return h
-
-def att(nfeatures, nb, nh, dropout=0.5, batchnorm=True, lr=5e-5):
-    inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
-    if batchnorm:
-        hidden = tf.keras.layers.BatchNormalization()(inputs)
-    else:
-        hidden = inputs
-    for _ in range(nb):
-        hidden = attention_block(hidden, nh)
-        if dropout is not None:
-            hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
-    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
-    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), 'binary_accuracy'])
-    return model, 'attnet_{0}_{1}'.format(nb, nh)
 
 def ae_reconstruction_loss(y_true, y_pred):
     y_true, _ = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
