@@ -135,7 +135,7 @@ if __name__ == '__main__':
         if not osp.isdir('{0}/common'.format(dir)):
             os.mkdir('{0}/common'.format(dir))
         shutil.copy('common/pcap.py', '{0}/common/'.format(dir))
-        shutil.copy('common/data_old.py', '{0}/common/'.format(dir))
+        shutil.copy('common/data.py', '{0}/common/'.format(dir))
 
     # copy meta for ids and ads
 

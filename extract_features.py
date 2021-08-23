@@ -3,6 +3,7 @@ import os.path as osp
 import os, sys
 
 from time import time
+from common import data
 from common.data import find_data_files, extract_flow_features
 from common.utils import isint, clean_dir
 from pathlib import Path
@@ -14,8 +15,17 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Generate datasets')
     parser.add_argument('-s', '--stepval', help='Time step', type=float)
-    parser.add_argument('-S', '--stepdistr', help='Time step distribution', nargs='+', default=[0.0, 1.0, 0.001, 3.0], type=float)
+    parser.add_argument('-d', '--stepdistr', help='Time step distribution', nargs='+', default=[0.0, 1.0, 0.001, 3.0], type=float)
+    parser.add_argument('-l', '--labeler', help='Labeler', default='label_cicids17_short')
     args = parser.parse_args()
+
+    # import labeler
+
+    labeler = getattr(data, args.labeler)
+
+    # metainfo
+
+    meta_f = osp.join(data_dir, meta_fname)
 
     # choose step value or distribution
 
@@ -81,3 +91,10 @@ if __name__ == '__main__':
     # print time elapsed
 
     print(f'\nCompleted in {(time() - tstart) / 3600} hours!')
+
+
+
+
+    input_fnames = [osp.join(spl_dir, df) for df in idfs]
+    for input_f in input_fnames:
+        split_by_label(input_f, labeler, meta_f, nulify_dscp=True)

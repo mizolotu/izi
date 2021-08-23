@@ -45,6 +45,24 @@ def label_cicids17_short(timestamp, src_ip, dst_ip, src_port=None, dst_port=None
         description = 'Normal traffic'
     return label, description
 
+def reverse_label_cicids17_short(label):
+    if label == 1:
+        ips = ['18.219.211.138', '18.217.165.70']
+        directions = ['src']
+    elif label == 2:
+        ips = ['18.218.115.60']
+        directions = ['src']
+    elif label == 3:
+        ips = ['13.58.225.34']
+        directions = ['src', 'dst']
+    elif label == 4:
+        ips = ['18.219.211.138']
+        directions = ['src', 'dst']
+    else:
+        ips = []
+        directions = []
+    return ips, directions
+
 def label_cicids17(timestamp, src_ip, dst_ip, src_port=None, dst_port=None):
     timestamp = datetime.fromtimestamp(timestamp)
     date = timestamp.strftime('%d%m')
@@ -177,27 +195,27 @@ def read_udp_packet(body):
     payload_size = len(body.body_bytes)
     return src_port, dst_port, payload_size
 
-def read_ip_pkt(body, nflags=8):
+def read_ip_pkt(body, read_proto=True, nflags=8):
     src_ip = body.src_s
     dst_ip = body.dst_s
     ip_header_size = body.header_len
     proto = body.p
     tos = body.tos
-    if proto == 6 and body[tcp.TCP] is not None:
-        src_port, dst_port, plen, flags, window = read_tcp_packet(body[tcp.TCP], nflags)
-    elif proto == 17 and body[udp.UDP] is not None:
-        src_port, dst_port, plen, = read_udp_packet(body[udp.UDP])
-        flags = ','.join(['0'] * nflags)
-        window = 0
-    else:
-        src_port = 0
-        dst_port = 0
-        plen = 0
-        flags = ','.join(['0'] * nflags)
-        window = 0
+    src_port = 0
+    dst_port = 0
+    plen = 0
+    flags = ','.join(['0'] * nflags)
+    window = 0
+    if read_proto:
+        if proto == 6 and body[tcp.TCP] is not None:
+            src_port, dst_port, plen, flags, window = read_tcp_packet(body[tcp.TCP], nflags)
+        elif proto == 17 and body[udp.UDP] is not None:
+            src_port, dst_port, plen, = read_udp_packet(body[udp.UDP])
+            flags = ','.join(['0'] * nflags)
+            window = 0
     return src_ip, dst_ip, src_port, dst_port, proto, ip_header_size, plen, flags, window, tos
 
-def read_pkt(raw):
+def read_pkt(raw, read_ip_proto=True):
     id = None
     features = None
     flags = None
@@ -206,7 +224,7 @@ def read_pkt(raw):
         pkt = ethernet.Ethernet(raw)
         if pkt[ip.IP] is not None:
             frame_size = len(raw)
-            src_ip, dst_ip, src_port, dst_port, proto, header_size, payload_size, flags, window, tos = read_ip_pkt(pkt[ip.IP])
+            src_ip, dst_ip, src_port, dst_port, proto, header_size, payload_size, flags, window, tos = read_ip_pkt(pkt[ip.IP], read_proto=read_ip_proto)
             id = [src_ip, src_port, dst_ip, dst_port, proto]
             features = [frame_size, header_size, payload_size, window]
             flags = [int(item) for item in flags.split(',')]

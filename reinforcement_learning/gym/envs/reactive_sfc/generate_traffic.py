@@ -1,10 +1,12 @@
 import os, pandas, requests, json
 import os.path as osp
 import numpy as np
+import argparse as arp
 
 from config import *
 from common.ml import load_meta
 from time import sleep
+from common import data
 
 def calculate_probs(samples_dir, labels, criteria='flows'):
     label_dirs = []
@@ -45,11 +47,26 @@ def replay_traffic_on_interface(ovs_ip, ovs_port, duration):
 
 if __name__ == '__main__':
 
+    # process args
+
+    parser = arp.ArgumentParser(description='Generate datasets')
+    parser.add_argument('-l', '--labeler', help='Labeler', default='reverse_label_cicids17_short')
+    args = parser.parse_args()
+
+    # import labeler
+
+    reverse_labeler = getattr(data, args.labeler)
+
+    # meta
+
     meta = load_meta(data_dir)
     labels = meta['labels']
     env_idx = 0
     label = 4
     profiles = calculate_probs(stats_dir, labels)
+    augment = True
+
+    # vms
 
     with open(vms_fpath, 'r') as f:
         vms = json.load(f)
@@ -59,20 +76,24 @@ if __name__ == '__main__':
 
     # prepare traffic
 
+    aug_ips, aug_directions = reverse_labeler(label)
     ips = sorted([item for item in os.listdir(spl_dir) if osp.isdir(osp.join(spl_dir, item))])
     for ip in ips:
         if ip in profiles[label].keys():
             prob_idx = label
-            aug = True
+            if augment:
+                aug = {'ips': aug_ips, 'directions': aug_directions}
+            else:
+                aug = None
         else:
             prob_idx = 0
-            aug =False
+            aug = None
         fname_idx = np.random.choice(np.arange(len(profiles[prob_idx][ip][1])), p=profiles[prob_idx][ip][1])
         fnames = [f'{profiles[prob_idx][ip][0][fname_idx]}_label:{prob_idx}']
         augments = [aug]
         if prob_idx > 0:
             fnames.append(f'{profiles[prob_idx][ip][0][fname_idx]}_label:{0}')
-            augments.append(False)
+            augments.append(None)
         for fname, aug in zip(fnames, augments):
             prepare_traffic_on_interface(ovs_vm['mgmt'], flask_port, fname, augment=aug)
 

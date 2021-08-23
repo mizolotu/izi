@@ -1,13 +1,19 @@
-import json, logging, pcap
+import json, logging, pcap, os
 import numpy as np
 import os.path as osp
 
-from subprocess import Popen, DEVNULL, PIPE
+from subprocess import Popen, PIPE
 from collections import deque
 from threading import Thread
 from flask import Flask, request, jsonify
 from datetime import datetime
-from common.data_old import read_pkt_faster
+from common.data import read_pkt
+from socket import socket, AF_PACKET, SOCK_RAW
+from time import sleep, time
+
+from pypacker.layer12 import ethernet
+from pypacker.layer3 import ip
+from pypacker.layer4 import tcp
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -63,8 +69,8 @@ def ip_counts():
 
 @app.route('/report')
 def report():
-    in_pkts = [[ts, *read_pkt_faster(pkt)] for ts, pkt in list(flow_collector.in_pkts)]
-    out_pkts = [[ts, *read_pkt_faster(pkt)] for ts, pkt in list(flow_collector.out_pkts)]
+    in_pkts = [[ts, *read_pkt(pkt, read_proto=False)] for ts, pkt in list(flow_collector.in_pkts)]
+    out_pkts = [[ts, *read_pkt(pkt, read_proto=False)] for ts, pkt in list(flow_collector.out_pkts)]
     return jsonify({'in_pkts': in_pkts, 'out_pkts': out_pkts, 'timestamps': list(flow_collector.state_timestamps)})
 
 @app.route('/reset')
@@ -77,51 +83,104 @@ class TrafficGenerator():
     def __init__(self, iface, homedir):
         self.iface = iface
         self.homedir = homedir
-        self.pkts = {0: [], 1: []}
-        #self.sock =
+        self.pkts = []
+        self.sock = socket(AF_PACKET, SOCK_RAW)
+        self.sock.bind((self.iface, 0))
+        self.iat = 0.01
+        self.pad = 100
+        self.zpd = 0.005
+        self.zpp = 60
 
     def readpcap(self, fname, augment):
         fpath = osp.join(self.homedir, fname)
         pkts = []
         ts_last = None
         raw_last = None
+        aug_last = None
+        id_last = None
+        traffic_duration = 0
         try:
             reader = pcap.pcap(name=fpath)
             while True:
                 try:
                     ts, raw = next(reader)
-                    if ts_last is not None and raw_last is not None:
-                        pkts.append([ts - ts_last, raw_last])
+                    if ts_last is not None:
+                        tdelta = ts - ts_last
+                        pkts.append([tdelta, raw_last, id_last, aug_last])
+                        traffic_duration += tdelta
+                    aug = False
+                    if augment is not None:
+                        id, features, flags, tos = read_pkt(raw)
+                        if ('src' in augment['directions'] and id[0] in augment['ips'] or 'dst' in augment['directions'] and id[2] in augment['ips']) and flags[3]:
+                            aug = True
+                    else:
+                        id = []
                     ts_last = ts
                     raw_last = raw
-                except:
-                    pkts.append([None, raw_last])
+                    aug_last = aug
+                    id_last = id.copy()
+                except Exception as e:
+                    print(e)
+                    pkts.append([0, raw_last, id_last, aug_last])
                     break
-            self.pkts[augment].append(pkts)
+            self.pkts.append([traffic_duration, pkts])
             added = True
         except:
             added = False
         return added
 
     def replay(self, duration):
-
-        # replay packets in separate threads
-
         thrs = []
-        for key in self.pkts.keys():
-            for pkt_list in self.pkts[key]:
-                thrs.append(Thread(target=self._sendpkts, args=(pkt_list, duration, key), daemon=True))
+        for traffic_duration, pkt_list in self.pkts:
+            delay = np.random.rand() * (duration - traffic_duration)
+            thrs.append(Thread(target=self._sendpkts, args=(pkt_list, delay, duration), daemon=True))
         for thr in thrs:
             thr.start()
+        self.tstart = time()
+        self.pkts = []
 
-        # clear pkts
+    def _sendpkts(self, pkt_list, delay, duration):
+        td_total = 0
+        sleep(delay)
+        for td, pkt, id, aug in pkt_list:
+            if aug:
+                pkts_to_send = self._augment_pkt(pkt, id)
+            else:
+                pkts_to_send = [(td, pkt)]
+            for td, pkt in pkts_to_send:
+                try:
+                    self.sock.send(pkt)
+                except Exception as e:
+                    print(e, len(pkt))
+                sleep(td)
+                td_total += td
+            if td_total > duration:
+                break
 
-        self.pkts = {0: [], 1: []}
+    def _augment_pkt(self, pkt, id):
+        if self.iat > self.zpd:
+            pa = self._generate_zero_pkt(*id)
+            a = self._generate_ack(*id)
+            td = np.random.rand() * (self.iat - self.zpd)
+            pkts = [
+                (self.zpd, pa),
+                (td, a)
+            ]
+        else:
+            pkts = []
+        pkt += bytearray(os.urandom(self.pad))
+        pkts.append((self.iat, pkt))
+        return pkts
 
-    def _sendpkts(self, pkt_list, duration, augment):
-        for ts, pkt in pkt_list:
-            if ts is None:
-                print(ts)
+    def _generate_ack(self, src_ip, src_port, dst_ip, dst_port, proto):
+        assert proto == 6
+        ack = ethernet.Ethernet() + ip.IP(src_s=dst_ip, dst_s=src_ip) + tcp.TCP(sport=dst_port, dport=src_port, flags=16)
+        return ack.bin()
+
+    def _generate_zero_pkt(self, src_ip, src_port, dst_ip, dst_port, proto):
+        assert proto == 6
+        zp = ethernet.Ethernet() + ip.IP(src_s=src_ip, dst_s=dst_ip) + tcp.TCP(sport=src_port, dport=dst_port, flags=24, body_bytes=bytearray(self.zpp))
+        return zp.bin()
 
 class FlowCollector():
 
@@ -154,7 +213,7 @@ class FlowCollector():
         tnow = datetime.now().timestamp()
         self.state_timestamps.appendleft(tnow)
         in_items = list(self.in_pkts)
-        samples = [read_pkt_faster(item[1]) for item in in_items if item[0] > tnow - window]
+        samples = [read_pkt(item[1], read_ip_proto=False) for item in in_items if item[0] > tnow - window]
         return samples
 
     def clear_queues(self):

@@ -53,7 +53,7 @@ env_vms = {
     },
     'ids': {
         'unique': False,
-        'n': 1,
+        'n': 2,
         'cpus': 2,
         'ips': ['192.168.254.60'],
         'sources': [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']],
@@ -82,7 +82,11 @@ ctrl_name = 'odl'
 ctrl_port = 6653
 in_table = 0
 app_table = 1
-out_table = 10
+flag_table = 2
+attacker_in_table = 3
+action_tables = [i for i in range(4, 8)]
+attacker_out_table = 8
+out_table = 9
 block_table = out_table - 1
 ids_tables = [idx for idx in range(3, block_table)]
 priorities = {'lowest': 0, 'lower': 1, 'medium': 2, 'higher': 3, 'highest': 4}

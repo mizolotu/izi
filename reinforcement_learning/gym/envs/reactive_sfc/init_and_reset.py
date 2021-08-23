@@ -65,15 +65,38 @@ def restart_sdn(controller_vm, controller_obj, service='odl', sleep_interval=3):
         print('Controller is not ready!', ready)
         sleep(sleep_interval)
 
-def init_ovs_tables(controller, ovs_node, ovs_veths):
+def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths):
+
+    # input ofport
 
     in_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == in_veth_prefix]
     assert len(in_ofports) == 1
     in_ofport = in_ofports[0]
+
+    # ids vxlan ofports
+
+    vxlan_ofports, vxlan_tables = [], []
+    for vxlan in ovs_vxlans:
+        ids_name = vxlan['remote']
+        spl = ids_name.split('_')
+        ids_idx = int(spl[-1])
+        table = action_tables[0] + ids_idx + 1
+        vxlan_ofports.append(vxlan['ofport'])
+        vxlan_tables.append(table)
+
+    # output ofport
+
     out_ofports = [item['ofport'] for item in ovs_veths if item['tag'] == out_veth_prefix]
     assert len(out_ofports) == 1
     out_ofport = out_ofports[0]
+
+    # table 0 (input)
+
     controller.input_resubmit(ovs_node, in_table, priorities['lowest'], in_ofport, in_table + 1)
+    for ofport, table in zip(vxlan_ofports, vxlan_tables):
+        controller.input_resubmit(ovs_node, in_table, priorities['lower'], ofport, table)
+
+    # table 1 (applications)
 
     for app in applications:
         proto_name, proto_number = ip_proto(app[0])
@@ -84,12 +107,22 @@ def init_ovs_tables(controller, ovs_node, ovs_veths):
         elif len(app) == 1:
             controller.proto_resubmit(ovs_node, app_table, priorities['lowest'], proto_name, proto_number, app_table + 1)
 
-    for i in range(app_table + 1, out_table):
+    # table 2 (flags)
+
+    # table 3 (attackers before actions)
+
+    # tables 4 - 7 (actions)
+
+    for i in action_tables:
         controller.resubmit(ovs_node, i, priorities['lowest'], i + 1)
+
+    # table 8 (attacker after actions)
 
     for ip in attackers:
         for dir in ['source', 'destination']:
             controller.ip_resubmit(ovs_node, block_table, priorities['lower'], dir, ip, out_table)
+
+    # table 9 (output)
 
     controller.output(ovs_node, out_table, priorities['lowest'], out_ofport)
 
@@ -131,12 +164,16 @@ if __name__ == '__main__':
     controller_ip = controller_vm[0]['ip']
     controller = Odl(controller_ip)
 
-    # clean and init ovs tables
+    # clean ovs tables
 
-    ovs_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ovs_vm['vm']]
     clean_ovs_tables_via_api(controller, ovs_node)
     clean_ovs_tables_via_ssh(ovs_vm)
-    init_ovs_tables(controller, ovs_node, ovs_veths)
+
+    # init ovs tables
+
+    ovs_vxlans = [item for item in ofports if item['type'] == 'vxlan' and item['vm'] == ovs_vm['vm']]
+    ovs_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ovs_vm['vm']]
+    init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths)
 
     # clean and init ids tables
 
