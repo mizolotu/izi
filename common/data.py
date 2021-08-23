@@ -50,9 +50,6 @@ def reverse_label_cicids17_short(label):
         ips = ['18.218.115.60']
         directions = ['src']
     elif label == 3:
-        ips = ['13.58.225.34']
-        directions = ['src', 'dst']
-    elif label == 4:
         ips = ['18.219.211.138']
         directions = ['src', 'dst']
     else:

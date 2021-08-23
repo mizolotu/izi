@@ -65,7 +65,7 @@ python3 split_data.py
 2. Create datasets using different sampling interval, e.g. 0.5, 1, 2, etc:
 
 ```bash
-python3 preprocess_data.py -s <sampling interval>
+python3 extract_features.py -s <sampling interval>
 ```
 
 This may take some time, depending on the amount of the data and your computational power.

@@ -14,13 +14,14 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='ae', choices=['mlp', 'ae', 'som'])
-    parser.add_argument('-l', '--layers', help='Number of layers', default=[512, 256, 512], type=int, nargs='+')
+    parser.add_argument('-f', '--features', help='Feature extractor', default='dns', choices=['dns', 'cnn', 'att'])
+    parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'ae', 'som', 'gan'])  # TO DO gan
+    parser.add_argument('-l', '--layers', help='Number of layers', default=[512, 512], type=int, nargs='+')
     parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
-    parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0'])
-    parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,2,4'])
-    parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,2,4'])
-    parser.add_argument('-s', '--steps', help='Polling step', nargs='+', default=['0.0-1.0-0.001-3.0'])
+    parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,3'])
+    parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,3'])
+    parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,3'])
+    parser.add_argument('-s', '--steps', help='Polling step value or distribution', nargs='+', default=['0.0-1.0-0.001-3.0'])
     parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
 
     args = parser.parse_args()
@@ -124,22 +125,25 @@ if __name__ == '__main__':
 
             # meta
 
+            nwindows = meta['nwindows']
             nfeatures = meta['nfeatures']
             xmin = np.array(meta['xmin'])
             xmax = np.array(meta['xmax'])
 
             # define model
 
+            fe_type = getattr(models, args.features)
             model_type = getattr(models, args.model)
-            model, model_name, detection_type = model_type(nfeatures, args.layers)
+            model_inputs, model_hidden = fe_type(nwindows, nfeatures)
+            model, model_name, detection_type = model_type(model_inputs, model_hidden, args.layers)
             model.summary()
 
             # mappers
 
             if detection_type == 'cl':
-                mapper = lambda x, y: classification_mapper(x, y, xmin=xmin, xmax=xmax)
+                mapper = lambda x, y: classification_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
             elif detection_type == 'ad':
-                mapper = lambda x, y: anomaly_detection_mapper(x, y, xmin=xmin, xmax=xmax)
+                mapper = lambda x, y: anomaly_detection_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
             else:
                 print('Unknown detection type!')
                 sys.exit(1)
@@ -156,14 +160,14 @@ if __name__ == '__main__':
                 else:
                     batch_shares = [1.0 / len(labels[stage]) for _ in labels[stage]]
 
-                batches_ = [load_batches(fp, batch_size, nfeatures).map(mapper) for fp in fpaths_star[stage]]
+                batches_ = [load_batches(fp, batch_size, nfeatures=nwindows*nfeatures+1).map(mapper) for fp in fpaths_star[stage]]
                 batches[stage] = tf.data.experimental.sample_from_datasets(batches_, batch_shares).unbatch().shuffle(batch_size).batch(batch_size)
                 if num_batches[stage] is not None:
                     batches[stage] = batches[stage].take(num_batches[stage])
 
             # create model and results directories
 
-            m_path = osp.join(ids_models_dir, '{0}_{1}_{2}'.format(model_name, train_labels_str, step))
+            m_path = osp.join(ids_models_dir, '{0}_{1}_{2}_{3}'.format(args.features, model_name, train_labels_str, step))
             if not osp.isdir(m_path):
                 os.mkdir(m_path)
 
@@ -271,7 +275,7 @@ if __name__ == '__main__':
 
             results = [str(sk_auc)]
 
-            r_path = osp.join(foutput, '{0}_{1}_{2}'.format(model_name, inf_labels_str, step))
+            r_path = osp.join(foutput, '{0}_{1}_{2}_{3}'.format(args.features, model_name, inf_labels_str, step))
             if not osp.isdir(r_path):
                 os.mkdir(r_path)
             stats_path = osp.join(r_path, 'stats.csv')

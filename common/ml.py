@@ -31,23 +31,33 @@ def set_seeds(seed):
     tf.random.set_seed(seed)
     np.random.seed(seed)
 
-def classification_mapper(features, label, xmin, xmax, eps=1e-10):
-    features = (tf.stack(list(features.values()), axis=-1) - xmin) / (xmax - xmin + eps)
+def classification_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e-10):
+    features = tf.stack(list(features.values()), axis=-1)
+    features = tf.reshape(features, [-1, nsteps, nfeatures])
+    features = (features - xmin[None, None, :]) / (xmax[None, None, :] - xmin[None, None, :] + eps)
     label = tf.clip_by_value(label, 0, 1)
     return features, label
 
-def anomaly_detection_mapper(features, label, xmin, xmax, eps=1e-10):
-    features = (tf.stack(list(features.values()), axis=-1) - xmin) / (xmax - xmin + eps)
+def anomaly_detection_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e-10):
+    features = tf.stack(list(features.values()), axis=-1)
+    features = tf.reshape(features, [-1, nsteps, nfeatures])
+    features = (features - xmin[None, None, :]) / (xmax[None, None, :] - xmin[None, None, :] + eps)
     label = tf.clip_by_value(label, 0, 1)
-    features_with_labels = tf.concat([features, tf.reshape(label, (-1, 1))], axis=1)
+    features_with_labels = tf.reshape(features, [-1, nsteps * nfeatures])
+    features_with_labels = tf.concat([features_with_labels, tf.reshape(label, (-1, 1))], axis=1)
     return features, features_with_labels
 
-def mlp(nfeatures, layers, dropout=0.5, batchnorm=False, lr=5e-5):
-    inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
+def dns(nsteps, nfeatures, batchnorm=False, nhidden=512):
+    inputs = tf.keras.layers.Input(shape=(nsteps, nfeatures,))
     if batchnorm:
         hidden = tf.keras.layers.BatchNormalization()(inputs)
     else:
         hidden = inputs
+    hidden = tf.keras.layers.Flatten()(hidden)
+    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
+    return inputs, hidden
+
+def mlp(inputs, hidden, layers, dropout=0.5, lr=5e-5):
     for layer in layers:
         hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
         if dropout is not None:
