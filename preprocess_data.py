@@ -80,6 +80,7 @@ if __name__ == '__main__':
             if nv > 0 and tt > 0:
                 ttotal += tt
                 ntotal += nv
+            print(f'{fcount}/{len(input_fnames)}')
         print('Extracted features from {0} files of directory {1}/{2}: {3}, feature vectors: {4}, time per vector: {5}'.format(
             len(input_fnames), dcount, len(dnames), dname, ntotal, ttotal / ntotal)
         )

@@ -179,7 +179,7 @@ def read_pkt(raw, read_ip_proto=True):
 
 class Flow():
 
-    def __init__(self, ts, id, features, flags, nfeatures=65, nwindows=16, blk_thr=1.0, idl_thr=5.0):
+    def __init__(self, ts, id, features, flags, nfeatures=65, nwindows=4, blk_thr=1.0, idl_thr=5.0):
 
         # lists
 
@@ -914,7 +914,7 @@ def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpat
 
     # close writers
 
-    #os.remove(input)
+    os.remove(input)
     for pwriter in pwriters:
         pwriter.close()
 
