@@ -14,7 +14,7 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-f', '--features', help='Feature extractor', default='att', choices=['dns', 'cnn', 'att'])
+    parser.add_argument('-f', '--features', help='Feature extractor', default='dns', choices=['dns', 'cnn', 'att'])
     parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'aen', 'som', 'gan'])  # TO DO gan
     parser.add_argument('-l', '--layers', help='Number of layers', default=[512, 512], type=int, nargs='+')
     parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
