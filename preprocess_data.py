@@ -1,10 +1,10 @@
 import argparse as arp
 import os.path as osp
-import os, sys
+import os, sys, shutil
 
 from time import time
 from common import data
-from common.data import find_data_files, extract_flow_features
+from common.data import find_data_files, split_by_label_and_extract_flow_features
 from common.utils import isint, clean_dir
 from pathlib import Path
 from config import *
@@ -45,6 +45,7 @@ if __name__ == '__main__':
             for label in labels:
                 label_dir = osp.join(_dir, label)
                 clean_dir(label_dir, postfix='')
+                shutil.rmtree(label_dir)
         else:
             os.mkdir(_dir)
 
@@ -52,7 +53,7 @@ if __name__ == '__main__':
 
     dnames, fnames = find_data_files(spl_dir)
 
-    # metainfo
+    # metainfo fpath
 
     meta_f = osp.join(data_dir, meta_fname)
 
@@ -64,23 +65,18 @@ if __name__ == '__main__':
     for dname, fname_list in zip(dnames, fnames):
         dcount += 1
         idfs = [osp.join(dname, fname) for fname in fname_list]
-        input_fnames = [osp.join(spl_dir, input_fname) for input_fname in idfs]
-        input_fnames = [item for item in input_fnames if item.split('_')[-1].split(':')[0] == 'label' and isint(item.split('_')[-1].split(':')[1])]
+        input_fnames = [osp.join(spl_dir, input_fname) for input_fname in idfs if 'label' not in input_fname]
         fcount = 0
         ntotal = 0
         ttotal = 0
         for input_f in input_fnames:
             fcount += 1
-            label = input_f.split('_')[-1].split(':')[1]
-            features_label_dir = osp.join(features_dir, label)
-            stats_label_dir = osp.join(stats_dir, label)
-            for _dir in [features_label_dir, stats_label_dir]:
-                if not osp.isdir(_dir):
-                    os.mkdir(_dir)
+            features_label_dir = osp.join(features_dir, '{0}')
+            stats_label_dir = osp.join(stats_dir, '{0}')
             output_f = osp.join(features_label_dir, dname)
             stats_f = osp.join(stats_label_dir, dname)
             fsize = Path(input_f).stat().st_size
-            nv, tt = extract_flow_features(input_f, output_f, stats_f, meta_f, label=label, tstep=step, stages=stages, splits=splits)
+            nv, tt = split_by_label_and_extract_flow_features(input_f, features_dir, stats_dir, dname, meta_f, labeler=labeler, tstep=step, stages=stages, splits=splits)
             if nv > 0 and tt > 0:
                 ttotal += tt
                 ntotal += nv
@@ -91,10 +87,3 @@ if __name__ == '__main__':
     # print time elapsed
 
     print(f'\nCompleted in {(time() - tstart) / 3600} hours!')
-
-
-
-
-    input_fnames = [osp.join(spl_dir, df) for df in idfs]
-    for input_f in input_fnames:
-        split_by_label(input_f, labeler, meta_f, nulify_dscp=True)

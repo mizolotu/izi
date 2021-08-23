@@ -120,61 +120,6 @@ def label_cicids17(timestamp, src_ip, dst_ip, src_port=None, dst_port=None):
 
     return label, description
 
-def split_by_label(input, labeler, meta_fpath, nulify_dscp=True):
-
-    # meta
-
-    try:
-        with open(meta_fpath, 'r') as jf:
-            meta = json.load(jf)
-            if 'labels' not in meta.keys():
-                meta['labels'] = []
-    except:
-        meta = {'labels': []}
-
-    # read and write
-
-    labels = []
-    pwriters = []
-    try:
-        reader = pcap.pcap(input)
-        for ts, raw in reader:
-            eth = ethernet.Ethernet(raw)
-            if eth[ethernet.Ethernet, ip.IP] is not None:
-                src = eth[ip.IP].src_s
-                dst = eth[ip.IP].dst_s
-                if eth[tcp.TCP] is not None:
-                    sport = eth[tcp.TCP].sport
-                    dport = eth[tcp.TCP].dport
-                elif eth[udp.UDP] is not None:
-                    sport = eth[udp.UDP].sport
-                    dport = eth[udp.UDP].dport
-                else:
-                    sport = 0
-                    dport = 0
-                label, description = labeler(ts, src, dst, sport, dport)
-                if label in labels:
-                    idx = labels.index(label)
-                else:
-                    labels.append(label)
-                    pwriters.append(ppcap.Writer(filename=f'{input}_label:{label}'))
-                    idx = -1
-                if nulify_dscp:
-                    eth[ip.IP].tos = 0
-                pwriters[idx].write(eth.bin(), ts=ts*1e9)
-    except Exception as e:
-        print(e)
-
-    os.remove(input)
-    for pwriter in pwriters:
-        pwriter.close()
-
-    meta['labels'] += labels
-    meta['labels'] = np.unique(meta['labels']).tolist()
-
-    with open(meta_fpath, 'w') as jf:
-        json.dump(meta, jf)
-
 def decode_tcp_flags_value(value, nflags):
     b = '{0:b}'.format(value)[::-1]
     l = len(b)
@@ -230,11 +175,11 @@ def read_pkt(raw, read_ip_proto=True):
             flags = [int(item) for item in flags.split(',')]
     except Exception as e:
         print(e)
-    return id, features, flags, tos
+    return id, features, flags, pkt
 
 class Flow():
 
-    def __init__(self, ts, id, features, flags, blk_thr=1.0, idl_thr=5.0):
+    def __init__(self, ts, id, features, flags, nfeatures=65, nwindows=16, blk_thr=1.0, idl_thr=5.0):
 
         # lists
 
@@ -242,6 +187,9 @@ class Flow():
         self.pkts = [[ts, *features]]
         self.flags = [flags]
         self.directions = [1]
+        self.features = deque(maxlen=nwindows)
+        for i in range(nwindows):
+            self.features.append(np.zeros(nfeatures))
 
         # thresholds
 
@@ -462,70 +410,128 @@ class Flow():
         self.fw_seg_min = np.min(fw_pkts[:, 2]) if len(fw_pkts) > 0 else 0
 
         self.nnewpkts = 0
+        self.features.append(
+            np.array([
+                self.is_tcp,  # 0
+                self.is_udp,  # 1
+                self.fl_dur,  # 2
+                self.tot_fw_pk,  # 3
+                self.tot_bw_pk,  # 4
+                self.tot_l_fw_pkt,  # 5
+                self.fw_pkt_l_max,  # 6
+                self.fw_pkt_l_min,  # 7
+                self.fw_pkt_l_avg,  # 8
+                self.fw_pkt_l_std,  # 9
+                self.bw_pkt_l_max,  # 10
+                self.bw_pkt_l_min,  # 11
+                self.bw_pkt_l_avg,  # 12
+                self.bw_pkt_l_std,  # 13
+                self.fl_byt_s,  # 14
+                self.fl_pkt_s,  # 15
+                self.fl_iat_avg,  # 16
+                self.fl_iat_std,  # 17
+                self.fl_iat_max,  # 18
+                self.fl_iat_min,  # 19
+                self.fw_iat_tot,  # 20
+                self.fw_iat_avg,  # 21
+                self.fw_iat_std,  # 22
+                self.fw_iat_max,  # 23
+                self.fw_iat_min,  # 24
+                self.bw_iat_tot,  # 25
+                self.bw_iat_avg,  # 26
+                self.bw_iat_std,  # 27
+                self.bw_iat_max,  # 28
+                self.bw_iat_min,  # 29
+                self.fw_psh_flag,  # 30
+                self.bw_psh_flag,  # 31
+                self.fw_pkt_s,  # 32
+                self.bw_pkt_s,  # 33
+                self.pkt_len_min,  # 34
+                self.pkt_len_max,  # 35
+                self.pkt_len_avg,  # 36
+                self.pkt_len_std,  # 37
+                *self.flag_counts,  # 38, 39, 40, 41, 42
+                self.down_up_ratio,  # 43
+                self.fw_byt_blk_avg,  # 44
+                self.fw_pkt_blk_avg,  # 45
+                self.fw_blk_rate_avg,  # 46
+                self.bw_byt_blk_avg,  # 47
+                self.bw_pkt_blk_avg,  # 48
+                self.bw_blk_rate_avg,  # 49
+                self.fw_pkt_sub_avg,  # 50
+                self.fw_byt_sub_avg,  # 51
+                self.bw_pkt_sub_avg,  # 52
+                self.bw_byt_sub_avg,  # 53
+                self.fw_win_byt,  # 54
+                self.bw_win_byt,  # 55
+                self.fw_act_pkt,  # 56
+                self.atv_avg,  # 57
+                self.atv_std,  # 58
+                self.atv_max,  # 59
+                self.atv_min,  # 60
+                self.idl_avg,  # 61
+                self.idl_std,  # 62
+                self.idl_max,  # 63
+                self.idl_min  # 64
+            ])
+        )
 
-        return np.array([
-            self.is_tcp,  # 0
-            self.is_udp,  # 1
-            self.fl_dur,  # 2
-            self.tot_fw_pk,  # 3
-            self.tot_bw_pk,  # 4
-            self.tot_l_fw_pkt,  # 5
-            self.fw_pkt_l_max,  # 6
-            self.fw_pkt_l_min,  # 7
-            self.fw_pkt_l_avg,  # 8
-            self.fw_pkt_l_std,  # 9
-            self.bw_pkt_l_max,  # 10
-            self.bw_pkt_l_min,  # 11
-            self.bw_pkt_l_avg,  # 12
-            self.bw_pkt_l_std,  # 13
-            self.fl_byt_s,  # 14
-            self.fl_pkt_s,  # 15
-            self.fl_iat_avg,  # 16
-            self.fl_iat_std,  # 17
-            self.fl_iat_max,  # 18
-            self.fl_iat_min,  # 19
-            self.fw_iat_tot,  # 20
-            self.fw_iat_avg,  # 21
-            self.fw_iat_std,  # 22
-            self.fw_iat_max,  # 23
-            self.fw_iat_min,  # 24
-            self.bw_iat_tot,  # 25
-            self.bw_iat_avg,  # 26
-            self.bw_iat_std,  # 27
-            self.bw_iat_max,  # 28
-            self.bw_iat_min,  # 29
-            self.fw_psh_flag,  # 30
-            self.bw_psh_flag,  # 31
-            self.fw_pkt_s,  # 32
-            self.bw_pkt_s,  # 33
-            self.pkt_len_min,  # 34
-            self.pkt_len_max,  # 35
-            self.pkt_len_avg,  # 36
-            self.pkt_len_std,  # 37
-            *self.flag_counts, # 38, 39, 40, 41, 42
-            self.down_up_ratio,  # 43
-            self.fw_byt_blk_avg,  # 44
-            self.fw_pkt_blk_avg,  # 45
-            self.fw_blk_rate_avg,  # 46
-            self.bw_byt_blk_avg,  # 47
-            self.bw_pkt_blk_avg,  # 48
-            self.bw_blk_rate_avg,  # 49
-            self.fw_pkt_sub_avg,  # 50
-            self.fw_byt_sub_avg,  # 51
-            self.bw_pkt_sub_avg,  # 52
-            self.bw_byt_sub_avg,  # 53
-            self.fw_win_byt,  # 54
-            self.bw_win_byt,  # 55
-            self.fw_act_pkt,  # 56
-            self.atv_avg,  # 57
-            self.atv_std,  # 58
-            self.atv_max,  # 59
-            self.atv_min,  # 60
-            self.idl_avg,  # 61
-            self.idl_std,  # 62
-            self.idl_max,  # 63
-            self.idl_min  # 64
-        ])
+        return np.vstack(self.features)
+
+def split_by_label(input, labeler, meta_fpath, nulify_dscp=True):
+
+    # meta
+
+    try:
+        with open(meta_fpath, 'r') as jf:
+            meta = json.load(jf)
+            if 'labels' not in meta.keys():
+                meta['labels'] = []
+    except:
+        meta = {'labels': []}
+
+    # read and write
+
+    labels = []
+    pwriters = []
+    try:
+        reader = pcap.pcap(input)
+        for ts, raw in reader:
+            eth = ethernet.Ethernet(raw)
+            if eth[ethernet.Ethernet, ip.IP] is not None:
+                src = eth[ip.IP].src_s
+                dst = eth[ip.IP].dst_s
+                if eth[tcp.TCP] is not None:
+                    sport = eth[tcp.TCP].sport
+                    dport = eth[tcp.TCP].dport
+                elif eth[udp.UDP] is not None:
+                    sport = eth[udp.UDP].sport
+                    dport = eth[udp.UDP].dport
+                else:
+                    sport = 0
+                    dport = 0
+                label, description = labeler(ts, src, dst, sport, dport)
+                if label in labels:
+                    idx = labels.index(label)
+                else:
+                    labels.append(label)
+                    pwriters.append(ppcap.Writer(filename=f'{input}_label:{label}'))
+                    idx = -1
+                if nulify_dscp:
+                    eth[ip.IP].tos = 0
+                pwriters[idx].write(eth.bin(), ts=ts*1e9)
+    except Exception as e:
+        print(e)
+
+    os.remove(input)
+    for pwriter in pwriters:
+        pwriter.close()
+
+    meta['labels'] += labels
+    meta['labels'] = np.unique(meta['labels']).tolist()
+
+    with open(meta_fpath, 'w') as jf:
+        json.dump(meta, jf)
 
 def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages, splits, nnewpkts_min=0, lasttime_min=1.0):
 
@@ -685,6 +691,232 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
         print(e, fname, exc_tb.tb_lineno)
+
+    return nvectors, ttotal
+
+def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpath, labeler, tstep, stages, splits, nnewpkts_min=0, lasttime_min=1.0, nulify_dscp=True):
+
+    src_ip_idx = 0
+    src_port_idx = 1
+    dst_ip_idx = 2
+    dst_port_idx = 3
+    proto_idx = 4
+
+    flow_ids = []
+    flow_objects = []
+    flow_labels = []
+    flow_features = []
+    flow_feature_labels = []
+
+    tstart = None
+    ttotal = 0
+    npkts = 0
+    nflows = 0
+    nvectors = 0
+
+    if type(tstep) == tuple or type(tstep) == list:
+        assert len(tstep) == 4, 'There should be 4 parameters: mu, std, min and max'
+        get_next_tstep = lambda: np.clip(np.abs(tstep[0] + np.random.rand() * tstep[1]), tstep[2], tstep[3])
+        tstep_str = '-'.join([str(item) for item in tstep])
+    else:
+        get_next_tstep = lambda: tstep
+        tstep_str = str(tstep)
+
+    # load meta
+
+    try:
+        with open(meta_fpath, 'r') as jf:
+            meta = json.load(jf)
+            if 'labels' not in meta.keys():
+                meta['labels'] = []
+    except:
+        meta = {'labels': []}
+
+    try:
+        nwindows = meta['nwindows']
+        nfeatures = meta['nfeatures']
+        xmin = meta['xmin']
+        xmax = meta['xmax']
+    except:
+        nwindows = None
+        nfeatures = None
+        xmin = None
+        xmax = None
+
+    # main read loop
+
+    labels = []
+    pwriters = []
+
+    try:
+        reader = pcap.pcap(input)
+        for timestamp, raw in reader:
+
+            # read pkt
+
+            id, features, flags, ether = read_pkt(raw)
+
+            if id is not None:
+
+                # label the packet
+
+                src = id[src_ip_idx]
+                dst = id[dst_ip_idx]
+                sport = id[src_port_idx]
+                dport = id[dst_port_idx]
+                proto = id[proto_idx]
+                label, description = labeler(timestamp, src, dst, sport, dport)
+
+                # nulify tos field because it will be used to mark flows
+
+                if nulify_dscp:
+                    ether[ip.IP].tos = 0
+
+                # write the packet
+
+                if label in labels:
+                    label_idx = labels.index(label)
+                else:
+                    labels.append(label)
+                    pwriters.append(ppcap.Writer(filename=f'{input}_label:{label}'))
+                    label_idx = -1
+                pwriters[label_idx].write(ether.bin(), ts=timestamp * 1e9)
+
+                # time start
+
+                if tstart is None:
+                    tstart = int(timestamp)
+                    seconds = get_next_tstep()
+
+                # add packets to flows
+
+                reverse_id = [dst, dport, src, sport, proto]
+
+                if timestamp > (tstart + seconds):
+
+                    # remove old flows
+
+                    tmp_ids = []
+                    tmp_objects = []
+                    tmp_labels = []
+                    for i, o, l in zip(flow_ids, flow_objects, flow_labels):
+                        if o.is_active:
+                            tmp_ids.append(i)
+                            tmp_objects.append(o)
+                            tmp_labels.append(l)
+                    flow_ids = list(tmp_ids)
+                    flow_objects = list(tmp_objects)
+                    flow_labels = list(tmp_labels)
+
+                    # calculate_features
+
+                    flow_features_t = []
+                    flow_labels_t = []
+                    for flow_id, flow_object, flow_label in zip(flow_ids, flow_objects, flow_labels):
+                        if flow_object.nnewpkts > nnewpkts_min or (timestamp - flow_object.lasttime) > lasttime_min:
+                            t_calc_start = time()
+                            _features = flow_object.get_features()
+                            ttotal += time() - t_calc_start
+                            flow_features_t.append(_features)
+                            flow_labels_t.append(flow_label)
+                    flow_features.extend(flow_features_t)
+                    flow_feature_labels.extend(flow_labels_t)
+
+                    # update time
+
+                    seconds += get_next_tstep()
+
+                # add packets
+
+                if id in flow_ids:
+                    direction = 1
+                    idx = flow_ids.index(id)
+                    flow_objects[idx].append(timestamp, features, flags, direction)
+                elif reverse_id in flow_ids:
+                    direction = -1
+                    idx = flow_ids.index(reverse_id)
+                    flow_objects[idx].append(timestamp, features, flags, direction)
+                else:
+                    flow_ids.append(id)
+                    flow_objects.append(Flow(timestamp, id, features, flags))
+                    flow_labels.append(label)
+                    nflows += 1
+
+                npkts += 1
+
+        # lists to arrays
+
+        flow_features = np.array(flow_features, dtype=np.float)
+        flow_feature_labels = np.array(flow_feature_labels, dtype=np.float)
+        assert flow_features.shape[0] == len(flow_feature_labels)
+
+        # update meta
+
+        nvectors = flow_features.shape[0]
+        if nvectors > 0:
+            if nfeatures is None:
+                nwindows = flow_features.shape[1]
+                nfeatures = flow_features.shape[2]
+                xmin = np.min(flow_features[:, -1, :], axis=0)
+                xmax = np.max(flow_features[:, -1, :], axis=0)
+            else:
+                assert nwindows == flow_features.shape[1]
+                assert nfeatures == flow_features.shape[2]
+                xmin = np.min(np.vstack([xmin, flow_features[:, -1, :]]), axis=0)
+                xmax = np.max(np.vstack([xmax, flow_features[:, -1, :]]), axis=0)
+
+            # split and save features
+
+            for label in labels:
+                features_label_dir = osp.join(fdir, str(label))
+                stats_label_dir = osp.join(sdir, str(label))
+                for _dir in [features_label_dir, stats_label_dir]:
+                   if not osp.isdir(_dir):
+                       os.mkdir(_dir)
+                output_f = osp.join(features_label_dir, dname)
+                stats_f = osp.join(stats_label_dir, dname)
+                idx = np.where(flow_feature_labels == label)[0]
+                if len(idx) > 0:
+                    values_l = np.hstack([flow_features[idx, :].reshape(len(idx), nwindows * nfeatures), flow_feature_labels[idx, None]])
+                    inds = np.arange(len(values_l))
+                    inds_splitted = [[] for _ in stages]
+                    np.random.shuffle(inds)
+                    val, remaining = np.split(inds, [int(splits[1] * len(inds))])
+                    tr, te = np.split(remaining, [int(splits[0] * len(remaining))])
+                    inds_splitted[0] = tr
+                    inds_splitted[1] = te
+                    inds_splitted[2] = val
+                    for fi, stage in enumerate(stages):
+                        fname = '{0}_{1}_{2}'.format(output_f, tstep_str, stage)
+                        pandas.DataFrame(values_l[inds_splitted[fi], :]).to_csv(fname, header=False, mode='a', index=False)
+
+                # save stats
+
+                spl = input.split('_')
+                cap_name = '_'.join(spl[:-1])
+                pandas.DataFrame([[cap_name] + [nflows, npkts]]).to_csv(stats_f, header=False, mode='a', index=False)
+
+            # save meta
+
+            meta['labels'] += labels
+            meta['labels'] = np.unique(meta['labels']).tolist()
+            meta['nwindows'] = nwindows
+            meta['nfeatures'] = nfeatures
+            meta['xmin'] = xmin.tolist()
+            meta['xmax'] = xmax.tolist()
+            with open(meta_fpath, 'w') as jf:
+                json.dump(meta, jf)
+
+    except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(e, fname, exc_tb.tb_lineno)
+
+    # close writers
+
+    #os.remove(input)
+    for pwriter in pwriters:
+        pwriter.close()
 
     return nvectors, ttotal
 

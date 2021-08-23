@@ -44,4 +44,4 @@ if __name__ == '__main__':
 
     # print time elapsed
 
-    print(f'\nCompleted in {(time() - tstart) / 3600} hours!')
+    print(f'\nCompleted in {(time() - tstart) / 60} minutes!')

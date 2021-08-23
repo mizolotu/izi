@@ -62,7 +62,7 @@ env_vms = {
     }
 }
 
-# ids and ips
+# data, deep learning and ids
 
 stages = ['train', 'validate', 'inference']
 splits = [0.5, 0.2]
