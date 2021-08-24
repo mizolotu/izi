@@ -486,7 +486,6 @@ class SOMLayer(tf.keras.layers.Layer):
         self.map_size = map_size
         self.nprototypes = np.prod(map_size)
         self.initial_prototypes = prototypes
-        #self.input_spec = tf.keras.layers.InputSpec(ndim=3)
         self.prototypes = None
         self.built = False
 
@@ -542,14 +541,9 @@ class SOM(tf.keras.models.Model):
         x = self.som_layer(x)
         s = tf.sort(x, axis=1)
         spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
-        return tf.reduce_mean(spl[0], axis=1)  # tf.math.argmin(d, axis=1)
+        return tf.reduce_mean(spl[0], axis=1)
 
     def map_dist(self, y_pred):
-        #labels = np.arange(self.nprototypes)
-        #tmp = tf.expand_dims(y_pred, axis=1)
-        #d_row = tf.math.abs(tmp - labels) // self.map_size[1]
-        #d_col = tf.math.abs(tmp % self.map_size[1] - labels % self.map_size[1])
-        #return tf.cast(d_row + d_col, tf.float32)
         labels = tf.gather(self.prototype_coordinates, y_pred)
         mh = tf.reduce_sum(tf.math.abs(tf.expand_dims(labels, 1) - tf.expand_dims(self.prototype_coordinates, 0)), axis=-1)
         return tf.cast(mh, tf.float32)
@@ -592,9 +586,6 @@ class SOM(tf.keras.models.Model):
 
     def test_step(self, data):
         inputs, outputs = data
-
-        # Compute cluster assignments for batches
-
         inputs = self.bn_layer(inputs)
         d = self.som_layer(inputs)
         y_pred = tf.math.argmin(d, axis=1)
@@ -610,3 +601,47 @@ def som(nsteps, nfeatures, layers=[64, 64], dropout=0.5, batchnorm=True, lr=5e-5
     model.build(input_shape=(None, nsteps, nfeatures))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'som_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
+
+class BGNGenerator(tf.keras.layers.Layer):
+
+    def __init__(self, layers, kernel_size=2, **kwargs):
+        super(BGNGenerator, self).__init__(**kwargs)
+        self.hiddens = layers
+        self.convs = []
+        for nh in self.hiddens:
+            self.convs.append(tf.keras.layers.Conv1DTranspose(filters=nh, kernel_size=kernel_size))
+        self.built = False
+
+    def build(self, input_shape):
+        input_dims = input_shape[1:]
+        self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, *input_dims))
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        h = inputs
+        for conv in self.convs:
+            h = conv(h)
+        return h
+
+class BGN(tf.keras.models.Model):
+
+    def __init__(self, layers, batchnorm):
+        super(BGN, self).__init__()
+        self.hiddens = layers
+        self.bn_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
+
+    def call(self, x):
+        x = self.bn_layer(x)
+        x = self.som_layer(x)
+        s = tf.sort(x, axis=1)
+        spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
+        return tf.reduce_mean(spl[0], axis=1)
+
+    def train_step(self, data):
+
+
+def bgn(nsteps, nfeatures, layers=[512], dropout=0.5, batchnorm=True, lr=5e-5):
+    model = BGN(layers, dropout, batchnorm)
+    model.build(input_shape=(None, nsteps, nfeatures))
+    model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
+    return model, 'bgn_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
