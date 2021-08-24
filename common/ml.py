@@ -39,7 +39,7 @@ def classification_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e
     label = tf.clip_by_value(label, 0, 1)
     return features, label
 
-def autoencoder_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e-10):
+def anomaly_detection_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e-10):
     features = tf.stack(list(features.values()), axis=-1)
     features = tf.reshape(features, [-1, nsteps, nfeatures])
     features = (features - xmin[None, None, :]) / (xmax[None, None, :] - xmin[None, None, :] + eps)
@@ -226,12 +226,13 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         probs = []
         testy = []
         for x, y in self.validation_data:
-            #y_labels = np.clip(y[:, -1], 0, 1)
-            y_labels = np.clip(y, 0, 1)
+            y_labels = np.clip(y[:, -1], 0, 1)
             reconstructions = self.model.predict(x)
             if self.model_type == 'aen':
-                new_probs = np.linalg.norm(reconstructions - x, axis=1)
+                new_probs = np.mean(np.linalg.norm(reconstructions - x, axis=-1), axis=-1)
             elif self.model_type == 'som':
+                new_probs = reconstructions
+            elif self.model_type == 'bgn':
                 new_probs = reconstructions
             else:
                 raise NotImplemented
@@ -626,7 +627,6 @@ class BGNGenerator(tf.keras.layers.Layer):
         x = inputs
         for hidden in self.hiddens:
             x = hidden(x)
-            print(x)
         x = self.output_layer(x)
         return x
 
@@ -638,12 +638,16 @@ class BGNDiscriminator(tf.keras.layers.Layer):
         self.convs = []
         for nh in self.hiddens:
             self.convs.append(tf.keras.layers.Conv1D(filters=nh, kernel_size=kernel_size))
+        self.flat = tf.keras.layers.Flatten()
+        self.outputs = tf.keras.layers.Dense(1, activation='sigmoid')
 
     def call(self, inputs, **kwargs):
         h = inputs
         for conv in self.convs:
             h = conv(h)
-        return h
+        h = self.flat(h)
+        h = self.outputs(h)
+        return h[:, 0]
 
 class BGN(tf.keras.models.Model):
 
@@ -673,15 +677,33 @@ class BGN(tf.keras.models.Model):
         d_inputs = tf.concat([x_fake, x_real], axis=0)
         d_preds = self.discriminator(d_inputs)
         pred_g, pred_e = tf.split(d_preds, num_or_size_splits=2, axis=0)
+        d_loss = tf.reduce_mean(tf.nn.softplus(pred_g)) + tf.reduce_mean(tf.nn.softplus(-pred_e))
+        g_loss = tf.reduce_mean(tf.nn.softplus(-pred_g))
+        d_gradients = tf.gradients(d_loss, self.discriminator.trainable_variables)
+        g_gradients = tf.gradients(g_loss, self.generator.trainable_variables)
+        self.optimizer.apply_gradients(zip(d_gradients, self.discriminator.trainable_variables))
+        self.optimizer.apply_gradients(zip(g_gradients, self.generator.trainable_variables))
+        self.g_loss_tracker.update_state(g_loss)
+        self.d_loss_tracker.update_state(d_loss)
+
+        return {
+            "g_loss": self.g_loss_tracker.result(),
+            "d_loss": self.d_loss_tracker.result(),
+        }
+
+        return d_loss, g_loss
+
+    def test_step(self, data):
+        x_real, z_with_label = data
+        z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
+        z = tf.expand_dims(z, 1)
+        x_fake = self.generator(z)
+        d_inputs = tf.concat([x_fake, x_real], axis=0)
+        d_preds = self.discriminator(d_inputs)
+        pred_g, pred_e = tf.split(d_preds, num_or_size_splits=2, axis=0)
 
         d_loss = tf.reduce_mean(tf.nn.softplus(pred_g)) + tf.reduce_mean(tf.nn.softplus(-pred_e))
         g_loss = tf.reduce_mean(tf.nn.softplus(-pred_g))
-
-        d_gradients = tf.gradients(d_loss, self.discriminator.trainable_variables)
-        g_gradients = tf.gradients(g_loss, self.generator.trainable_variables)
-
-        self.optimizer.apply_gradients(zip(d_gradients, self.discriminator.trainable_variables))
-        self.optimizer.apply_gradients(zip(g_gradients, self.generator.trainable_variables))
 
         self.g_loss_tracker.update_state(g_loss)
         self.d_loss_tracker.update_state(d_loss)

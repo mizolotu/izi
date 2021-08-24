@@ -8,7 +8,7 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, classification_mapper, autoencoder_mapper, gan_mapper, load_meta, EarlyStoppingAtMaxMetric
+from common.ml import set_seeds, load_batches, classification_mapper, anomaly_detection_mapper, gan_mapper, load_meta, EarlyStoppingAtMaxMetric
 from config import *
 
 if __name__ == '__main__':
@@ -142,12 +142,13 @@ if __name__ == '__main__':
 
             # mappers
 
-            if detection_type == 'cl' or args.model == 'som':
+            if detection_type == 'cl':
                 mapper = lambda x, y: classification_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
-            elif args.model == 'aen':
-                mapper = lambda x, y: autoencoder_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
-            elif args.model == 'bgn':
-                mapper = lambda x, y: gan_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
+            elif detection_type == 'ad':
+                if args.model in ['aen', 'som']:
+                    mapper = lambda x, y: anomaly_detection_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
+                elif args.model in ['bgn']:
+                    mapper = lambda x, y: gan_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
             else:
                 print('Unknown detection type!')
                 sys.exit(1)
