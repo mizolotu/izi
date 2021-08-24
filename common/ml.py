@@ -486,22 +486,21 @@ class SOMLayer(tf.keras.layers.Layer):
         self.map_size = map_size
         self.nprototypes = np.prod(map_size)
         self.initial_prototypes = prototypes
-        self.input_spec = tf.keras.layers.InputSpec(ndim=2)
+        #self.input_spec = tf.keras.layers.InputSpec(ndim=3)
         self.prototypes = None
         self.built = False
 
     def build(self, input_shape):
-        assert(len(input_shape) == 2)
-        input_dim = input_shape[1]
-        self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, input_dim))
-        self.prototypes = self.add_weight(shape=(self.nprototypes, input_dim), initializer='glorot_uniform', name='prototypes')
+        input_dims = input_shape[1:]
+        self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, *input_dims))
+        self.prototypes = self.add_weight(shape=(self.nprototypes, *input_dims), initializer='glorot_uniform', name='prototypes')
         if self.initial_prototypes is not None:
             self.set_weights(self.initial_prototypes)
             del self.initial_prototypes
         self.built = True
 
     def call(self, inputs, **kwargs):
-        d = tf.reduce_sum(tf.square(tf.expand_dims(inputs, axis=1) - self.prototypes), axis=2)
+        d = tf.reduce_mean(tf.reduce_sum(tf.square(tf.expand_dims(inputs, axis=1) - self.prototypes), axis=-1), axis=-1)
         return d
 
     def compute_output_shape(self, input_shape):
@@ -516,17 +515,17 @@ class SOMLayer(tf.keras.layers.Layer):
 def som_loss(weights, distances):
     return tf.reduce_mean(tf.reduce_sum(weights * distances, axis=1))
 
-class DSOM(tf.keras.models.Model):
+class SOM(tf.keras.models.Model):
 
     def __init__(self, map_size, batchnorm, T_min=0.1, T_max=10.0, niterations=10000, nnn=4):
-        super(DSOM, self).__init__()
+        super(SOM, self).__init__()
         self.map_size = map_size
         self.nprototypes = np.prod(map_size)
         ranges = [np.arange(m) for m in map_size]
         mg = np.meshgrid(*ranges, indexing='ij')
         self.prototype_coordinates = tf.convert_to_tensor(np.array([item.flatten() for item in mg]).T)
         self.bn_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
-        self.som_layer = SOMLayer(map_size, name='SOM')
+        self.som_layer = SOMLayer(map_size, name='som_layer')
         self.T_min = T_min
         self.T_max = T_max
         self.niterations = niterations
@@ -606,8 +605,8 @@ class DSOM(tf.keras.models.Model):
             "total_loss": self.total_loss_tracker.result()
         }
 
-def som(nfeatures, layers, dropout=0.5, batchnorm=True, lr=5e-5):
-    model = DSOM(layers, dropout, batchnorm)
-    model.build(input_shape=(None, nfeatures - 1))
+def som(nsteps, nfeatures, layers=[64, 64], dropout=0.5, batchnorm=True, lr=5e-5):
+    model = SOM(layers, dropout, batchnorm)
+    model.build(input_shape=(None, nsteps, nfeatures))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'som_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
