@@ -132,10 +132,12 @@ if __name__ == '__main__':
 
             # define model
 
-            fe_type = getattr(models, args.features)
-            model_type = getattr(models, args.model)
-            model_inputs, model_hidden, att_name = fe_type(nwindows, nfeatures)
-            model, model_name, detection_type = model_type(model_inputs, model_hidden, args.layers)
+            mirrored_strategy = tf.distribute.MirroredStrategy()
+            with mirrored_strategy.scope():
+                fe_type = getattr(models, args.features)
+                model_type = getattr(models, args.model)
+                model_inputs, model_hidden, att_name = fe_type(nwindows, nfeatures)
+                model, model_name, detection_type = model_type(model_inputs, model_hidden, args.layers)
             model.summary()
 
             # mappers
