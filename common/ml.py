@@ -137,9 +137,10 @@ def res(nfeatures, nb, nh, dropout=0.5, lr=5e-5):
     return model, 'resnet_{0}_{1}'.format(nb, nh)
 
 def ae_reconstruction_loss(y_true, y_pred):
-    y_true, _ = tf.split(y_true, [y_pred.shape[1], 1], axis=1)
+    y_true, _ = tf.split(y_true, [y_pred.shape[1] * y_pred.shape[2], 1], axis=1)
+    y_true = tf.reshape(y_true, [-1, y_pred.shape[1], y_pred.shape[2]])
     squared_difference = tf.square(y_true - y_pred)
-    return tf.math.sqrt(tf.reduce_sum(squared_difference, axis=-1))
+    return tf.reduce_mean(tf.math.sqrt(tf.reduce_sum(squared_difference, axis=-1)), axis=-1)
 
 class ReconstructionAuc(tf.keras.metrics.Metric):
 
@@ -255,7 +256,6 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
             raise NotImplemented
         print(f'\nValidation {self.metric}:', self.current)
 
-
 class ReconstructionPrecision(tf.keras.metrics.Metric):
 
     def __init__(self, name='reconstruction_precision', alpha=3, **kwargs):
@@ -318,21 +318,25 @@ class ReconstructionAccuracy(tf.keras.metrics.Metric):
         self.reconstruction_errors.assign([])
         self.true_labels.assign([])
 
-def aen(nfeatures, layers, dropout=0.5, batchnorm=True, lr=5e-5):
-    inputs = tf.keras.layers.Input(shape=(nfeatures - 1,))
+def aen(nsteps, nfeatures, layers=[512, 512], kernel_size=2, nhidden=32, dropout=0.5, batchnorm=True, lr=5e-5):
+    inputs = tf.keras.layers.Input(shape=(nsteps, nfeatures,))
     if batchnorm:
-        norm = tf.keras.layers.BatchNormalization()
-        hidden = norm(inputs)
+        hidden = tf.keras.layers.BatchNormalization()(inputs)
     else:
         hidden = inputs
-    for layer in layers:
-        hidden = tf.keras.layers.Dense(layer, activation='relu')(hidden)
+    for nfilters in layers:
+        hidden = tf.keras.layers.Conv1D(nfilters, kernel_size, activation='relu')(hidden)
         if dropout is not None:
             hidden = tf.keras.layers.Dropout(dropout)(hidden)
-    outputs = tf.keras.layers.Dense(nfeatures - 1, activation='sigmoid')(hidden)
+    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
+    for nfilters in layers:
+        hidden = tf.keras.layers.Conv1DTranspose(nfilters, kernel_size, activation='relu')(hidden)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    outputs = tf.keras.layers.Dense(nfeatures, activation='sigmoid')(hidden)
     model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=ae_reconstruction_loss, optimizer=tf.keras.optimizers.Adam(lr=lr))
-    return model, 'ae_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
+    return model, 'aen_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
 
 class Sampling(tf.keras.layers.Layer):
 
