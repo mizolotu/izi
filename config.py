@@ -75,6 +75,7 @@ ds_params = ['nflows', 'delay']
 n_ds_params = len(ds_params)
 roc_fname = 'roc.csv'
 fpr_levels = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
+gan_latent_dim = 16
 
 # sdn
 

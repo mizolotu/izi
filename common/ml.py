@@ -3,7 +3,8 @@ import os.path as osp
 import tensorflow as tf
 import numpy as np
 
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import roc_auc_score
+from config import gan_latent_dim
 
 def load_batches(path, batch_size, nfeatures):
     batches = tf.data.experimental.make_csv_dataset(
@@ -38,7 +39,7 @@ def classification_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e
     label = tf.clip_by_value(label, 0, 1)
     return features, label
 
-def anomaly_detection_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e-10):
+def autoencoder_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps=1e-10):
     features = tf.stack(list(features.values()), axis=-1)
     features = tf.reshape(features, [-1, nsteps, nfeatures])
     features = (features - xmin[None, None, :]) / (xmax[None, None, :] - xmin[None, None, :] + eps)
@@ -46,6 +47,15 @@ def anomaly_detection_mapper(features, label, nsteps, nfeatures, xmin, xmax, eps
     features_with_labels = tf.reshape(features, [-1, nsteps * nfeatures])
     features_with_labels = tf.concat([features_with_labels, tf.reshape(label, (-1, 1))], axis=1)
     return features, features_with_labels
+
+def gan_mapper(features, label, nsteps, nfeatures, xmin, xmax, latent_dim=gan_latent_dim, eps=1e-10):
+    features = tf.stack(list(features.values()), axis=-1)
+    features = tf.reshape(features, [-1, nsteps, nfeatures])
+    features = (features - xmin[None, None, :]) / (xmax[None, None, :] - xmin[None, None, :] + eps)
+    label = tf.clip_by_value(label, 0, 1)
+    z = tf.random.uniform(shape=(features.shape[0], tf.constant(latent_dim)))
+    z_with_labels = tf.concat([z, tf.reshape(label, (-1, 1))], axis=1)
+    return features, z_with_labels
 
 def mlp(nsteps, nfeatures, layers=[768, 768], nhidden=512, batchnorm=True, dropout=0.5, lr=5e-5):
     inputs = tf.keras.layers.Input(shape=(nsteps, nfeatures,))
@@ -216,7 +226,8 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         probs = []
         testy = []
         for x, y in self.validation_data:
-            y_labels = np.clip(y[:, -1], 0, 1)
+            #y_labels = np.clip(y[:, -1], 0, 1)
+            y_labels = np.clip(y, 0, 1)
             reconstructions = self.model.predict(x)
             if self.model_type == 'aen':
                 new_probs = np.linalg.norm(reconstructions - x, axis=1)
@@ -604,18 +615,29 @@ def som(nsteps, nfeatures, layers=[64, 64], dropout=0.5, batchnorm=True, lr=5e-5
 
 class BGNGenerator(tf.keras.layers.Layer):
 
-    def __init__(self, layers, kernel_size=2, **kwargs):
+    def __init__(self, nsteps, nfeatures, layers=[512], kernel_size=2, **kwargs):
         super(BGNGenerator, self).__init__(**kwargs)
+        self.hiddens = []
+        for nfilters in layers:
+            self.hiddens.append(tf.keras.layers.Conv1DTranspose(filters=nfilters, kernel_size=kernel_size))
+        self.output_layer = tf.keras.layers.Conv1DTranspose(filters=nfeatures, kernel_size=nsteps-len(layers))
+
+    def call(self, inputs, **kwargs):
+        x = inputs
+        for hidden in self.hiddens:
+            x = hidden(x)
+            print(x)
+        x = self.output_layer(x)
+        return x
+
+class BGNDiscriminator(tf.keras.layers.Layer):
+
+    def __init__(self, layers=[512], kernel_size=2, **kwargs):
+        super(BGNDiscriminator, self).__init__(**kwargs)
         self.hiddens = layers
         self.convs = []
         for nh in self.hiddens:
-            self.convs.append(tf.keras.layers.Conv1DTranspose(filters=nh, kernel_size=kernel_size))
-        self.built = False
-
-    def build(self, input_shape):
-        input_dims = input_shape[1:]
-        self.input_spec = tf.keras.layers.InputSpec(dtype=tf.float32, shape=(None, *input_dims))
-        self.built = True
+            self.convs.append(tf.keras.layers.Conv1D(filters=nh, kernel_size=kernel_size))
 
     def call(self, inputs, **kwargs):
         h = inputs
@@ -625,23 +647,55 @@ class BGNGenerator(tf.keras.layers.Layer):
 
 class BGN(tf.keras.models.Model):
 
-    def __init__(self, layers, batchnorm):
+    def __init__(self, nsteps, nfeatures, latent_dim):
         super(BGN, self).__init__()
-        self.hiddens = layers
-        self.bn_layer = tf.keras.layers.BatchNormalization(trainable=batchnorm)
+        self.generator = BGNGenerator(nsteps, nfeatures)
+        self.discriminator = BGNDiscriminator()
+        self.latent_dim = tf.constant(latent_dim)
+        self.g_loss_tracker = tf.keras.metrics.Mean(name='g_loss')
+        self.d_loss_tracker = tf.keras.metrics.Mean(name='d_loss')
+        self.built = False
+
+    def build(self, input_shape):
+        self.generator.build(input_shape=(None, self.latent_dim))
+        self.discriminator.build(input_shape)
+        self.built = True
 
     def call(self, x):
-        x = self.bn_layer(x)
-        x = self.som_layer(x)
-        s = tf.sort(x, axis=1)
-        spl = tf.split(s, [self.nnn, self.nprototypes - self.nnn], axis=1)
-        return tf.reduce_mean(spl[0], axis=1)
+        pred = self.discriminator(x)
+        return pred
 
     def train_step(self, data):
+        x_real, z_with_label = data
+        z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
+        z = tf.expand_dims(z, 1)
+        x_fake = self.generator(z)
+        d_inputs = tf.concat([x_fake, x_real], axis=0)
+        d_preds = self.discriminator(d_inputs)
+        pred_g, pred_e = tf.split(d_preds, num_or_size_splits=2, axis=0)
+
+        d_loss = tf.reduce_mean(tf.nn.softplus(pred_g)) + tf.reduce_mean(tf.nn.softplus(-pred_e))
+        g_loss = tf.reduce_mean(tf.nn.softplus(-pred_g))
+
+        d_gradients = tf.gradients(d_loss, self.discriminator.trainable_variables)
+        g_gradients = tf.gradients(g_loss, self.generator.trainable_variables)
+
+        self.optimizer.apply_gradients(zip(d_gradients, self.discriminator.trainable_variables))
+        self.optimizer.apply_gradients(zip(g_gradients, self.generator.trainable_variables))
+
+        self.g_loss_tracker.update_state(g_loss)
+        self.d_loss_tracker.update_state(d_loss)
+
+        return {
+            "g_loss": self.g_loss_tracker.result(),
+            "d_loss": self.d_loss_tracker.result(),
+        }
+
+        return d_loss, g_loss
 
 
-def bgn(nsteps, nfeatures, layers=[512], dropout=0.5, batchnorm=True, lr=5e-5):
-    model = BGN(layers, dropout, batchnorm)
+def bgn(nsteps, nfeatures, layers=[512], latent_dim=gan_latent_dim, lr=5e-5):
+    model = BGN(nsteps, nfeatures, latent_dim)
     model.build(input_shape=(None, nsteps, nfeatures))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'bgn_{0}'.format('-'.join([str(item) for item in layers])), 'ad'

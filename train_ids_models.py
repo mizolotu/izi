@@ -8,13 +8,13 @@ import common.ml as models
 from time import time
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
-from common.ml import set_seeds, load_batches, classification_mapper, anomaly_detection_mapper, load_meta, EarlyStoppingAtMaxMetric
+from common.ml import set_seeds, load_batches, classification_mapper, autoencoder_mapper, gan_mapper, load_meta, EarlyStoppingAtMaxMetric
 from config import *
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'cnn', 'att', 'aen', 'som', 'bgn'])
+    parser.add_argument('-m', '--model', help='Model', default='bgn', choices=['mlp', 'cnn', 'att', 'aen', 'som', 'bgn'])
     parser.add_argument('-l', '--layers', help='Number of layers', type=int, nargs='+')
     parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
     parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,2,3'])
@@ -142,10 +142,12 @@ if __name__ == '__main__':
 
             # mappers
 
-            if detection_type == 'cl':
+            if detection_type == 'cl' or args.model == 'som':
                 mapper = lambda x, y: classification_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
-            elif detection_type == 'ad':
-                mapper = lambda x, y: anomaly_detection_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
+            elif args.model == 'aen':
+                mapper = lambda x, y: autoencoder_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
+            elif args.model == 'bgn':
+                mapper = lambda x, y: gan_mapper(x, y, nsteps=nwindows, nfeatures=nfeatures, xmin=xmin, xmax=xmax)
             else:
                 print('Unknown detection type!')
                 sys.exit(1)
