@@ -144,7 +144,7 @@ class TrafficGenerator():
         sleep(delay)
         for td, pkt, id, aug in pkt_list:
             if aug:
-                pkts_to_send = self._augment_pkt(pkt, id)
+                pkts_to_send = self._augment_pkt(pkt, id, td)
             else:
                 pkts_to_send = [(td, pkt)]
             for td, pkt in pkts_to_send:

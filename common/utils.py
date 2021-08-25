@@ -192,8 +192,7 @@ def ip_proto(value):
 
 def isint(value):
     try:
-        int(value)
-        result = True
+        result = int(value) == value
     except:
         result = False
     return result

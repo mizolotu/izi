@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     # handle attack indexes
 
-    meta = load_meta(feature_dir)
+    meta = load_meta(data_dir)
     attack_labels = sorted([label for label in meta['labels'] if label > 0])
     attack_indexes = []
     for a in args.labels:
