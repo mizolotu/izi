@@ -763,7 +763,6 @@ class BGN(tf.keras.models.Model):
 
 def bgn(nsteps, nfeatures, layers=[512, 512], latent_dim=gan_latent_dim, lr=5e-5):
     model = BGN(nsteps, nfeatures, latent_dim, layers)
-    #model.build(input_shape=(None, nsteps, nfeatures))
     model.build(input_shape=(None, 1, latent_dim))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'bgn_{0}'.format('-'.join([str(item) for item in layers])), 'ad'

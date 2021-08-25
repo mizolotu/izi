@@ -14,7 +14,7 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='bgn', choices=['mlp', 'cnn', 'att', 'aen', 'som', 'bgn'])
+    parser.add_argument('-m', '--model', help='Model', default='cnn', choices=['mlp', 'cnn', 'att', 'aen', 'som', 'bgn'])
     parser.add_argument('-l', '--layers', help='Number of layers', type=int, nargs='+')
     parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
     parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,2,3'])
