@@ -131,8 +131,11 @@ if __name__ == '__main__':
 
             # define model
 
-            mirrored_strategy = tf.distribute.MirroredStrategy()
-            with mirrored_strategy.scope():
+            if args.cuda:
+                strategy = tf.distribute.MirroredStrategy()
+            else:
+                strategy = tf.distribute.get_strategy()
+            with strategy.scope():
                 model_type = getattr(models, args.model)
                 model_args = [nwindows, nfeatures]
                 if args.layers is not None:

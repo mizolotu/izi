@@ -651,38 +651,80 @@ class BGNDiscriminator(tf.keras.layers.Layer):
 
 class BGN(tf.keras.models.Model):
 
-    def __init__(self, nsteps, nfeatures, latent_dim):
+    def __init__(self, nsteps, nfeatures, latent_dim, layers, kernel_size=2):
         super(BGN, self).__init__()
-        self.generator = BGNGenerator(nsteps, nfeatures)
-        self.discriminator = BGNDiscriminator()
+        self.nsteps = nsteps
+        self.nfeatures = nfeatures
         self.latent_dim = tf.constant(latent_dim)
+        self.filters = layers
+
+        # generator
+
+        self.generator_layers = []
+        for nfilters in layers[:-1]:
+            self.generator_layers.append(tf.keras.layers.Conv1DTranspose(filters=nfilters, kernel_size=kernel_size))
+        self.generator_layers.append(tf.keras.layers.Conv1DTranspose(filters=nfeatures, kernel_size=nsteps - len(layers) + 1))
+
+        # discriminator
+
+        self.discriminator_layers = []
+        for nfilters in layers:
+            self.discriminator_layers.append(tf.keras.layers.Conv1D(filters=nfilters, kernel_size=kernel_size))
+        self.discriminator_layers.append(tf.keras.layers.Flatten())
+        self.discriminator_layers.append(tf.keras.layers.Dense(1, activation='sigmoid'))
+
+        # loss trackers
+
         self.g_loss_tracker = tf.keras.metrics.Mean(name='g_loss')
         self.d_loss_tracker = tf.keras.metrics.Mean(name='d_loss')
+
         self.built = False
 
     def build(self, input_shape):
-        self.generator.build(input_shape=(None, self.latent_dim))
-        self.discriminator.build(input_shape)
+
+        # generator
+
+        self.generator_trainable_variables = []
+        self.generator_layers[0].build(input_shape)
+        for i in range(len(self.filters) - 1):
+            self.generator_layers[i + 1].build(input_shape=(None, i + 2, self.filters[i]))
+        for i in range(len(self.generator_layers)):
+            self.generator_trainable_variables.extend(self.generator_layers[i].trainable_variables)
+
+        # discriminator
+
+        self.discriminator_trainable_variables = []
+        self.discriminator_layers[0].build((None, self.nsteps, self.nfeatures))
+        for i in range(len(self.filters)):
+            self.discriminator_layers[i + 1].build(input_shape=(None, self.nsteps - i - 1, self.filters[i]))
+        self.discriminator_layers[-1].build(input_shape=(None, (self.nsteps - len(self.filters)) * self.filters[-1]))
+        for i in range(len(self.discriminator_layers)):
+            self.discriminator_trainable_variables.extend(self.discriminator_layers[i].trainable_variables)
         self.built = True
 
     def call(self, x):
-        pred = self.discriminator(x)
-        return pred
+        for layer in self.discriminator_layers:
+            x = layer(x)
+        score = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(x), logits=x)
+        return score[:, 0]
 
     def train_step(self, data):
         x_real, z_with_label = data
         z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
         z = tf.expand_dims(z, 1)
-        x_fake = self.generator(z)
-        d_inputs = tf.concat([x_fake, x_real], axis=0)
-        d_preds = self.discriminator(d_inputs)
+        x_fake = z
+        for layer in self.generator_layers:
+            x_fake = layer(x_fake)
+        d_preds = tf.concat([x_fake, x_real], axis=0)
+        for layer in self.discriminator_layers:
+            d_preds = layer(d_preds)
         pred_g, pred_e = tf.split(d_preds, num_or_size_splits=2, axis=0)
         d_loss = tf.reduce_mean(tf.nn.softplus(pred_g)) + tf.reduce_mean(tf.nn.softplus(-pred_e))
         g_loss = tf.reduce_mean(tf.nn.softplus(-pred_g))
-        d_gradients = tf.gradients(d_loss, self.discriminator.trainable_variables)
-        g_gradients = tf.gradients(g_loss, self.generator.trainable_variables)
-        self.optimizer.apply_gradients(zip(d_gradients, self.discriminator.trainable_variables))
-        self.optimizer.apply_gradients(zip(g_gradients, self.generator.trainable_variables))
+        d_gradients = tf.gradients(d_loss, self.discriminator_trainable_variables)
+        g_gradients = tf.gradients(g_loss, self.generator_trainable_variables)
+        self.optimizer.apply_gradients(zip(d_gradients, self.discriminator_trainable_variables))
+        self.optimizer.apply_gradients(zip(g_gradients, self.generator_trainable_variables))
         self.g_loss_tracker.update_state(g_loss)
         self.d_loss_tracker.update_state(d_loss)
 
@@ -697,9 +739,12 @@ class BGN(tf.keras.models.Model):
         x_real, z_with_label = data
         z, _ = tf.split(z_with_label, [self.latent_dim, 1], axis=1)
         z = tf.expand_dims(z, 1)
-        x_fake = self.generator(z)
-        d_inputs = tf.concat([x_fake, x_real], axis=0)
-        d_preds = self.discriminator(d_inputs)
+        x_fake = z
+        for layer in self.generator_layers:
+            x_fake = layer(x_fake)
+        d_preds = tf.concat([x_fake, x_real], axis=0)
+        for layer in self.discriminator_layers:
+            d_preds = layer(d_preds)
         pred_g, pred_e = tf.split(d_preds, num_or_size_splits=2, axis=0)
 
         d_loss = tf.reduce_mean(tf.nn.softplus(pred_g)) + tf.reduce_mean(tf.nn.softplus(-pred_e))
@@ -716,8 +761,9 @@ class BGN(tf.keras.models.Model):
         return d_loss, g_loss
 
 
-def bgn(nsteps, nfeatures, layers=[512], latent_dim=gan_latent_dim, lr=5e-5):
-    model = BGN(nsteps, nfeatures, latent_dim)
-    model.build(input_shape=(None, nsteps, nfeatures))
+def bgn(nsteps, nfeatures, layers=[512, 512], latent_dim=gan_latent_dim, lr=5e-5):
+    model = BGN(nsteps, nfeatures, latent_dim, layers)
+    #model.build(input_shape=(None, nsteps, nfeatures))
+    model.build(input_shape=(None, 1, latent_dim))
     model.compile(optimizer=tf.keras.optimizers.Adam(lr=lr))
     return model, 'bgn_{0}'.format('-'.join([str(item) for item in layers])), 'ad'
