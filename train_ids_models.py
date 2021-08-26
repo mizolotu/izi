@@ -227,14 +227,12 @@ if __name__ == '__main__':
                 thrs = []
                 for x, y in batches['validate']:
                     predictions = model.predict(x)
-                    if detection_type == 'cl':
-                        new_probs = predictions[:, 0]
-                    elif detection_type == 'ad':
-                        if args.model == 'aen':
-                            new_probs = np.linalg.norm(predictions - y[:, :-1], axis=1)
-                        elif args.model == 'som':
-                            new_probs = predictions
+                    if len(y.shape) > 1:
                         y = y[:, -1]
+                    if args.model == 'aen':
+                        new_probs = np.linalg.norm(predictions - y, axis=1)
+                    else:
+                        new_probs = predictions.flatten()
                     probs = np.hstack([probs, new_probs])
                     testy = np.concatenate([testy, y])
                 ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
@@ -260,19 +258,17 @@ if __name__ == '__main__':
             for x, y in batches['inference']:
                 t_now = time()
                 predictions = model.predict(x)
-                if detection_type == 'cl':
-                    new_probs = predictions[:, 0]
-                elif detection_type == 'ad':
-                    if args.model == 'aen':
-                        new_probs = np.linalg.norm(predictions - y[:, :-1], axis=1)
-                    elif args.model == 'som':
-                        new_probs = predictions
+                if len(y.shape) > 1:
                     y = y[:, -1]
+                if args.model == 'aen':
+                    new_probs = np.linalg.norm(predictions - y, axis=1)
+                else:
+                    new_probs = predictions.flatten()
                 probs = np.hstack([probs, new_probs])
                 testy = np.hstack([testy, y])
                 t_test += (time() - t_now)
 
-            sk_auc = roc_auc_score(testy, probs)
+            sk_auc = roc_auc_score(testy, probs, max_fpr=np.max(fpr_levels))
             ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
             roc = np.zeros((ns_fpr.shape[0], 3))
             roc[:, 0] = ns_fpr
