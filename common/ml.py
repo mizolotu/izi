@@ -239,7 +239,7 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
             probs = np.hstack([probs, new_probs])
             testy = np.hstack([testy, y_labels])
         if self.metric == 'auc':
-            self.current = roc_auc_score(testy, probs)
+            self.current = roc_auc_score(testy, probs, max_fpr=0.01)
         elif self.metric == 'acc':
             n = len(testy)
             p0 = probs[np.where(testy == 0)[0]]

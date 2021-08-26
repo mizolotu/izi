@@ -16,7 +16,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Train classifiers')
     parser.add_argument('-m', '--model', help='Model', default='cnn', choices=['mlp', 'cnn', 'att', 'aen', 'som', 'bgn'])
     parser.add_argument('-l', '--layers', help='Number of layers', type=int, nargs='+')
-    parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='acc', choices=['auc', 'acc'])
+    parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='auc', choices=['auc', 'acc'])
     parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,2,3'])
     parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,2,3'])
     parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,2,3'])
@@ -242,7 +242,10 @@ if __name__ == '__main__':
                     testy = np.concatenate([testy, y])
                 ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
                 for fpr_level in fpr_levels:
-                    idx = np.where(ns_fpr <= fpr_level)[0][-1]
+                    if fpr_level == 0:
+                        idx = np.where(ns_fpr == np.min(ns_fpr))[0][-1]
+                    else:
+                        idx = np.where(ns_fpr <= fpr_level)[0][-1]
                     thrs.append(str(ns_thr[idx]))
                     print(ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
 
