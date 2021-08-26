@@ -196,7 +196,7 @@ class ToggleMetrics(tf.keras.callbacks.Callback):
 
 class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
 
-    def __init__(self, validation_data, metric, model_type, patience=10):
+    def __init__(self, validation_data, metric, model_type, patience=10, max_fpr=1.0):
         super(EarlyStoppingAtMaxMetric, self).__init__()
         self.patience = patience
         self.best_weights = None
@@ -204,6 +204,7 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         self.validation_data = validation_data
         self.current = -np.Inf
         self.model_type = model_type
+        self.max_fpr = max_fpr
 
     def on_train_begin(self, logs=None):
         self.wait = 0
@@ -239,7 +240,7 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
             probs = np.hstack([probs, new_probs])
             testy = np.hstack([testy, y_labels])
         if self.metric == 'auc':
-            self.current = roc_auc_score(testy, probs, max_fpr=0.01)
+            self.current = roc_auc_score(testy, probs, max_fpr=self.max_fpr)
         elif self.metric == 'acc':
             n = len(testy)
             p0 = probs[np.where(testy == 0)[0]]

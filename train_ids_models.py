@@ -191,7 +191,7 @@ if __name__ == '__main__':
                 print(e)
                 print('Training model {0}'.format(model_name))
 
-                cb = EarlyStoppingAtMaxMetric(validation_data=batches['validate'], metric=args.earlystopping, patience=patience, model_type=args.model)
+                cb = EarlyStoppingAtMaxMetric(validation_data=batches['validate'], metric=args.earlystopping, patience=patience, model_type=args.model, max_fpr=np.max(fpr_levels))
 
                 model.fit(
                     batches['train'],
