@@ -14,7 +14,7 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Train classifiers')
-    parser.add_argument('-m', '--model', help='Model', default='cnn', choices=['mlp', 'cnn', 'att', 'aen', 'som', 'bgn'])
+    parser.add_argument('-m', '--model', help='Model', default='mlp', choices=['mlp', 'cnn', 'att', 'aen', 'som', 'bgn'])
     parser.add_argument('-l', '--layers', help='Number of layers', type=int, nargs='+')
     parser.add_argument('-e', '--earlystopping', help='Early stopping metric', default='auc', choices=['auc', 'acc'])
     parser.add_argument('-t', '--trlabels', help='Train labels', nargs='+', default=['0,1,2,3'])
@@ -191,10 +191,7 @@ if __name__ == '__main__':
                 print(e)
                 print('Training model {0}'.format(model_name))
 
-                if detection_type == 'cl':
-                    cb = tf.keras.callbacks.EarlyStopping(monitor=f'val_{args.earlystopping}', verbose=0, patience=patience, mode='max', restore_best_weights=True)
-                elif detection_type == 'ad':
-                    cb = EarlyStoppingAtMaxMetric(validation_data=batches['validate'], metric=args.earlystopping, model_type=args.model)
+                cb = EarlyStoppingAtMaxMetric(validation_data=batches['validate'], metric=args.earlystopping, patience=patience, model_type=args.model)
 
                 model.fit(
                     batches['train'],

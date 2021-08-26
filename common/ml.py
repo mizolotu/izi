@@ -196,7 +196,7 @@ class ToggleMetrics(tf.keras.callbacks.Callback):
 
 class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
 
-    def __init__(self, validation_data, metric, patience=10, model_type='aen'):
+    def __init__(self, validation_data, metric, model_type, patience=10):
         super(EarlyStoppingAtMaxMetric, self).__init__()
         self.patience = patience
         self.best_weights = None
@@ -226,16 +226,16 @@ class EarlyStoppingAtMaxMetric(tf.keras.callbacks.Callback):
         probs = []
         testy = []
         for x, y in self.validation_data:
-            y_labels = np.clip(y[:, -1], 0, 1)
-            reconstructions = self.model.predict(x)
-            if self.model_type == 'aen':
-                new_probs = np.mean(np.linalg.norm(reconstructions - x, axis=-1), axis=-1)
-            elif self.model_type == 'som':
-                new_probs = reconstructions
-            elif self.model_type == 'bgn':
-                new_probs = reconstructions
+            if len(y.shape) > 1:
+                y_labels = y[:, -1]
             else:
-                raise NotImplemented
+                y_labels = y
+            y_labels = np.clip(y_labels, 0, 1)
+            predictions = self.model.predict(x)
+            if self.model_type == 'aen':
+                new_probs = np.mean(np.linalg.norm(predictions - x, axis=-1), axis=-1)
+            else:
+                new_probs = predictions.flatten()
             probs = np.hstack([probs, new_probs])
             testy = np.hstack([testy, y_labels])
         if self.metric == 'auc':
