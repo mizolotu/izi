@@ -133,16 +133,11 @@ if __name__ == '__main__':
 
             # define model
 
-            if args.cuda:
-                strategy = tf.distribute.MirroredStrategy()
-            else:
-                strategy = tf.distribute.get_strategy()
-            with strategy.scope():
-                model_type = getattr(models, args.model)
-                model_args = [nwindows, nfeatures]
-                if args.layers is not None:
-                    model_args.append(args.layers)
-                model, model_name, detection_type = model_type(*model_args)
+            model_type = getattr(models, args.model)
+            model_args = [nwindows, nfeatures]
+            if args.layers is not None:
+                model_args.append(args.layers)
+            model, model_name, detection_type = model_type(*model_args)
             model.summary()
 
             # mappers
