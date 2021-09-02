@@ -21,12 +21,14 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--vallabels', help='Validate labels', nargs='+', default=['0,1,2,3'])
     parser.add_argument('-i', '--inflabels', help='Inference labels', nargs='+', default=['0,1,2,3'])
     parser.add_argument('-s', '--steps', help='Polling step value or distribution', nargs='+', default=['0.0-1.0-0.001-3.0'])
-    parser.add_argument('-c', '--cuda', help='Use CUDA', default=False, type=bool)
+    parser.add_argument('-g', '--gpu', help='GPU to use')
 
     args = parser.parse_args()
 
-    if not args.cuda:
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    if args.gpu is None:
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    else:
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
 
     # global params
 
