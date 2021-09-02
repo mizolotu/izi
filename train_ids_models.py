@@ -238,11 +238,14 @@ if __name__ == '__main__':
                 ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
                 for fpr_level in fpr_levels:
                     if fpr_level == 0:
-                        idx = np.where(ns_fpr == np.min(ns_fpr))[0][-1]
+                        idx = np.where(ns_fpr == 0)[0][-1]
+                        if ns_tpr[idx] == 0:
+                            idx_f = np.where(ns_fpr > 0)[0][0]
+                            idx = np.where(ns_fpr == ns_fpr[idx_f])[0][-1]
                     else:
                         idx = np.where(ns_fpr <= fpr_level)[0][-1]
                     thrs.append(str(ns_thr[idx]))
-                    print(ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
+                    print(fpr_level, ns_fpr[idx], ns_tpr[idx], ns_thr[idx])
 
                 # save thresholds
 
