@@ -91,6 +91,23 @@ def cnn(nsteps, nfeatures, layers=[512, 512], kernel_size=2, nhidden=512, batchn
     model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.BinaryAccuracy(name='acc'), tf.keras.metrics.Precision(name='pre')])
     return model, 'cnn_{0}'.format('-'.join([str(item) for item in layers])), 'cl'
 
+def rnn(nsteps, nfeatures, layers=[512], nhidden=512, batchnorm=True, dropout=0.5, lr=5e-5):
+    inputs = tf.keras.layers.Input(shape=(nsteps, nfeatures,))
+    if batchnorm:
+        hidden = tf.keras.layers.BatchNormalization()(inputs)
+    else:
+        hidden = inputs
+    for i, nfilters in enumerate(layers):
+        hidden = tf.keras.layers.LSTM(nfilters, activation='relu', return_sequences=i<(len(layers)-1))(hidden)
+        if dropout is not None:
+            hidden = tf.keras.layers.Dropout(dropout)(hidden)
+    hidden = tf.keras.layers.Flatten()(hidden)
+    hidden = tf.keras.layers.Dense(nhidden, activation='relu')(hidden)
+    outputs = tf.keras.layers.Dense(1, activation='sigmoid')(hidden)
+    model = tf.keras.models.Model(inputs=inputs, outputs=outputs)
+    model.compile(loss=tf.keras.losses.BinaryCrossentropy(), optimizer=tf.keras.optimizers.Adam(lr=lr), metrics=[tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.BinaryAccuracy(name='acc'), tf.keras.metrics.Precision(name='pre')])
+    return model, 'rnn_{0}'.format('-'.join([str(item) for item in layers])), 'cl'
+
 def attention_block(x, nh):
     q = tf.keras.layers.Dense(nh, use_bias=False)(x)
     k = tf.keras.layers.Dense(nh, use_bias=False)(x)
