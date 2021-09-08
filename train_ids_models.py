@@ -224,15 +224,18 @@ if __name__ == '__main__':
                 thrs = []
                 for x, y in batches['validate']:
                     predictions = model.predict(x)
+                    if len(y.shape) > 1:
+                        y_labels = y[:, -1]
+                    else:
+                        y_labels = y
+                    y_labels = np.clip(y_labels, 0, 1)
                     if args.model == 'aen':
                         print(predictions.shape, y.shape)
-                        new_probs = np.linalg.norm(predictions - y, axis=1)
+                        new_probs = np.mean(np.linalg.norm(predictions - x, axis=-1), axis=-1)
                     else:
                         new_probs = predictions.flatten()
-                    if len(y.shape) > 1:
-                        y = y[:, -1]
                     probs = np.hstack([probs, new_probs])
-                    testy = np.concatenate([testy, y])
+                    testy = np.concatenate([testy, y_labels])
                 ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
                 for fpr_level in fpr_levels:
                     if fpr_level == 0:
