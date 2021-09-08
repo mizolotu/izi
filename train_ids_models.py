@@ -230,7 +230,6 @@ if __name__ == '__main__':
                         y_labels = y
                     y_labels = np.clip(y_labels, 0, 1)
                     if args.model == 'aen':
-                        print(predictions.shape, y.shape)
                         new_probs = np.mean(np.linalg.norm(predictions - x, axis=-1), axis=-1)
                     else:
                         new_probs = predictions.flatten()
