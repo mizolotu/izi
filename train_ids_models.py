@@ -225,6 +225,7 @@ if __name__ == '__main__':
                 for x, y in batches['validate']:
                     predictions = model.predict(x)
                     if args.model == 'aen':
+                        print(predictions.shape, y.shape)
                         new_probs = np.linalg.norm(predictions - y, axis=1)
                     else:
                         new_probs = predictions.flatten()
