@@ -224,12 +224,12 @@ if __name__ == '__main__':
                 thrs = []
                 for x, y in batches['validate']:
                     predictions = model.predict(x)
-                    if len(y.shape) > 1:
-                        y = y[:, -1]
                     if args.model == 'aen':
                         new_probs = np.linalg.norm(predictions - y, axis=1)
                     else:
                         new_probs = predictions.flatten()
+                    if len(y.shape) > 1:
+                        y = y[:, -1]
                     probs = np.hstack([probs, new_probs])
                     testy = np.concatenate([testy, y])
                 ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)
