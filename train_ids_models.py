@@ -262,13 +262,16 @@ if __name__ == '__main__':
                 t_now = time()
                 predictions = model.predict(x)
                 if len(y.shape) > 1:
-                    y = y[:, -1]
+                    y_labels = y[:, -1]
+                else:
+                    y_labels = y
+                y_labels = np.clip(y_labels, 0, 1)
                 if args.model == 'aen':
-                    new_probs = np.linalg.norm(predictions - y, axis=1)
+                    new_probs = np.mean(np.linalg.norm(predictions - x, axis=-1), axis=-1)
                 else:
                     new_probs = predictions.flatten()
                 probs = np.hstack([probs, new_probs])
-                testy = np.hstack([testy, y])
+                testy = np.hstack([testy, y_labels])
                 t_test += (time() - t_now)
 
             sk_auc = roc_auc_score(testy, probs, max_fpr=np.max(fpr_levels))
