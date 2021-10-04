@@ -1,3 +1,5 @@
+import shutil
+
 import pandas, pcap, os, json, sys
 import numpy as np
 import os.path as osp
@@ -134,7 +136,7 @@ def read_udp_packet(body):
     payload_size = len(body.body_bytes)
     return src_port, dst_port, payload_size
 
-def read_ip_pkt(body, read_proto=True, nflags=8):
+def read_ip_pkt(body, read_proto=True, nflags=5):
     src_ip = body.src_s
     dst_ip = body.dst_s
     ip_header_size = body.header_len
@@ -688,7 +690,7 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
 
     return nvectors, ttotal
 
-def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpath, labeler, tstep, stages, splits, nnewpkts_min=0, lasttime_min=1.0, nulify_dscp=True):
+def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpath, labeler, tstep, stages, splits, nnewpkts_min=0, lasttime_min=1.0, nulify_dscp=True, remove_flags=True):
 
     src_ip_idx = 0
     src_port_idx = 1
@@ -765,6 +767,11 @@ def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpat
 
                 if nulify_dscp:
                     ether[ip.IP].tos = 0
+
+                # remove last 3 tcp flags
+
+                if np.sum(flags) > 0 and remove_flags:
+                    ether[ip.IP][tcp.TCP].flags = int(''.join([str(i) for i in flags[::-1]]), 2)
 
                 # write the packet
 
@@ -930,6 +937,32 @@ def count_flags(input):
     except Exception as e:
         print(e)
     return uflags, uflag_counts
+
+def remove_flags(input, nflags=5):
+    output = f'{input}_tmp'
+    writer = ppcap.Writer(filename=output)
+    try:
+        reader = pcap.pcap(input)
+        for timestamp, raw in reader:
+            try:
+                pkt = ethernet.Ethernet(raw)
+                if pkt[ip.IP] is not None:
+                    ip_body = pkt[ip.IP]
+                    if ip_body[tcp.TCP] is not None:
+                        tcp_body = ip_body[tcp.TCP]
+                        print(tcp_body.flags)
+                        flags = decode_tcp_flags_value(tcp_body.flags, nflags)[::-1]
+                        flags = int(''.join([str(i) for i in flags]), 2)
+                        print(flags)
+                        pkt[ip.IP][tcp.TCP].flags = flags
+                    writer.write(pkt.bin(), ts=timestamp * 1e9)
+            except Exception as e:
+                print(e)
+    except Exception as e:
+        print(e)
+    writer.close()
+    shutil.copyfile(output, input)
+    os.remove(output)
 
 def count_ports(input, ports):
     counts = np.zeros(len(ports) + 1)

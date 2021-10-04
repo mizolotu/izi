@@ -109,7 +109,8 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths):
 
     # table 2 (flags)
 
-    for flag in
+    for flag in [16, 24, 17, 18, 20, 25, 2, 4]:
+
 
     # table 3 (attackers before actions)
 
