@@ -915,7 +915,7 @@ def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpat
     return nvectors, ttotal
 
 def count_flags(input):
-    uflags = []
+    uflags, uflag_counts = [], []
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
@@ -923,9 +923,13 @@ def count_flags(input):
             flags = int(''.join([str(i) for i in flags]), 2)
             if flags not in uflags:
                 uflags.append(flags)
+                uflag_counts.append(1)
+            else:
+                idx = uflags.index(flags)
+                uflag_counts[idx] += 1
     except Exception as e:
         print(e)
-    return uflags
+    return uflags, uflag_counts
 
 def count_ports(input, ports):
     counts = np.zeros(len(ports) + 1)
