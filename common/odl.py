@@ -250,6 +250,18 @@ class Odl:
             pushed_flow = {}
         return pushed_flow
 
+    def tcp_flag_resubmit(self, node_id, table_id, priority, flag, goto_table):
+        flow_id = 'f_{0}'.format(flag)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(6), Flow.tcp_flag(flag)])
+        flow.instructions([Flow.go_to_table(goto_table)], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
     def ip_resubmit(self, node_id, table_id, priority, ip_dir, ip, goto_table, mask=32):
         flow_id = 'ii_{0}_{1}'.format(ip_dir, ip)
         ip_with_mask = '{0}/{1}'.format(ip, mask)
@@ -897,6 +909,11 @@ class Flow():
     def port(proto, port):
         p_s = ['{0}-{1}-port'.format(proto, port[1]), port[0]]
         return p_s
+
+    @staticmethod
+    def tcp_flag(flag):
+        t_f = ['tcp-flags-match', 'tcp-flags', flag]
+        return t_f
 
     @staticmethod
     def ip_ecn(ecn):

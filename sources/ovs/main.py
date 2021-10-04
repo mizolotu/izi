@@ -111,7 +111,7 @@ class TrafficGenerator():
                     aug = False
                     if augment is not None:
                         id, features, flags, tos = read_pkt(raw)
-                        if ('src' in augment['directions'] and id[0] in augment['ips'] or 'dst' in augment['directions'] and id[2] in augment['ips']) and flags[3]:
+                        if ('source' in augment['directions'] and id[0] in augment['ips'] or 'destination' in augment['directions'] and id[2] in augment['ips']) and flags[3]:
                             aug = True
                     else:
                         id = []

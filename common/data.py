@@ -47,13 +47,13 @@ def label_cicids17_short(timestamp, src_ip, dst_ip, src_port=None, dst_port=None
 def reverse_label_cicids17_short(label):
     if label == 1:
         ips = ['18.219.211.138', '18.217.165.70']
-        directions = ['src']
+        directions = ['source']
     elif label == 2:
         ips = ['18.218.115.60']
-        directions = ['src']
+        directions = ['source']
     elif label == 3:
         ips = ['18.219.211.138']
-        directions = ['src', 'dst']
+        directions = ['source', 'destination']
     else:
         ips = []
         directions = []

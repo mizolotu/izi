@@ -62,7 +62,7 @@ if __name__ == '__main__':
     meta = load_meta(data_dir)
     labels = meta['labels']
     env_idx = 0
-    label = 4
+    label = 1
     profiles = calculate_probs(stats_dir, labels)
     augment = True
 

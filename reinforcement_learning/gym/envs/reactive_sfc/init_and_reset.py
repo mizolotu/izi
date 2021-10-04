@@ -1,5 +1,7 @@
 import json
+import argparse as arp
 
+from common import data
 from common.odl import Odl
 from config import *
 from common.ovs import delete_flows
@@ -65,7 +67,7 @@ def restart_sdn(controller_vm, controller_obj, service='odl', sleep_interval=3):
         print('Controller is not ready!', ready)
         sleep(sleep_interval)
 
-def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths):
+def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths, attack_ips, attack_directions):
 
     # input ofport
 
@@ -110,9 +112,15 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths):
     # table 2 (flags)
 
     for flag in [16, 24, 17, 18, 20, 25, 2, 4]:
-
+        controller.tcp_flag_resubmit(ovs_node, flag_table, priorities['lower'], flag, flag_table + 1)
+    controller.resubmit(ovs_node, flag_table, priorities['lowest'], flag_table + 1)
 
     # table 3 (attackers before actions)
+
+    for ip in attack_ips:
+        for dir in attack_directions:
+            controller.ip_resubmit(ovs_node, attacker_in_table, priorities['lower'], dir, ip, action_tables[0])
+    controller.resubmit(ovs_node, flag_table, priorities['lowest'], flag_table + 1)
 
     # tables 4 - 7 (actions)
 
@@ -121,9 +129,10 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths):
 
     # table 8 (attacker after actions)
 
-    for ip in attackers:
-        for dir in ['source', 'destination']:
-            controller.ip_resubmit(ovs_node, block_table, priorities['lower'], dir, ip, out_table)
+    for ip in attack_ips:
+        for dir in attack_directions:
+            controller.ip_resubmit(ovs_node, attacker_out_table, priorities['lower'], dir, ip, out_table)
+    controller.resubmit(ovs_node, flag_table, priorities['lowest'], flag_table + 1)
 
     # table 9 (output)
 
@@ -131,9 +140,24 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths):
 
 if __name__ == '__main__':
 
+    # process args
+
+    parser = arp.ArgumentParser(description='Init tables')
+    parser.add_argument('-l', '--labeler', help='Labeler', default='reverse_label_cicids17_short')
+    args = parser.parse_args()
+
+    # import labeler
+
+    reverse_labeler = getattr(data, args.labeler)
+
     # env index
 
     env_idx = 0
+
+    # label
+
+    label = 1
+    attack_ips, attack_directions = reverse_labeler(label)
 
     # load data
 
@@ -176,7 +200,7 @@ if __name__ == '__main__':
 
     ovs_vxlans = [item for item in ofports if item['type'] == 'vxlan' and item['vm'] == ovs_vm['vm']]
     ovs_veths = [item for item in ofports if item['type'] == 'veth' and item['vm'] == ovs_vm['vm']]
-    init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths)
+    init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths, attack_ips, attack_directions)
 
     # clean and init ids tables
 
