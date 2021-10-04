@@ -156,7 +156,7 @@ if __name__ == '__main__':
 
     # label
 
-    label = 3
+    label = 1
     attack_ips, attack_directions = reverse_labeler(label)
 
     # load data
