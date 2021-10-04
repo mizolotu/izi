@@ -8,6 +8,12 @@ def get_vnf_param(ids_ip, ids_port, param):
     value = float(r.json()[param])
     return value
 
+def get_vnf_model(ids_ip, ids_port):
+    uri = f'http://{ids_ip}:{ids_port}/model'
+    r = requests.get(uri)
+    value = r.json()['model']
+    return value
+
 def get_intrusions(ids_ip, ids_port):
     uri = f'http://{ids_ip}:{ids_port}/intrusions'
     r = requests.get(uri)
@@ -24,21 +30,18 @@ if __name__ == '__main__':
     with open(nodes_fpath, 'r') as f:
         nodes = json.load(f)
 
-    with open(tunnels_fpath, 'r') as f:
-        tunnels = json.load(f)
-
     # ids vms
 
     ids_vms = [vm for vm in vms if vm['role'] == 'ids']
     ids_nodes = [nodes[vm['vm']] for vm in ids_vms]
-    assert (len(ids_nodes) + 5) <= ntables
 
     # get param values
 
     for ids_vm in ids_vms:
-        vals = []
-        for param in ['model', 'step', 'delay', 'nflows']:
-            val = get_vnf_param(ids_vm['mgmt'], param)
+        val = get_vnf_model(ids_vm['mgmt'], flask_port)
+        vals = [val]
+        for param in ['delay', 'nflows']:
+            val = get_vnf_param(ids_vm['mgmt'], flask_port, param)
             vals.append(val)
-        intrusions = get_intrusions(ids_vm['mgmt'])
+        intrusions = get_intrusions(ids_vm['mgmt'], flask_port)
         print(ids_vm['vm'], vals, intrusions)

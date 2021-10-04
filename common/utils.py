@@ -107,6 +107,9 @@ def mac_hex(ip, prefix="00:00"):
 def ip_hex(ip):
     return ip, '0x{:02X}{:02X}{:02X}{:02X}'.format(*map(int, ip.split('.')))
 
+def bit_list_to_dec(bits):
+    return int(''.join([str(item) for item in bits[::-1]]), 2)
+
 def ssh_connect(ip, keyfile, user='vagrant'):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())

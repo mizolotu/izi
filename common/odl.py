@@ -327,6 +327,23 @@ class Odl:
             pushed_flow = {}
         return pushed_flow
 
+    def dscp_output_and_resubmit(self, node_id, table_id, priority, dscp, output, goto_table):
+        flow_id = 'd_{0}'.format(dscp)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_dscp(dscp)])
+        flow.instructions([
+            Flow.go_to_table(goto_table),
+            ['apply-actions', [
+                {'action': [Flow.output_to_port(output)], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0, 1])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
     def ip_proto_output_and_resubmit(self, node_id, table_id, priority, ip_dir, ip, proto_name, proto_number, output, goto_table, mask=32):
         flow_id = 'iip_{0}_{1}_{2}'.format(ip_dir, ip, proto_name)
         ip_with_mask = '{0}/{1}'.format(ip, mask)
@@ -367,6 +384,22 @@ class Odl:
         ip_with_mask = '{0}/{1}'.format(ip, mask)
         flow = Flow(node_id, table_id, flow_id, priority, self.ns)
         flow.match([Flow.ethernet_type(2048), Flow.ip_protocol(proto_number), Flow.ip_direction(ip_dir, ip_with_mask)])
+        flow.instructions([
+            ['apply-actions', [
+                {'action': [['drop-action', None]], 'order': 0, 'ns': 'f'}
+            ]]
+        ], [0])
+        result = self.push_flow(node_id, flow.body)
+        if result == 0:
+            pushed_flow = {'node_id': node_id, 'table_id': table_id, 'flow_id': flow_id}
+        else:
+            pushed_flow = {}
+        return pushed_flow
+
+    def dscp_drop(self, node_id, table_id, priority, dscp):
+        flow_id = 'd_{0}'.format(dscp)
+        flow = Flow(node_id, table_id, flow_id, priority, self.ns)
+        flow.match([Flow.ethernet_type(2048), Flow.ip_dscp(dscp)])
         flow.instructions([
             ['apply-actions', [
                 {'action': [['drop-action', None]], 'order': 0, 'ns': 'f'}

@@ -1,7 +1,7 @@
 import tflite_runtime.interpreter as tflite
-import logging, pcap, inspect
+import logging, inspect
 
-from common.data_old import *
+from common.data import *
 from flask import Flask, request, jsonify
 from threading import Thread
 from collections import deque
@@ -14,7 +14,7 @@ log.setLevel(logging.ERROR)
 
 @app.route('/')
 def info():
-    return jsonify({'nlabels': len(interceptor.model_labels), 'nsteps': len(interceptor.model_steps)})
+    return jsonify({'models': interceptor.models})
 
 @app.route('/network')
 def set_hosts_and_apps():
@@ -44,15 +44,7 @@ def model_label():
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
         interceptor.set_model(jdata['model'])
-    return jsonify({'model': interceptor.model_labels[interceptor.model_idx]})
-
-@app.route('/step', methods=['GET', 'POST'])
-def polling_step():
-    if request.method == 'POST':
-        data = request.data.decode('utf-8')
-        jdata = json.loads(data)
-        interceptor.set_step(jdata['step'])
-    return jsonify({'step': interceptor.model_steps[interceptor.step_idx]})
+    return jsonify({'model': interceptor.models[interceptor.model_idx]})
 
 @app.route('/threshold', methods=['GET', 'POST'])
 def model_threshold():
@@ -94,7 +86,7 @@ class Interceptor:
     dst_port_idx = 3
     proto_idx = 4
 
-    def __init__(self, iface_in, iface_out, main_path, model_idx=0, step_idx=0, thr_idx=0, qsize=10000):
+    def __init__(self, iface_in, iface_out, main_path, model_idx=0, thr_idx=0, qsize=10000, nnewpkts_min=0, lasttime_min=1.0):
 
         self.iface_in = iface_in
         self.iface_out = iface_out
@@ -103,8 +95,7 @@ class Interceptor:
         self.intrusion_ids = deque(maxlen=qsize)
         self.model_path = osp.join(main_path, 'weights')
         self.thr_path = osp.join(main_path, 'thresholds')
-        self.model_labels = sorted(list(set(['_'.join(item.split('.tflite')[0].split('_')[:-1]) for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
-        self.model_steps = sorted(list(set([item.split('.tflite')[0].split('_')[-1] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
+        self.models = sorted(list(set([item.split('.tflite')[0] for item in os.listdir(self.model_path) if item.endswith('.tflite')])))
 
         with open(osp.join(main_path, 'metainfo.json'), 'r') as f:
             meta = json.load(f)
@@ -115,11 +106,12 @@ class Interceptor:
         self.sock.bind((self.iface_out, 0))
 
         self.model_idx = model_idx
-        self.step_idx = step_idx
         self.thr_idx = thr_idx
         self.set_model(model_idx)
-        self.set_step(step_idx)
         self.set_threshold(thr_idx)
+
+        self.nnewpkts_min = nnewpkts_min
+        self.lasttime_min = lasttime_min
 
         self.to_be_reset = False
         self.delay = 0
@@ -127,22 +119,15 @@ class Interceptor:
         self.hosts = []
         self.apps = []
 
-    def load_model(self, model_label, model_step):
-        self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, '{0}_{1}.tflite'.format(model_label, model_step)))
-        self.model_type = model_label.split('_')[0]
-        self.thrs = [float(item) for item in open(osp.join(self.thr_path, f'{model_label}_{model_step}.thr')).readline().strip().split(',')]
+    def load_model(self, model):
+        self.interpreter = tflite.Interpreter(model_path=osp.join(self.model_path, f'{model}.tflite'))
+        self.model_type = model.split('_')[0]
+        self.thrs = [float(item) for item in open(osp.join(self.thr_path, f'{model}.thr')).readline().strip().split(',')]
 
     def set_model(self, idx):
-        model_label = self.model_labels[idx]
-        model_step = self.model_steps[self.step_idx]
-        self.load_model(model_label, model_step)
+        model = self.models[idx]
+        self.load_model(model)
         self.model_idx = idx
-
-    def set_step(self, idx):
-        model_step = self.model_steps[idx]
-        model_label = self.model_labels[self.model_idx]
-        self.load_model(model_label, model_step)
-        self.step_idx = idx
 
     def set_threshold(self, idx):
         self.thr_idx = idx
@@ -151,22 +136,17 @@ class Interceptor:
         self.dcsp = dcsp
 
     def reset(self):
-        step_idx = 0
         model_idx = 0
         self.set_model(model_idx)
-        self.set_step(step_idx)
         self.to_be_reset = True
 
     def start(self):
-        tstart = datetime.now().timestamp()
-        step = float(self.model_steps[self.step_idx])
         try:
             reader = pcap.pcap(name=self.iface_in)
             while True:
                 timestamp, raw = next(reader)
                 id, features, flags, tos = read_pkt(raw)
                 if id is not None:
-                    print(self.dcsp)
                     if self.dcsp is not None:
                         label = 1 << (2 + self.dcsp)
                         self.sock.setsockopt(SOL_IP, IP_TOS, tos | label)
@@ -191,45 +171,39 @@ class Interceptor:
                         self.flow_ids.append(id)
                         self.flows.append(Flow(timestamp, id, features, flags))
 
-                if timestamp > (tstart + step):
+                # remove old flows
 
-                    # remove old flows
+                tmp_ids = []
+                tmp_objects = []
+                for i, o in zip(self.flow_ids, self.flows):
+                    if o.is_active:
+                        tmp_ids.append(i)
+                        tmp_objects.append(o)
+                self.flow_ids = list(tmp_ids)
+                self.flows = list(tmp_objects)
 
-                    tmp_ids = []
-                    tmp_objects = []
-                    for i, o in zip(self.flow_ids, self.flows):
-                        if o.is_active:
-                            tmp_ids.append(i)
-                            tmp_objects.append(o)
-                            self.flow_ids = list(tmp_ids)
-                            self.flows = list(tmp_objects)
+                # calculate_features
 
-                    # calculate_features
-
-                    tnow = datetime.now().timestamp()
-                    for i in range(len(self.flows)):
+                tnow = datetime.now().timestamp()
+                for flow_id, flow_object in zip(self.flow_ids, self.flows):
+                    if flow_object.nnewpkts > self.nnewpkts_min or (timestamp - flow_object.lasttime) > self.lasttime_min:
                         try:
                             p = self.analyze_flow(i)
                         except:
                             p = -np.inf
                         if p > self.thrs[self.thr_idx]:
                             self.intrusion_ids.appendleft(self.flow_ids[i])
-                    self.delay = datetime.now().timestamp() - tnow
-                    self.nflows = len(self.flow_ids)
+                self.delay = datetime.now().timestamp() - tnow
+                self.nflows = len(self.flow_ids)
 
-                    # update time
+                # reset if needed
 
-                    tstart = datetime.now().timestamp()
-                    step = float(self.model_steps[self.step_idx])
-
-                    # reset if needed
-
-                    if self.to_be_reset:
-                        print('Reseting...')
-                        self.flow_ids = []
-                        self.flows = []
-                        self.intrusion_ids.clear()
-                        self.to_be_reset = False
+                if self.to_be_reset:
+                    print('Reseting...')
+                    self.flow_ids = []
+                    self.flows = []
+                    self.intrusion_ids.clear()
+                    self.to_be_reset = False
 
         except Exception as e:
             exc_type, exc_obj, exc_tb = sys.exc_info()

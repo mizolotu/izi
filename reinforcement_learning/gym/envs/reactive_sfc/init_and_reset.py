@@ -120,7 +120,7 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths, attack_ips, att
     for ip in attack_ips:
         for dir in attack_directions:
             controller.ip_resubmit(ovs_node, attacker_in_table, priorities['lower'], dir, ip, action_tables[0])
-    controller.resubmit(ovs_node, flag_table, priorities['lowest'], flag_table + 1)
+    controller.resubmit(ovs_node, attacker_in_table, priorities['lowest'], attacker_in_table + 1)
 
     # tables 4 - 7 (actions)
 
@@ -132,7 +132,7 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths, attack_ips, att
     for ip in attack_ips:
         for dir in attack_directions:
             controller.ip_resubmit(ovs_node, attacker_out_table, priorities['lower'], dir, ip, out_table)
-    controller.resubmit(ovs_node, flag_table, priorities['lowest'], flag_table + 1)
+    controller.resubmit(ovs_node, attacker_out_table, priorities['lowest'], attacker_out_table + 1)
 
     # table 9 (output)
 
@@ -156,7 +156,7 @@ if __name__ == '__main__':
 
     # label
 
-    label = 1
+    label = 3
     attack_ips, attack_directions = reverse_labeler(label)
 
     # load data

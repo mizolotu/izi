@@ -53,6 +53,13 @@ def samples():
     vals = flow_collector.retrieve_data(jdata['window'])
     return jsonify(vals)
 
+@app.route('/flag_counts')
+def flag_counts():
+    data = request.data.decode('utf-8')
+    jdata = json.loads(data)
+    flags, pkts, bts = flow_collector.parse_flag_table(jdata['table'])
+    return jsonify({'flags': flags, 'packets': pkts, 'bytes': bts})
+
 @app.route('/app_counts')
 def app_counts():
     data = request.data.decode('utf-8')
@@ -220,6 +227,28 @@ class FlowCollector():
         self.in_pkts.clear()
         self.out_pkts.clear()
         self.state_timestamps.clear()
+
+    def parse_flag_table(self, table):
+        cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']
+        with Popen(cmd, stdout=PIPE) as p:
+            lines = p.stdout.readlines()
+        lines = [line.decode()[1:].strip() for line in lines]
+        flags = []
+        pkts = []
+        bts = []
+        for line in lines:
+            spl = line.split(', ')
+            if len(spl) >= 7:
+                npkts = int(spl[3].split('n_packets=')[1])
+                nbts = int(spl[4].split('n_bytes=')[1])
+                match_actions_spl = spl[6].split(' actions=')
+                match_spl = match_actions_spl[0].split(',')
+                if len(match_spl) == 3:
+                    f = match_spl[2].split('=')[1]
+                    flags.append(f)
+                    pkts.append(npkts)
+                    bts.append(nbts)
+        return flags, pkts, bts
 
     def parse_app_table(self, table):
         cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']

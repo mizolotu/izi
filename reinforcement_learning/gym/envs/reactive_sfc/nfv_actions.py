@@ -13,10 +13,10 @@ def reset_ids(ids_ip, ids_port, sleep_interval=0.1):
         except:
             sleep(sleep_interval)
 
-def set_vnf_param(ids_ip, ids_port, param, value):
-    uri = f'http://{ids_ip}:{ids_port}/{param}'
-    r = requests.post(uri, json={param: value})
-    value = r.json()[param]
+def set_vnf_model(ids_ip, ids_port, value):
+    uri = f'http://{ids_ip}:{ids_port}/model'
+    r = requests.post(uri, json={'model': value})
+    value = r.json()['model']
     return value
 
 if __name__ == '__main__':
@@ -29,22 +29,18 @@ if __name__ == '__main__':
     with open(nodes_fpath, 'r') as f:
         nodes = json.load(f)
 
-    with open(tunnels_fpath, 'r') as f:
-        tunnels = json.load(f)
-
     # ids vms
 
     ids_vms = [vm for vm in vms if vm['role'] == 'ids']
     ids_nodes = [nodes[vm['vm']] for vm in ids_vms]
-    assert (len(ids_nodes) + 5) <= ntables
 
     # set param values
 
-    values = [9,3]
+    model = 1
 
     for ids_vm in ids_vms:
         vals = []
-        for param, value in zip(['model', 'step'], values):
-            val = set_vnf_param(ids_vm['mgmt'], param, value)
-            vals.append(val)
+        val = set_vnf_model(ids_vm['mgmt'], flask_port, model)
+        vals.append(val)
         print(ids_vm['vm'], vals)
+        model += 1

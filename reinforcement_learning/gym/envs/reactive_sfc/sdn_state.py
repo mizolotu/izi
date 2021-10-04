@@ -14,6 +14,11 @@ def get_flow_samples(flow_collector_ip, flow_collector_port, flow_window):
     samples = requests.get(url, json={'window': flow_window}).json()
     return samples
 
+def get_flag_counts(flow_collector_ip, flow_collector_port, flow_table):
+    url = f'http://{flow_collector_ip}:{flow_collector_port}/flag_counts'
+    samples = requests.get(url, json={'table': flow_table}).json()
+    return samples
+
 def get_app_counts(flow_collector_ip, flow_collector_port, flow_table):
     url = f'http://{flow_collector_ip}:{flow_collector_port}/app_counts'
     samples = requests.get(url, json={'table': flow_table}).json()
@@ -36,7 +41,8 @@ def reset_flow_collector(ovs_ip, ovs_port, sleep_interval=0.1):
         try:
             requests.get(uri)
             ready = True
-        except:
+        except Exception as e:
+            print(e)
             sleep(sleep_interval)
 
 if __name__ == '__main__':
@@ -66,13 +72,12 @@ if __name__ == '__main__':
     print('Observation:')
     for i in range(nsteps):
         tstep = time()
-        samples0 = get_app_counts(ovs_vm['mgmt'], flask_port, app_table)
-        samples1 = get_ip_counts(ovs_vm['mgmt'], flask_port, block_table)
-        print(samples0, samples1)
+        samples0 = get_flag_counts(ovs_vm['mgmt'], flask_port, flag_table)
+        samples1 = get_app_counts(ovs_vm['mgmt'], flask_port, app_table)
+        samples2 = get_ip_counts(ovs_vm['mgmt'], flask_port, block_table)
+        print(samples0, samples1, samples2)
         tdelta = time() - tstep
         if tdelta < episode_duration / nsteps:
+            print(f'Sleeping for {episode_duration / nsteps - tdelta} seconds')
             sleep(episode_duration / nsteps - tdelta)
         print('Time elapsed: {0}'.format(time() - tstep))
-    in_pkts, out_pkts, timestamps = get_flow_report(ovs_vm['mgmt'], flask_port)
-    print('Time elapsed: {0}'.format(time() - tstart))
-    print(len(in_pkts), len(out_pkts), len(timestamps), nsamples)
