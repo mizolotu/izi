@@ -920,6 +920,7 @@ def count_flags(input):
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
             id, features, flags, ether = read_pkt(raw)
+            flags = int(''.join([str(i) for i in flags]),2)
             if flags not in uflags:
                 uflags.append(flags)
     except Exception as e:
