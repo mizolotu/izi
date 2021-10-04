@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     # process args
 
-    parser = arp.ArgumentParser(description='Generate datasets')
+    parser = arp.ArgumentParser(description='Generate traffic')
     parser.add_argument('-l', '--labeler', help='Labeler', default='reverse_label_cicids17_short')
     args = parser.parse_args()
 
