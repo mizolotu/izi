@@ -14,10 +14,10 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Prepare resources')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=nenvs)
     parser.add_argument('-i', '--nidss', help='Number of IDS boxes in each environment', type=int, default=env_vms['ids']['n'])
-    parser.add_argument('-l', '--labels', help='Model labels to compile', nargs='+', default=['1', '2', '3', '4', '1,2,3,4'])
+    parser.add_argument('-l', '--labels', help='Model labels to compile', nargs='+', default=['0', '1', '2', '3', '0,1,2,3'])
     parser.add_argument('-e', '--exclude', help='Model labels to avoid', nargs='+', default=[])
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
-    parser.add_argument('-m', '--models', help='IDS models', nargs='+', default=['mlp'])
+    parser.add_argument('-m', '--models', help='IDS models', nargs='+', default=['mlp', 'cnn', 'rnn', 'aen', 'som', 'bgn'])
     parser.add_argument('-u', '--ubuntu', help='Ubuntu version', default=ubuntu_version)
     args = parser.parse_args()
 
@@ -59,8 +59,7 @@ if __name__ == '__main__':
 
     # input directories
 
-    m_dir = osp.join(ids_models_dir, 'checkpoints')
-    r_dir = osp.join(ids_models_dir, 'results')
+    m_dir = ids_models_dir
 
     # output directories
 
@@ -96,6 +95,7 @@ if __name__ == '__main__':
         sstep = spl[-1]
         alabel = spl[-2]
         model = '_'.join(spl[:-1])
+        print(model, alabel, sstep)
 
         # check labels
 
