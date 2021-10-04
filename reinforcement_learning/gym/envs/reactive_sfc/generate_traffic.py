@@ -19,12 +19,11 @@ def calculate_probs(samples_dir, labels, criteria='flows'):
     for label, label_dir in zip(labels_selected, label_dirs):
         profiles[label] = {}
         for stats_file in os.listdir(label_dir):
-            print(label, stats_file)
             fpath = osp.join(label_dir, stats_file)
             vals = pandas.read_csv(fpath, header=None).values
             idx = np.where(vals[:, 2] >= npkts_min)[0]
             if len(idx) == 0:
-                print(np.max(vals[:, 2]))
+                print(label, stats_file, np.max(vals[:, 2]))
             assert len(idx) > 0
             fnames = vals[idx, 0]
             if criteria == 'flows':
