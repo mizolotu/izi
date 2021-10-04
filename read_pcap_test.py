@@ -18,6 +18,6 @@ if __name__ == '__main__':
                     uflags.append(f)
                     newf = True
             if newf:
-                print(uflags)
+                print(sorted(uflags))
 
 
