@@ -893,9 +893,7 @@ def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpat
 
                 # save stats
 
-                spl = input.split('_')
-                cap_name = '_'.join(spl[:-1])
-                pandas.DataFrame([[cap_name] + [nflows, npkts]]).to_csv(stats_f, header=False, mode='a', index=False)
+                pandas.DataFrame([[input] + [nflows, npkts]]).to_csv(stats_f, header=False, mode='a', index=False)
 
             # save meta
 
