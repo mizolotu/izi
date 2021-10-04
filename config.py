@@ -53,7 +53,7 @@ env_vms = {
     },
     'ids': {
         'unique': False,
-        'n': 2,
+        'n': 3,
         'cpus': 2,
         'ips': ['192.168.254.60'],
         'sources': [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']],
@@ -133,7 +133,7 @@ applications = [
 ip_proto_names = list(set([item[0] for item in applications]))
 directions = ['source', 'destination']
 
-npkts_min = 100
+npkts_min = 80
 
 # rl
 
