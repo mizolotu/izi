@@ -244,10 +244,10 @@ class Interceptor:
         prediction = self.predict(np.array(flow_features, dtype=np.float32).reshape(1, -1, len(self.xmin)))
         if self.model_type == 'aen':
             result = np.mean(np.linalg.norm(prediction - flow_features, axis=-1), axis=-1)
-        elif self.model_type == 'mlp':
-            result = prediction[0]
-        elif self.model_type == 'som':
+        elif self.model_type in ['som', 'bgn']:
             result = prediction
+        else:
+            result = prediction[0]
         return result
 
     def get_intrusions(self):

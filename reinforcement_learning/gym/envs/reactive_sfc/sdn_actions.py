@@ -253,6 +253,7 @@ if __name__ == '__main__':
     # mirror and block
 
     for i, (dscp, tunnel_to_ids) in enumerate(zip(dscp_to_idss, tunnel_to_idss)):
+        print(bit_list_to_dec(dscp))
         mirror_dscp_to_ids(controller, ovs_node, ids_tables[i], priorities['lower'], bit_list_to_dec(dscp), tunnel_to_ids)
     block_dscp(controller, ovs_node, block_table, priorities['lower'], bit_list_to_dec(dscp_to_block))
 
