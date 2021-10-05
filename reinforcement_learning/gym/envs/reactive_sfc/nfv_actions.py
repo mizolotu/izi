@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     # set param values
 
-    model = 0
+    model = 2
     dscp = 0
 
     for ids_vm in ids_vms:

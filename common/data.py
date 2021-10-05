@@ -171,7 +171,7 @@ def read_pkt(raw, read_ip_proto=True):
             flags = [int(item) for item in flags.split(',')]
     except Exception as e:
         print(e)
-    return id, features, flags, pkt
+    return id, features, flags, pkt, tos
 
 class Flow():
 
@@ -560,7 +560,7 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
-            id, features, flags, tos = read_pkt(raw)
+            id, features, flags, ether, tos = read_pkt(raw)
             if id is not None:
                 if tos >= 4:
                     print(f'Flow {id} has high tos!!!')
@@ -750,7 +750,7 @@ def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpat
 
             # read pkt
 
-            id, features, flags, ether = read_pkt(raw)
+            id, features, flags, ether, tos = read_pkt(raw)
 
             if id is not None:
 
@@ -924,7 +924,7 @@ def count_flags(input):
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
-            id, features, flags, ether = read_pkt(raw)
+            id, features, flags, ether, tos = read_pkt(raw)
             flags = int(''.join([str(i) for i in flags])[::-1], 2)
             if flags not in uflags:
                 uflags.append(flags)
@@ -968,7 +968,7 @@ def count_ports(input, ports):
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
-            id, features, flags, tos = read_pkt(raw)
+            id, features, flags, ether, tos = read_pkt(raw)
             if id is not None:
                 if id[1] in ports:
                     idx = ports.index(id[1])
@@ -993,7 +993,7 @@ def count_labels(input, output, labels, labeler):
     try:
         reader = pcap.pcap(input)
         for timestamp, raw in reader:
-            id, features, flags, tos = read_pkt(raw)
+            id, features, flags, ether, tos = read_pkt(raw)
             if id is not None:
                 label, description = labeler(timestamp, id[0], id[2], id[1], id[3])
                 idx = labels.index(label)
