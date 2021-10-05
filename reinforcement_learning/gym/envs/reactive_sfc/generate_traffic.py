@@ -100,6 +100,7 @@ if __name__ == '__main__':
                 fnames.append(f'{profiles[prob_idx][ip][0][fname_idx]}_label:{0}')
                 augments.append(None)
             for fname, aug in zip(fnames, augments):
+                print(fname, aug)
                 prepare_traffic_on_interface(ovs_vm['mgmt'], flask_port, fname, augment=aug)
 
     # replay

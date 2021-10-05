@@ -117,7 +117,7 @@ class TrafficGenerator():
                         traffic_duration += tdelta
                     aug = False
                     if augment is not None:
-                        id, features, flags, tos = read_pkt(raw)
+                        id, features, flags, ether, tos = read_pkt(raw)
                         if ('source' in augment['directions'] and id[0] in augment['ips'] or 'destination' in augment['directions'] and id[2] in augment['ips']) and flags[3]:
                             aug = True
                     else:
