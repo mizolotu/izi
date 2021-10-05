@@ -115,26 +115,30 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths, attack_ips, att
         controller.tcp_flag_resubmit(ovs_node, flag_table, priorities['lower'], flag, flag_table + 1)
     controller.resubmit(ovs_node, flag_table, priorities['lowest'], flag_table + 1)
 
-    # table 3 (attackers before actions)
+    # tables 3 - 6 (ids_tables)
+
+    for i in ids_tables:
+        controller.resubmit(ovs_node, i, priorities['lowest'], i + 1)
+
+    # table 7 (attackers before actions)
 
     for ip in attack_ips:
         for dir in attack_directions:
-            controller.ip_resubmit(ovs_node, attacker_in_table, priorities['lower'], dir, ip, action_tables[0])
+            controller.ip_resubmit(ovs_node, attacker_in_table, priorities['lower'], dir, ip, attacker_in_table + 1)
     controller.resubmit(ovs_node, attacker_in_table, priorities['lowest'], attacker_in_table + 1)
 
-    # tables 4 - 7 (actions)
+    # table 8
 
-    for i in action_tables:
-        controller.resubmit(ovs_node, i, priorities['lowest'], i + 1)
+    controller.resubmit(ovs_node, block_table, priorities['lowest'], block_table + 1)
 
-    # table 8 (attacker after actions)
+    # table 9 (attacker after actions)
 
     for ip in attack_ips:
         for dir in attack_directions:
             controller.ip_resubmit(ovs_node, attacker_out_table, priorities['lower'], dir, ip, out_table)
     controller.resubmit(ovs_node, attacker_out_table, priorities['lowest'], attacker_out_table + 1)
 
-    # table 9 (output)
+    # table 10 (output)
 
     controller.output(ovs_node, out_table, priorities['lowest'], out_ofport)
 

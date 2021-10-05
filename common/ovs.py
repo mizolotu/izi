@@ -39,8 +39,7 @@ def create_vxlan_tunnel(vm, vxlan, ip, br='br'):
     mgmt = vm['mgmt']
     keyfile = vm['key']
     ssh = ssh_connect(mgmt, keyfile)
-    #cmd = 'sudo ovs-vsctl add-port {0} {1} -- set interface {1} type=vxlan options:remote_ip={2}'.format(br, vxlan, ip, br)
-    cmd = 'sudo ovs-vsctl add-port {0} {1} -- set interface {1} type=gre options:remote_ip={2}'.format(br, vxlan, ip, br)
+    cmd = 'sudo ovs-vsctl add-port {0} {1} -- set interface {1} type=vxlan options:remote_ip={2}'.format(br, vxlan, ip, br)
     ssh_command(ssh, cmd)
     ofport = get_iface_ofport(ssh, vxlan)
     return ofport

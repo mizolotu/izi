@@ -84,10 +84,11 @@ ctrl_port = 6653
 in_table = 0
 app_table = 1
 flag_table = 2
-attacker_in_table = 3
-action_tables = [i for i in range(4, 8)]
-attacker_out_table = 8
-out_table = 9
+ids_tables = [i for i in range(3, 7)]
+attacker_in_table = 7
+block_table = 8
+attacker_out_table = 9
+out_table = 10
 priorities = {'lowest': 0, 'lower': 1, 'medium': 2, 'higher': 3, 'highest': 4}
 
 # traffic

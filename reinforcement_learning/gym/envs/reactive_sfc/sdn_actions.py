@@ -254,9 +254,8 @@ if __name__ == '__main__':
     # mirror and block
 
     for i, (dscp, tunnel_to_ids) in enumerate(zip(dscp_to_idss, tunnel_to_idss)):
-        print(bit_list_to_dec(dscp))
-        forward_dscp_to_ids(controller, ovs_node, action_tables[i], priorities['lower'], bit_list_to_dec(dscp), tunnel_to_ids)
-    block_dscp(controller, ovs_node, action_tables[-1], priorities['lower'], bit_list_to_dec(dscp_to_block))
+        forward_dscp_to_ids(controller, ovs_node, ids_tables[i], priorities['lower'], bit_list_to_dec(dscp), tunnel_to_ids)
+    block_dscp(controller, ovs_node, block_table, priorities['lower'], bit_list_to_dec(dscp_to_block))
 
     if test_reverse_actions:
 
@@ -269,5 +268,5 @@ if __name__ == '__main__':
         # unmirror and unblock
 
         for i, (dscp, tunnel_to_ids) in enumerate(zip(dscp_to_idss, tunnel_to_idss)):
-            unforward_dscp_from_ids(controller, ovs_node, action_tables[i], bit_list_to_dec(dscp))
-        unblock_dscp(controller, ovs_node, action_tables[-1], bit_list_to_dec(dscp_to_block))
+            unforward_dscp_from_ids(controller, ovs_node, ids_tables[i], bit_list_to_dec(dscp))
+        unblock_dscp(controller, ovs_node, block_table, bit_list_to_dec(dscp_to_block))
