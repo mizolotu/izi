@@ -5,8 +5,9 @@ from common.data import *
 from flask import Flask, request, jsonify
 from threading import Thread
 from collections import deque
+from queue import Queue
 
-from socket import socket, AF_PACKET, SOCK_RAW, SOL_IP, IP_TOS
+from socket import socket, AF_PACKET, SOCK_RAW
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -90,6 +91,7 @@ class Interceptor:
 
         self.iface_in = iface_in
         self.iface_out = iface_out
+        self.pkt_q = Queue()
         self.flows = []
         self.flow_ids = []
         self.flow_labels = []
@@ -143,6 +145,47 @@ class Interceptor:
 
     def classify(self):
         while True:
+            try:
+
+                # get next timestamp and packet
+
+                timestamp, raw = self.pkt_q.get()
+                id, features, flags, ether, tos = read_pkt(raw)
+                if id is not None:
+
+                    # add packets to flows
+
+                    reverse_id = [id[self.dst_ip_idx], id[self.dst_port_idx], id[self.src_ip_idx], id[self.src_port_idx], id[self.proto_idx]]
+                    if id in self.flow_ids:
+                        direction = 1
+                        idx = self.flow_ids.index(id)
+                        self.flows[idx].append(timestamp, features, flags, direction)
+                        flow_label = self.flow_labels[idx]
+                    elif reverse_id in self.flow_ids:
+                        direction = -1
+                        idx = self.flow_ids.index(reverse_id)
+                        self.flows[idx].append(timestamp, features, flags, direction)
+                        flow_label = self.flow_labels[idx]
+                    else:
+                        self.flow_ids.append(id)
+                        self.flows.append(Flow(timestamp, id, features, flags))
+                        flow_label = 0
+                        self.flow_labels.append(flow_label)
+
+                    if self.dscp is not None:
+                        dscp = flow_label << (2 + self.dscp)
+                        ether[ip.IP].tos = tos | dscp
+                        raw = ether.bin()
+
+                    try:
+                        self.sock.send(raw)
+                    except Exception as e:
+                        print(e)
+                        print(id, tos)
+            except Exception as e:
+                exc_type, exc_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+                print(e, fname, exc_tb.tb_lineno)
 
             # remove old flows
 
@@ -177,43 +220,14 @@ class Interceptor:
             reader = pcap.pcap(name=self.iface_in)
             while True:
                 timestamp, raw = next(reader)
-                id, features, flags, ether, tos = read_pkt(raw)
-                if id is not None:
-
-                    # add packets to flows
-
-                    reverse_id = [id[self.dst_ip_idx], id[self.dst_port_idx], id[self.src_ip_idx], id[self.src_port_idx], id[self.proto_idx]]
-                    if id in self.flow_ids:
-                        direction = 1
-                        idx = self.flow_ids.index(id)
-                        self.flows[idx].append(timestamp, features, flags, direction)
-                        flow_label = self.flow_labels[idx]
-                    elif reverse_id in self.flow_ids:
-                        direction = -1
-                        idx = self.flow_ids.index(reverse_id)
-                        self.flows[idx].append(timestamp, features, flags, direction)
-                        flow_label = self.flow_labels[idx]
-                    else:
-                        self.flow_ids.append(id)
-                        self.flows.append(Flow(timestamp, id, features, flags))
-                        flow_label = 0
-                        self.flow_labels.append(flow_label)
-
-                    if self.dscp is not None:
-                        dscp = flow_label << (2 + self.dscp)
-                        ether[ip.IP].tos = tos | dscp
-                        raw = ether.bin()
-
-                    try:
-                        self.sock.send(raw)
-                    except Exception as e:
-                        print(e)
-                        print(id, tos)
+                self.pkt_q.put((timestamp, raw))
 
                 # reset if needed
 
                 if self.to_be_reset:
                     print('Reseting...')
+                    with self.pkt_q.mutex:
+                        self.pkt_q.queue.clear()
                     self.flow_ids = []
                     self.flows = []
                     self.intrusion_ids.clear()
