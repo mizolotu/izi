@@ -42,11 +42,13 @@ if __name__ == '__main__':
 
     # set param values
 
-    model = 1
+    model = 0
+    dscp = 0
 
     for ids_vm in ids_vms:
         vals = []
-        val = set_vnf_model(ids_vm['mgmt'], flask_port, model)
-        vals.append(val)
-        print(ids_vm['vm'], vals)
+        m_val = set_vnf_model(ids_vm['mgmt'], flask_port, model)
+        d_val = set_vnf_dscp(ids_vm['mgmt'], flask_port, dscp)
+        print(ids_vm['vm'], m_val, d_val)
         model += 1
+        dscp += 1
