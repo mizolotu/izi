@@ -92,6 +92,7 @@ class Interceptor:
         self.iface_out = iface_out
         self.flows = []
         self.flow_ids = []
+        self.flow_labels = []
         self.intrusion_ids = deque(maxlen=qsize)
         self.model_path = osp.join(main_path, 'weights')
         self.thr_path = osp.join(main_path, 'thresholds')
@@ -140,21 +141,42 @@ class Interceptor:
         self.set_model(model_idx)
         self.to_be_reset = True
 
+    def classify(self):
+        while True:
+
+            # remove old flows
+
+            tmp_ids = []
+            tmp_objects = []
+            for i, o in zip(self.flow_ids, self.flows):
+                if o.is_active:
+                    tmp_ids.append(i)
+                    tmp_objects.append(o)
+            self.flow_ids = list(tmp_ids)
+            self.flows = list(tmp_objects)
+
+            # label flows
+
+            tnow = datetime.now().timestamp()
+            for flow_id, flow_object in zip(self.flow_ids, self.flows):
+                if flow_object.nnewpkts > self.nnewpkts_min or (tnow - flow_object.lasttime) > self.lasttime_min:
+                    try:
+                        p = self.analyze_flow(i)
+                    except:
+                        p = -np.inf
+                    if p > self.thrs[self.thr_idx]:
+                        self.intrusion_ids.appendleft(self.flow_ids[i])
+            self.delay = datetime.now().timestamp() - tnow
+            self.nflows = len(self.flow_ids)
+
     def start(self):
+
         try:
             reader = pcap.pcap(name=self.iface_in)
             while True:
                 timestamp, raw = next(reader)
                 id, features, flags, tos = read_pkt(raw)
                 if id is not None:
-                    if self.dcsp is not None:
-                        label = 1 << (2 + self.dcsp)
-                        self.sock.setsockopt(SOL_IP, IP_TOS, tos | label)
-                        try:
-                            self.sock.send(raw)
-                        except Exception as e:
-                            print(e)
-                            print(id, tos)
 
                     # add packets to flows
 
@@ -163,38 +185,27 @@ class Interceptor:
                         direction = 1
                         idx = self.flow_ids.index(id)
                         self.flows[idx].append(timestamp, features, flags, direction)
+                        flow_label = self.flow_labels[idx]
                     elif reverse_id in self.flow_ids:
                         direction = -1
                         idx = self.flow_ids.index(reverse_id)
                         self.flows[idx].append(timestamp, features, flags, direction)
+                        flow_label = self.flow_labels[idx]
                     else:
                         self.flow_ids.append(id)
                         self.flows.append(Flow(timestamp, id, features, flags))
+                        flow_label = 0
+                        self.flow_labels.append(flow_label)
 
-                # remove old flows
+                    if self.dcsp is not None:
+                        dscp = flow_label << (2 + self.dcsp)
+                        self.sock.setsockopt(SOL_IP, IP_TOS, tos | dscp)
 
-                tmp_ids = []
-                tmp_objects = []
-                for i, o in zip(self.flow_ids, self.flows):
-                    if o.is_active:
-                        tmp_ids.append(i)
-                        tmp_objects.append(o)
-                self.flow_ids = list(tmp_ids)
-                self.flows = list(tmp_objects)
-
-                # calculate_features
-
-                tnow = datetime.now().timestamp()
-                for flow_id, flow_object in zip(self.flow_ids, self.flows):
-                    if flow_object.nnewpkts > self.nnewpkts_min or (timestamp - flow_object.lasttime) > self.lasttime_min:
-                        try:
-                            p = self.analyze_flow(i)
-                        except:
-                            p = -np.inf
-                        if p > self.thrs[self.thr_idx]:
-                            self.intrusion_ids.appendleft(self.flow_ids[i])
-                self.delay = datetime.now().timestamp() - tnow
-                self.nflows = len(self.flow_ids)
+                    try:
+                        self.sock.send(raw)
+                    except Exception as e:
+                        print(e)
+                        print(id, tos)
 
                 # reset if needed
 
@@ -249,7 +260,12 @@ if __name__ == "__main__":
     iface_out = 'out_br'
 
     interceptor = Interceptor(iface_in, iface_out, model_path)
+
     intercept_thread = Thread(target=interceptor.start, daemon=True)
     intercept_thread.start()
+
+    cl_thread = Thread(target=interceptor.classify, daemon=True)
+    cl_thread.start()
+
     app.run(host='0.0.0.0')
 
