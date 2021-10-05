@@ -241,11 +241,11 @@ class Interceptor:
     def analyze_flow(self, flow_idx):
         flow_features = self.calculate_flow_features(flow_idx)
         flow_features = (flow_features - self.xmin) / (self.xmax - self.xmin + 1e-10)
-        prediction = self.predict(np.array(flow_features, dtype=np.float32).reshape(1,len(flow_features)))
-        if self.model_type == 'mlp':
+        prediction = self.predict(np.array(flow_features, dtype=np.float32).reshape(1, -1, len(self.xmin)))
+        if self.model_type == 'aen':
+            result = np.mean(np.linalg.norm(prediction - flow_features, axis=-1), axis=-1)
+        elif self.model_type == 'mlp':
             result = prediction[0]
-        elif self.model_type == 'ae':
-            result = np.linalg.norm(flow_features - prediction[0])
         elif self.model_type == 'som':
             result = prediction
         return result
