@@ -115,12 +115,12 @@ def unmirror_ip_app_from_ids(controller, ovs_node, table_id, ips, application):
                 else:
                     break
 
-def mirror_dscp_to_ids(controller, ovs_node, table_id, priority, dscp, tunnel_to_ids):
+def forward_dscp_to_ids(controller, ovs_node, table_id, priority, dscp, tunnel_to_ids):
     flow_id = 'd_{0}'.format(dscp)
     if not controller.flow_exists_in_operational(ovs_node, table_id, flow_id):
-        controller.dscp_output_and_resubmit(ovs_node, table_id, priority, dscp, tunnel_to_ids, table_id + 1)
+        controller.dscp_output(ovs_node, table_id, priority, dscp, tunnel_to_ids)
 
-def unmirror_dscp_from_ids(controller, ovs_node, table_id, dscp):
+def unforward_dscp_from_ids(controller, ovs_node, table_id, dscp):
     flow_id = 'd_{0}'.format(dscp)
     if controller.flow_exists_in_config(ovs_node, table_id, flow_id):
         controller.delete_config_flow(ovs_node, table_id, flow_id)
@@ -254,7 +254,7 @@ if __name__ == '__main__':
 
     for i, (dscp, tunnel_to_ids) in enumerate(zip(dscp_to_idss, tunnel_to_idss)):
         print(bit_list_to_dec(dscp))
-        mirror_dscp_to_ids(controller, ovs_node, action_tables[i], priorities['lower'], bit_list_to_dec(dscp), tunnel_to_ids)
+        forward_dscp_to_ids(controller, ovs_node, action_tables[i], priorities['lower'], bit_list_to_dec(dscp), tunnel_to_ids)
     block_dscp(controller, ovs_node, action_tables[-1], priorities['lower'], bit_list_to_dec(dscp_to_block))
 
     # sleep
@@ -266,5 +266,5 @@ if __name__ == '__main__':
     # unmirror and unblock
 
     for i, (dscp, tunnel_to_ids) in enumerate(zip(dscp_to_idss, tunnel_to_idss)):
-        unmirror_dscp_from_ids(controller, ovs_node, action_tables[i], bit_list_to_dec(dscp))
+        unforward_dscp_from_ids(controller, ovs_node, action_tables[i], bit_list_to_dec(dscp))
     unblock_dscp(controller, ovs_node, action_tables[-1], bit_list_to_dec(dscp_to_block))
