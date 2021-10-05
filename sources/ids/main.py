@@ -287,6 +287,9 @@ if __name__ == "__main__":
     intercept_thread = Thread(target=interceptor.start, daemon=True)
     intercept_thread.start()
 
+    ap_thread = Thread(target=interceptor.append_packets, daemon=True)
+    ap_thread.start()
+
     cl_thread = Thread(target=interceptor.classify, daemon=True)
     cl_thread.start()
 
