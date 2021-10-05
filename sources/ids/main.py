@@ -177,7 +177,7 @@ class Interceptor:
             reader = pcap.pcap(name=self.iface_in)
             while True:
                 timestamp, raw = next(reader)
-                id, features, flags, tos = read_pkt(raw)
+                id, features, flags, ether, tos = read_pkt(raw)
                 if id is not None:
 
                     # add packets to flows
