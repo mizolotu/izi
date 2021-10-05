@@ -143,7 +143,7 @@ class Interceptor:
         self.set_model(model_idx)
         self.to_be_reset = True
 
-    def classify(self):
+    def append_packets(self):
         while True:
             try:
 
@@ -188,6 +188,10 @@ class Interceptor:
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                 print(e, fname, exc_tb.tb_lineno)
 
+    def classify(self):
+
+        while True:
+
             # remove old flows
 
             tmp_ids = []
@@ -214,6 +218,7 @@ class Interceptor:
                         print(flow_id)
             self.delay = datetime.now().timestamp() - tnow
             self.nflows = len(self.flow_ids)
+            print(self.delay)
 
     def start(self):
 
