@@ -25,13 +25,13 @@ def set_hosts_and_apps():
         interceptor.set_apps(jdata['applications'])
     return jsonify({'hosts': interceptor.hosts, 'applications': interceptor.apps})
 
-@app.route('/dcsp', methods=['GET', 'POST'])
+@app.route('/dscp', methods=['GET', 'POST'])
 def set_label():
     if request.method == 'POST':
         data = request.data.decode('utf-8')
         jdata = json.loads(data)
-        interceptor.set_dcsp(jdata['dcsp'])
-    return jsonify({'dcsp': interceptor.dcsp})
+        interceptor.set_dscp(jdata['dscp'])
+    return jsonify({'dscp': interceptor.dscp})
 
 @app.route('/reset', methods=['GET', 'POST'])
 def restart():
@@ -116,7 +116,7 @@ class Interceptor:
 
         self.to_be_reset = False
         self.delay = 0
-        self.dcsp = None
+        self.dscp = None
         self.hosts = []
         self.apps = []
 
@@ -133,8 +133,8 @@ class Interceptor:
     def set_threshold(self, idx):
         self.thr_idx = idx
 
-    def set_dcsp(self, dcsp):
-        self.dcsp = dcsp
+    def set_dscp(self, dscp):
+        self.dscp = dscp
 
     def reset(self):
         model_idx = 0
@@ -199,8 +199,8 @@ class Interceptor:
                         flow_label = 0
                         self.flow_labels.append(flow_label)
 
-                    if self.dcsp is not None:
-                        dscp = flow_label << (2 + self.dcsp)
+                    if self.dscp is not None:
+                        dscp = flow_label << (2 + self.dscp)
                         self.sock.setsockopt(SOL_IP, IP_TOS, tos | dscp)
 
                     try:
