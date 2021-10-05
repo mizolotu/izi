@@ -82,7 +82,7 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths, attack_ips, att
         ids_name = vxlan['remote']
         spl = ids_name.split('_')
         ids_idx = int(spl[-1])
-        table = action_tables[0] + ids_idx + 1
+        table = ids_tables[0] + ids_idx + 1
         vxlan_ofports.append(vxlan['ofport'])
         vxlan_tables.append(table)
 
