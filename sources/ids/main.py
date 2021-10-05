@@ -6,8 +6,8 @@ from flask import Flask, request, jsonify
 from threading import Thread
 from collections import deque
 from queue import Queue
-
 from socket import socket, AF_PACKET, SOCK_RAW
+from time import sleep
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
@@ -106,7 +106,13 @@ class Interceptor:
         self.xmax = np.array(meta['xmax'])
 
         self.sock = socket(AF_PACKET, SOCK_RAW)
-        self.sock.bind((self.iface_out, 0))
+        ready = False
+        while not ready:
+            try:
+                self.sock.bind((self.iface_out, 0))
+                ready = True
+            except:
+                sleep(1)
 
         self.model_idx = model_idx
         self.thr_idx = thr_idx
