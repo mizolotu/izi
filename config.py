@@ -88,8 +88,6 @@ attacker_in_table = 3
 action_tables = [i for i in range(4, 8)]
 attacker_out_table = 8
 out_table = 9
-block_table = out_table - 1
-ids_tables = [idx for idx in range(3, block_table)]
 priorities = {'lowest': 0, 'lower': 1, 'medium': 2, 'higher': 3, 'highest': 4}
 
 # traffic

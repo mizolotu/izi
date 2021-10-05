@@ -64,7 +64,7 @@ if __name__ == '__main__':
     env_idx = 0
     label = 1
     profiles = calculate_probs(stats_dir, labels)
-    augment = True
+    augment = False
 
     # vms
 
