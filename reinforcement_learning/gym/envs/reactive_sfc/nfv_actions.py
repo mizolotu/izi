@@ -19,6 +19,12 @@ def set_vnf_model(ids_ip, ids_port, value):
     value = r.json()['model']
     return value
 
+def set_vnf_dscp(ids_ip, ids_port, value):
+    uri = f'http://{ids_ip}:{ids_port}/dscp'
+    r = requests.post(uri, json={'dscp': value})
+    value = r.json()['dscp']
+    return value
+
 if __name__ == '__main__':
 
     # load data

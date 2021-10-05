@@ -158,14 +158,16 @@ class Interceptor:
             # label flows
 
             tnow = datetime.now().timestamp()
-            for flow_id, flow_object in zip(self.flow_ids, self.flows):
-                if flow_object.nnewpkts > self.nnewpkts_min or (tnow - flow_object.lasttime) > self.lasttime_min:
+            for i, (flow_id, flow_object) in enumerate(zip(self.flow_ids, self.flows)):
+                if self.flow_labels[i] == 0 and (flow_object.nnewpkts > self.nnewpkts_min or (tnow - flow_object.lasttime) > self.lasttime_min):
                     try:
                         p = self.analyze_flow(i)
                     except:
                         p = -np.inf
                     if p > self.thrs[self.thr_idx]:
                         self.intrusion_ids.appendleft(self.flow_ids[i])
+                        self.flow_labels[i] = 1
+                        print(flow_id)
             self.delay = datetime.now().timestamp() - tnow
             self.nflows = len(self.flow_ids)
 
