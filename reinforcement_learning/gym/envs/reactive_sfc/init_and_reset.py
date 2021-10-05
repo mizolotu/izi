@@ -38,8 +38,8 @@ def init_ids_tables(controller, ids_node, ids_vxlan, ids_veths):
     out_ofports = [item['ofport'] for item in ids_veths if item['tag'] == out_veth_prefix]
     assert len(out_ofports) == 1
     out_ofport = out_ofports[0]
-    controller.input_output(ids_node, in_table, priorities['lower'], vxlan_ofport, in_ofport)
-    controller.input_output(ids_node, in_table, priorities['lowest'], out_ofport, vxlan_ofport)
+    controller.input_output(ids_node, in_table, priorities['medium'], vxlan_ofport, in_ofport)
+    controller.input_output(ids_node, in_table, priorities['lower'], out_ofport, vxlan_ofport)
 
 def clean_ovs_tables_via_api(controller, ovs_node):
     tables = controller.find_operational_tables(ovs_node)
