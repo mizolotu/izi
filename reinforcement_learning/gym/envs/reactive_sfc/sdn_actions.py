@@ -213,6 +213,7 @@ if __name__ == '__main__':
     ids_ids = [0, 1, 2]
     dscp_to_idss = [[0, 0, 0], [1, 0, 0], [1, 1, 0]]
     dscp_to_block = [1, 1, 1]
+    test_reverse_actions = False
 
     # load data
 
@@ -257,14 +258,16 @@ if __name__ == '__main__':
         forward_dscp_to_ids(controller, ovs_node, action_tables[i], priorities['lower'], bit_list_to_dec(dscp), tunnel_to_ids)
     block_dscp(controller, ovs_node, action_tables[-1], priorities['lower'], bit_list_to_dec(dscp_to_block))
 
-    # sleep
+    if test_reverse_actions:
 
-    sleep_time = 10
-    print(f'Sleeping for {sleep_time} seconds...')
-    sleep(sleep_time)
+        # sleep
 
-    # unmirror and unblock
+        sleep_time = 10
+        print(f'Sleeping for {sleep_time} seconds...')
+        sleep(sleep_time)
 
-    for i, (dscp, tunnel_to_ids) in enumerate(zip(dscp_to_idss, tunnel_to_idss)):
-        unforward_dscp_from_ids(controller, ovs_node, action_tables[i], bit_list_to_dec(dscp))
-    unblock_dscp(controller, ovs_node, action_tables[-1], bit_list_to_dec(dscp_to_block))
+        # unmirror and unblock
+
+        for i, (dscp, tunnel_to_ids) in enumerate(zip(dscp_to_idss, tunnel_to_idss)):
+            unforward_dscp_from_ids(controller, ovs_node, action_tables[i], bit_list_to_dec(dscp))
+        unblock_dscp(controller, ovs_node, action_tables[-1], bit_list_to_dec(dscp_to_block))
