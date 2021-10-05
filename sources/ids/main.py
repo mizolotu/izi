@@ -201,7 +201,8 @@ class Interceptor:
 
                     if self.dscp is not None:
                         dscp = flow_label << (2 + self.dscp)
-                        self.sock.setsockopt(SOL_IP, IP_TOS, tos | dscp)
+                        ether[ip.IP].tos = tos | dscp
+                        raw = ether.bin()
 
                     try:
                         self.sock.send(raw)
