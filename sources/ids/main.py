@@ -221,10 +221,9 @@ class Interceptor:
                     if p > self.thrs[self.thr_idx]:
                         self.intrusion_ids.appendleft(self.flow_ids[i])
                         self.flow_labels[i] = 1
-                        print(flow_id)
+                        #print(flow_id)
             self.delay = datetime.now().timestamp() - tnow
             self.nflows = len(self.flow_ids)
-            print(self.delay)
 
     def start(self):
 
