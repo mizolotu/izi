@@ -13,11 +13,11 @@ from threading import Thread
 from itertools import cycle
 
 from reinforcement_learning.gym.envs.reactive_sfc.init_and_reset import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh, init_ids_tables
-from reinforcement_learning.gym.envs.reactive_sfc.sdn_actions import mirror_app_to_ids, unmirror_app_from_ids, mirror_ip_app_to_ids, unmirror_ip_app_from_ids, block_ip_app, unblock_ip_app
-from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_param, reset_ids
-from reinforcement_learning.gym.envs.reactive_sfc.sdn_state import get_flow_counts, reset_flow_collector, get_app_counts, get_ip_counts
+from reinforcement_learning.gym.envs.reactive_sfc.sdn_actions import forward_dscp_to_ids, unforward_dscp_from_ids, block_dscp, unblock_dscp
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_model, set_vnf_dscp, reset_ids
+from reinforcement_learning.gym.envs.reactive_sfc.sdn_state import get_flow_counts, reset_flow_collector, get_flag_counts, get_app_counts, get_ip_counts
 from reinforcement_learning.gym.envs.reactive_sfc.nfv_state import get_intrusions, get_vnf_param
-from reinforcement_learning.gym.envs.reactive_sfc.generate_traffic import set_seed, replay_ip_traffic_on_interface
+from reinforcement_learning.gym.envs.reactive_sfc.generate_traffic import set_seed, prepare_traffic_on_interface, replay_traffic_on_interface
 
 class ReactiveDiscreteEnv():
 
@@ -53,11 +53,7 @@ class ReactiveDiscreteEnv():
 
         # check ids model weights
 
-        ids_model_names = [item.split('.tflite')[0] for item in os.listdir(ids_model_weights_dir) if item.endswith('.tflite')]
-        spl = [item.split('_') for item in ids_model_names]
-        models = sorted(list(set(['_'.join(item[:-1]) for item in spl])))
-        steps = sorted(list(set([item[-1] for item in spl])))
-        self.n_steps = len(steps)
+        models = [item.split('.tflite')[0] for item in os.listdir(ids_model_weights_dir) if item.endswith('.tflite')]
         self.n_models = len(models)
         self.n_thrs = len(fpr_levels)
 
@@ -74,7 +70,6 @@ class ReactiveDiscreteEnv():
         self.ids_vms = [vm for vm in self.vms if vm['role'] == 'ids' and int(vm['vm'].split('_')[1]) == self.id]
         self.n_ids = len(self.ids_vms)
         self.ids_nodes = [self.nodes[vm['vm']] for vm in self.ids_vms]
-        assert (self.n_ids + 2) <= out_table
         for vm in self.ids_vms:
             restart_ids(vm)
         self.delay = [[] for _ in range(self.n_ids)]
@@ -86,12 +81,21 @@ class ReactiveDiscreteEnv():
         self.controller_vm = controller_vm[0]
         self.controller = Odl(self.controller_vm['ip'])
 
-        # tables and tunnels
+        # tunnels and veth pairs
 
         self.internal_hosts = sorted([item.split(csv_postfix)[0] for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith(csv_postfix)])
         self.tunnels = [item for item in self.ofports if item['type'] == 'vxlan' and int(item['vm'].split('_')[1]) == self.id]
         self.ovs_veths = [item for item in self.ofports if item['vm'].startswith('ovs') and item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
         self.ids_veths = [item for item in self.ofports if item['vm'].startswith('ids') and item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
+
+        # ids tunnels
+
+        self.ids_tunnels = []
+        for ids_vm in self.ids_vms:
+            tunnel_to_ids = [ofport['ofport'] for ofport in self.ofports if ofport['type'] == 'vxlan' and ofport['vm'] == self.ovs_vm['vm'] and ofport['remote'] == ids_vm['vm']]
+            assert len(tunnel_to_ids) == 1
+            tunnel_to_ids = tunnel_to_ids[0]
+            self.ids_tunnels.append(tunnel_to_ids)
 
         # configure ids
 
@@ -103,7 +107,7 @@ class ReactiveDiscreteEnv():
             clean_ids_tables(self.controller, ids_node)
             init_ids_tables(self.controller, ids_node, ids_vxlan, ids_veths)
             idx = int(ids_vm['vm'].split('_')[2])
-            set_vnf_param(ids_vm['ip'], flask_port, 'dcsp', idx)
+            set_vnf_dscp(ids_vm['ip'], flask_port, idx)
 
         # time
 
@@ -121,9 +125,11 @@ class ReactiveDiscreteEnv():
 
         self.stack_size = obs_stack_size
         self.n_apps = len(applications)
-        on_off_frame_shape = (self.n_apps, (self.n_ids + 1) * self.n_ids)
+        self.n_flags = len(tcp_flags)
+        self.n_dscps = 2 ** self.n_ids
+        on_off_frame_shape = (self.n_dscps, self.n_ids)
         self.on_off_frame = np.zeros(on_off_frame_shape)
-        obs_shape = (self.stack_size, self.n_apps, 2 + self.n_ids + on_off_frame_shape[1])
+        obs_shape = (self.stack_size, self.n_apps * 2 + self.n_flags * 2 + np.prod(on_off_frame_shape))
         self.samples_by_app = np.zeros((self.n_apps, 2))
         self.app_counts_stack = deque(maxlen=self.stack_size)
         self.in_samples_by_attacker_stack = deque(maxlen=self.stack_size)
@@ -134,14 +140,12 @@ class ReactiveDiscreteEnv():
 
         # actions
 
-        self.n_mirror_app_actions = self.n_apps * self.n_ids
-        self.n_unmirror_app_actions = self.n_apps * self.n_ids
-        self.n_mirror_int_actions = self.n_apps * (self.n_ids - 1) * self.n_ids
-        self.n_unmirror_int_actions = self.n_apps * (self.n_ids - 1) * self.n_ids
-        self.n_block_actions = self.n_apps * self.n_ids
-        self.n_unblock_actions = self.n_apps * self.n_ids
-        self.n_ids_actions = (self.n_models + self.n_steps + self.n_thrs) * self.n_ids
-        act_dim = self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
+        self.n_forward_actions = self.n_dscps * self.n_ids
+        self.n_unforward_actions = self.n_dscps * self.n_ids
+        self.n_block_actions = self.n_dscps
+        self.n_unblock_actions = self.n_dscps
+        self.n_ids_actions = (self.n_models + self.n_thrs) * self.n_ids
+        act_dim = self.n_forward_actions + self.n_unforward_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions + 1
         self.actions_queue = deque()
 
         # start acting
@@ -181,6 +185,8 @@ class ReactiveDiscreteEnv():
 
         self.in_samples = 0
         self.out_samples = 0
+
+        print('INIT COMPLETE!')
 
     def _act(self):
         while True:
@@ -341,95 +347,36 @@ class ReactiveDiscreteEnv():
 
     def _action_mapper(self, i):
 
-        if i < self.n_mirror_app_actions:
-            action_array = np.zeros(self.n_mirror_app_actions)
+        if i < self.n_forward_actions:
+            action_array = np.zeros(self.n_forward_actions)
             action_array[i] = 1
-            action_array = action_array.reshape(self.n_apps, self.n_ids)
-            app_i, ids_i = np.where(action_array == 1)
-            app_idx = app_i[0]
+            action_array = action_array.reshape(self.n_dscps, self.n_ids)
+            dscp_i, ids_i = np.where(action_array == 1)
+            dscp_idx = dscp_i[0]
             ids_idx = ids_i[0]
-            ids_name = self.ids_vms[ids_idx]['vm']
-            app = applications[app_idx]
-            action_fun = mirror_app_to_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], priorities['medium'], app, self.ovs_vm['vm'], ids_name, self.tunnels)
-            on_off_idx_and_value = (app_idx, ids_idx, 1)
+            dscp = dscp_idx
+            action_fun = forward_dscp_to_ids
+            args = (self.controller, self.ovs_node, ids_tables[ids_idx], priorities['lower'], dscp, self.ids_tunnels[ids_idx])
+            on_off_idx_and_value = (dscp_idx, ids_idx, 1)
             queue_the_action = True
-        elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions:
-            action_array = np.zeros(self.n_unmirror_app_actions)
-            action_array[i - self.n_mirror_app_actions] = 1
-            action_array = action_array.reshape(self.n_apps, self.n_ids)
-            app_i, ids_i = np.where(action_array == 1)
-            app_idx = app_i[0]
+        elif i < self.n_forward_actions + self.n_unforward_actions:
+            action_array = np.zeros(self.n_unforward_actions)
+            action_array[i - self.n_forward_actions] = 1
+            action_array = action_array.reshape(self.n_dscps, self.n_ids)
+            dscp_i, ids_i = np.where(action_array == 1)
+            dscp_idx = dscp_i[0]
             ids_idx = ids_i[0]
-            app = applications[app_idx]
-            action_fun = unmirror_app_from_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_idx], app)
-            on_off_idx_and_value = (app_idx, ids_idx, 0)
+            dscp = dscp_idx
+            action_fun = unforward_dscp_from_ids
+            args = (self.controller, self.ovs_node, ids_tables[ids_idx], dscp)
+            on_off_idx_and_value = (dscp_idx, ids_idx, 0)
             queue_the_action = True
-        elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions:
-            e = np.eye(self.n_ids)
-            action_array = np.zeros(self.n_mirror_int_actions)
-            action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions] = 1
-            action_array = action_array.reshape(self.n_apps, self.n_ids, self.n_ids - 1)
-            app_i, ids_from, ids_to_ = np.where(action_array == 1)
-            ids_from = ids_from[0]
-            ids_to = np.where(e[ids_from] == 0)[0][ids_to_[0]]
-            ids_name = self.ids_vms[ids_to]['vm']
-            app_idx = app_i[0]
-            app = applications[app_idx]
-            ips_to_mirror = self.intrusion_ips[ids_from][app_idx]
-            ips = []
-            for ip in ips_to_mirror:
-                if ip not in self.ips_to_check_or_block[ids_to][app_idx]:
-                    ips.append(ip)
-                    self.ips_to_check_or_block[ids_to][app_idx].append(ip)
-            action_fun = mirror_ip_app_to_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_to], priorities['higher'], priorities['highest'], ips, app, self.ovs_vm['vm'], ids_name, self.tunnels)
-            on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 1)
-            queue_the_action = True
-        elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions:
-            e = np.eye(self.n_ids)
-            action_array = np.zeros(self.n_mirror_int_actions)
-            action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions] = 1
-            action_array = action_array.reshape(self.n_apps, self.n_ids, self.n_ids - 1)
-            app_i, ids_from, ids_to_ = np.where(action_array == 1)
-            ids_from = ids_from[0]
-            ids_to = np.where(e[ids_from] == 0)[0][ids_to_[0]]
-            app_idx = app_i[0]
-            app = applications[app_idx]
-            ips_to_unmirror = self.intrusion_ips[ids_from][app_idx]
-            ips = []
-            for ip in ips_to_unmirror:
-                if ip in self.ips_to_check_or_block[ids_to][app_idx]:
-                    ips.append(ip)
-                    self.ips_to_check_or_block[ids_to][app_idx].remove(ip)
-            action_fun = unmirror_ip_app_from_ids
-            args = (self.controller, self.ovs_node, ids_tables[ids_to], ips, app)
-            on_off_idx_and_value = (app_idx, self.n_ids + ids_from * (self.n_ids - 1) + ids_to_[0], 0)
-            queue_the_action = True
-        elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions:
+        elif i < self.n_forward_actions + self.n_unforward_actions + self.n_block_actions:
             action_array = np.zeros(self.n_block_actions)
-            action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions] = 1
-            action_array = action_array.reshape(self.n_apps, self.n_ids)
-            app_i, ids_i = np.where(action_array == 1)
-            app_idx = app_i[0]
-            ids_idx = ids_i[0]
-            ips_to_block = self.intrusion_ips[ids_idx][app_idx]
-            ips = []
-            for ip in ips_to_block:
-                if ip not in self.ips_to_check_or_block[self.n_ids][app_idx]:
-                    ips.append(ip)
-                    self.ips_to_check_or_block[self.n_ids][app_idx].append(ip)
-            app = applications[app_idx]
-            action_fun = block_ip_app
-            args = (self.controller, self.ovs_node, block_table, priorities['higher'], priorities['highest'], ips, app)
-            if self.debug:
-                if len(app) == 2:
-                    for ip in ips:
-                        print('Blocking {0}:{1}:{2} in {3}'.format(app[0], ip, app[1], self.id))
-                elif len(app) == 1:
-                    for ip in ips:
-                        print('Blocking {0}:{1}:all in {2}'.format(app[0], ip, self.id))
+            action_array[i - self.n_forward_actions - self.n_unforward_actions] = 1
+            dscp = np.where(action_array == 1)
+            action_fun = block_dscp
+            args = (self.controller, self.ovs_node, block_table, priorities['higher'], dscp)
             on_off_idx_and_value = (app_idx, self.n_ids ** 2 + ids_idx, 1)
             queue_the_action = True
         elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions:

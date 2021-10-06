@@ -111,7 +111,7 @@ def init_ovs_tables(controller, ovs_node, ovs_vxlans, ovs_veths, attack_ips, att
 
     # table 2 (flags)
 
-    for flag in [16, 24, 17, 18, 20, 25, 2, 4]:
+    for flag in tcp_flags:
         controller.tcp_flag_resubmit(ovs_node, flag_table, priorities['lower'], flag, flag_table + 1)
     controller.resubmit(ovs_node, flag_table, priorities['lowest'], flag_table + 1)
 

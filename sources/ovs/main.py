@@ -35,8 +35,8 @@ def readpcap():
     jdata = json.loads(data)
     fname = jdata['fname']
     augment = jdata['augment']
-    added = tg.readpcap(fname, augment)
-    return jsonify(added)
+    flows = tg.readpcap(fname, augment)
+    return jsonify({'flows': flows})
 
 @app.route('/replay', methods=['POST'])
 def replay():
@@ -106,6 +106,7 @@ class TrafficGenerator():
         aug_last = None
         id_last = None
         traffic_duration = 0
+        flows = []
         try:
             reader = pcap.pcap(name=fpath)
             while True:
@@ -115,11 +116,18 @@ class TrafficGenerator():
                         tdelta = ts - ts_last
                         pkts.append([tdelta, raw_last, id_last, aug_last])
                         traffic_duration += tdelta
+                    id, features, flags, ether, tos = read_pkt(raw)
+                    src = id[0]
+                    dst = id[2]
+                    sport = id[1]
+                    dport = id[3]
+                    proto = id[4]
+                    reverse_id = [dst, dport, src, sport, proto]
+                    if id not in flows and reverse_id not in flows:
+                        flows.append(id)
                     aug = False
-                    if augment is not None:
-                        id, features, flags, ether, tos = read_pkt(raw)
-                        if ('source' in augment['directions'] and id[0] in augment['ips'] or 'destination' in augment['directions'] and id[2] in augment['ips']) and flags[3]:
-                            aug = True
+                    if augment is not None and ('source' in augment['directions'] and id[0] in augment['ips'] or 'destination' in augment['directions'] and id[2] in augment['ips']) and flags[3]:
+                        aug = True
                     else:
                         id = []
                     ts_last = ts
@@ -131,10 +139,9 @@ class TrafficGenerator():
                     pkts.append([0, raw_last, id_last, aug_last])
                     break
             self.pkts.append([traffic_duration, pkts])
-            added = True
         except:
-            added = False
-        return added
+            pass
+        return flows
 
     def replay(self, duration):
         thrs = []

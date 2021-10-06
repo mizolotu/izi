@@ -131,7 +131,7 @@ applications = [
 
 ip_proto_names = list(set([item[0] for item in applications]))
 directions = ['source', 'destination']
-
+tcp_flags = [16, 24, 17, 18, 20, 25, 2, 4]
 npkts_min = 80
 
 # rl

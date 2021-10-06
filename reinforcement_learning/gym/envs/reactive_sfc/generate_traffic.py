@@ -38,7 +38,8 @@ def set_seed(tgu_mgmt_ip, tgu_port, seed):
 def prepare_traffic_on_interface(ovs_ip, ovs_port, fname, augment=False):
     url = 'http://{0}:{1}/readpcap'.format(ovs_ip, ovs_port)
     r = requests.post(url, json={'ip': ip, 'fname': fname, 'augment': augment})
-    return r.json()
+    jdata = r.json()
+    return jdata['flows']
 
 def replay_traffic_on_interface(ovs_ip, ovs_port, duration):
     url = 'http://{0}:{1}/replay'.format(ovs_ip, ovs_port)
@@ -100,8 +101,9 @@ if __name__ == '__main__':
                 fnames.append(f'{profiles[prob_idx][ip][0][fname_idx]}_label:{0}')
                 augments.append(None)
             for fname, aug in zip(fnames, augments):
-                print(fname, aug)
-                prepare_traffic_on_interface(ovs_vm['mgmt'], flask_port, fname, augment=aug)
+                flows = prepare_traffic_on_interface(ovs_vm['mgmt'], flask_port, fname, augment=aug)
+                for flow in flows:
+                    print(flow)
 
     # replay
 
