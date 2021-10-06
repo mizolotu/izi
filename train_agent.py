@@ -15,6 +15,7 @@ from reinforcement_learning import logger
 from reinforcement_learning.common.callbacks import CheckpointCallback
 from config import *
 from common.ml import load_meta
+from common import data
 from itertools import cycle
 
 def find_checkpoint_with_max_step(checkpoint_dir, prefix='rl_model_'):
@@ -36,6 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
     parser.add_argument('-n', '--nenvs', help='Number of environments', type=int, default=nenvs)
     parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', type=int, default=train_attacks)
+    parser.add_argument('-r', '--reverse_labeler', help='Reverse labeler', default='reverse_label_cicids17_short')
     parser.add_argument('-u', '--augment', help='Augment the data?', default=False, type=bool)
     parser.add_argument('-t', '--timestamp', help='Checkpoint timestamp', type=int)
     args = parser.parse_args()
@@ -45,18 +47,23 @@ if __name__ == '__main__':
     if args.nenvs is not None:
         nenvs = args.nenvs
 
-    # handle attack indexes
+    # reverse labeler
+
+    reverse_labeler = getattr(data, args.reverse_labeler)
+
+    # check attack labels
 
     meta = load_meta(data_dir)
     attack_labels = sorted([label for label in meta['labels'] if label > 0])
-    attack_indexes = []
+    attacks = []
+    attack_data = {}
     for a in args.labels:
-        if a in attack_labels:
-            idx = attack_labels.index(a)
-            if idx not in attack_indexes:
-                attack_indexes.append(idx)
-    attack_indexes = cycle(attack_indexes)
-    attack_str = ','.join([str(item) for item in args.labels])
+        if a in attack_labels and a not in attacks:
+            attacks.append(a)
+            attack_ips, attack_directions = reverse_labeler(a)
+            attack_data[a] = (attack_ips, attack_directions)
+    attacks = cycle(attacks)
+    attack_str = ','.join([str(item) for item in attacks])
 
     # environment and algorithm
 
@@ -74,7 +81,7 @@ if __name__ == '__main__':
 
     # create environments
 
-    env_fns = [make_env(env_class, env_idx, next(attack_indexes), args.augment, env_idx) for env_idx in range(nenvs)]
+    env_fns = [make_env(env_class, env_idx, next(attacks), attack_data, args.augment, env_idx) for env_idx in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
     try:
