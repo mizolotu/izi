@@ -505,8 +505,8 @@ class ReactiveDiscreteEnv():
             self.actions_queue.appendleft((func, args))
         else:
             func(*args)
-        #if self.debug:
-        print(func, args, on_off_idx_and_value)
+        if self.debug:
+            print(func, args, on_off_idx_and_value)
         if on_off_idx_and_value is not None:
             if len(on_off_idx_and_value) == 3:
                 i, j, val = on_off_idx_and_value
