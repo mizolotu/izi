@@ -14,14 +14,14 @@ from itertools import cycle
 
 from reinforcement_learning.gym.envs.reactive_sfc.init_and_reset import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh, init_ids_tables
 from reinforcement_learning.gym.envs.reactive_sfc.sdn_actions import forward_dscp_to_ids, unforward_dscp_from_ids, block_dscp, unblock_dscp
-from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_model, set_vnf_dscp, reset_ids
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_param, reset_ids
 from reinforcement_learning.gym.envs.reactive_sfc.sdn_state import get_flow_counts, reset_flow_collector, get_flag_counts, get_app_counts, get_ip_counts
 from reinforcement_learning.gym.envs.reactive_sfc.nfv_state import get_intrusions, get_vnf_param
-from reinforcement_learning.gym.envs.reactive_sfc.generate_traffic import set_seed, prepare_traffic_on_interface, replay_traffic_on_interface
+from reinforcement_learning.gym.envs.reactive_sfc.generate_traffic import set_seed, calculate_probs, prepare_traffic_on_interface, replay_traffic_on_interface
 
 class ReactiveDiscreteEnv():
 
-    def __init__(self, env_id, label, aug, seed=None, policy=None):
+    def __init__(self, env_id, label, attack_data, aug, seed=None, policy=None):
 
         # id
 
@@ -83,10 +83,9 @@ class ReactiveDiscreteEnv():
 
         # tunnels and veth pairs
 
-        self.internal_hosts = sorted([item.split(csv_postfix)[0] for item in os.listdir(spl_dir) if osp.isfile(osp.join(spl_dir, item)) and item.endswith(csv_postfix)])
-        self.tunnels = [item for item in self.ofports if item['type'] == 'vxlan' and int(item['vm'].split('_')[1]) == self.id]
-        self.ovs_veths = [item for item in self.ofports if item['vm'].startswith('ovs') and item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
-        self.ids_veths = [item for item in self.ofports if item['vm'].startswith('ids') and item['type'] == 'veth' and int(item['vm'].split('_')[1]) == self.id]
+        self.internal_hosts = sorted([item for item in os.listdir(spl_dir) if osp.isdir(osp.join(spl_dir, item))])
+        self.ovs_vxlans = [item for item in self.ofports if item['vm'] == self.ovs_vm['vm'] and item['type'] == 'vxlan']
+        self.ovs_veths = [item for item in self.ofports if item['vm'] == self.ovs_vm['vm'] and item['type'] == 'veth']
 
         # ids tunnels
 
@@ -107,7 +106,7 @@ class ReactiveDiscreteEnv():
             clean_ids_tables(self.controller, ids_node)
             init_ids_tables(self.controller, ids_node, ids_vxlan, ids_veths)
             idx = int(ids_vm['vm'].split('_')[2])
-            set_vnf_dscp(ids_vm['ip'], flask_port, idx)
+            set_vnf_param(ids_vm['ip'], flask_port, 'dscp', idx)
 
         # time
 
@@ -119,7 +118,11 @@ class ReactiveDiscreteEnv():
 
         if type(label) is not list:
             label = [label]
+        for l in label:
+            assert l in attack_data.keys(), f'No data found for attack {l}!'
+        self.profiles = calculate_probs(stats_dir, label)
         self.label = cycle(label)
+        self.attack_data = attack_data
 
         # obs
 
@@ -127,13 +130,24 @@ class ReactiveDiscreteEnv():
         self.n_apps = len(applications)
         self.n_flags = len(tcp_flags)
         self.n_dscps = 2 ** self.n_ids
-        on_off_frame_shape = (self.n_dscps, self.n_ids)
-        self.on_off_frame = np.zeros(on_off_frame_shape)
-        obs_shape = (self.stack_size, self.n_apps * 2 + self.n_flags * 2 + np.prod(on_off_frame_shape))
+
+        sdn_on_off_frame_shape = (self.n_dscps, self.n_ids + 1)
+        self.sdn_on_off_frame = np.zeros(sdn_on_off_frame_shape)
+
+        nfv_on_off_frame_shape = (self.n_ids, self.n_models + self.n_thrs)
+        self.nfv_on_off_frame = np.zeros(nfv_on_off_frame_shape)
+        self.nfv_on_off_frame[:, 0] = 1  # default model idx is 0
+        self.nfv_on_off_frame[:, self.n_models] = 1  # default thr idx is 0
+
+        obs_shape = (self.stack_size, self.n_apps * 2 + (self.n_flags + 1) * 2 + self.n_apps * self.n_ids + np.prod(sdn_on_off_frame_shape) + np.prod(nfv_on_off_frame_shape))
+
         self.samples_by_app = np.zeros((self.n_apps, 2))
+        self.samples_by_flag = np.zeros((self.n_flags + 1, 2))
         self.app_counts_stack = deque(maxlen=self.stack_size)
+
         self.in_samples_by_attacker_stack = deque(maxlen=self.stack_size)
         self.out_samples_by_attacker_stack = deque(maxlen=self.stack_size)
+
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
@@ -185,8 +199,6 @@ class ReactiveDiscreteEnv():
 
         self.in_samples = 0
         self.out_samples = 0
-
-        print('INIT COMPLETE!')
 
     def _act(self):
         while True:
@@ -324,6 +336,7 @@ class ReactiveDiscreteEnv():
             if b > 0:
                 blocked = np.clip(b - a, 0, b)
                 allowed = np.clip(a, 0, b)
+                allowed = np.clip(a, 0, b)
                 if i < self.n_attackers:
                     attack.append(blocked / b)
                 elif i == self.n_attackers:
@@ -374,49 +387,41 @@ class ReactiveDiscreteEnv():
         elif i < self.n_forward_actions + self.n_unforward_actions + self.n_block_actions:
             action_array = np.zeros(self.n_block_actions)
             action_array[i - self.n_forward_actions - self.n_unforward_actions] = 1
-            dscp = np.where(action_array == 1)
+            dscp = np.where(action_array == 1)[0]
             action_fun = block_dscp
             args = (self.controller, self.ovs_node, block_table, priorities['higher'], dscp)
-            on_off_idx_and_value = (app_idx, self.n_ids ** 2 + ids_idx, 1)
+            on_off_idx_and_value = (dscp, self.n_ids + 1, 1)
             queue_the_action = True
-        elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions:
+        elif i < self.n_forward_actions + self.n_unforward_actions + self.n_block_actions + self.n_unblock_actions:
             action_array = np.zeros(self.n_unblock_actions)
-            action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions] = 1
-            action_array = action_array.reshape(self.n_apps, self.n_ids)
-            app_i, ids_i = np.where(action_array == 1)
-            app_idx = app_i[0]
-            ids_idx = ids_i[0]
-            ips_to_unblock = self.intrusion_ips[ids_idx][app_idx]
-            ips = []
-            for ip in ips_to_unblock:
-                if ip in self.ips_to_check_or_block[self.n_ids][app_idx]:
-                    ips.append(ip)
-                    self.ips_to_check_or_block[self.n_ids][app_idx].remove(ip)
-            app = applications[app_idx]
-            action_fun = unblock_ip_app
-            args = (self.controller, self.ovs_node, block_table, ips, app)
-            on_off_idx_and_value = (app_idx, self.n_ids ** 2 + ids_idx, 0)
+            action_array[i - self.n_forward_actions - self.n_unforward_actions - self.n_block_actions] = 1
+            dscp = np.where(action_array == 1)[0]
+            action_fun = unblock_dscp
+            args = (self.controller, self.ovs_node, block_table, dscp)
+            on_off_idx_and_value = (dscp, self.n_ids + 1, 0)
             queue_the_action = True
-        elif i < self.n_mirror_app_actions + self.n_unmirror_app_actions + self.n_mirror_int_actions + self.n_unmirror_int_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions:
+        elif i < self.n_forward_actions + self.n_unforward_actions + self.n_block_actions + self.n_unblock_actions + self.n_ids_actions:
             action_array = np.zeros(self.n_ids_actions)
-            action_array[i - self.n_mirror_app_actions - self.n_unmirror_app_actions - self.n_mirror_int_actions - self.n_unmirror_int_actions - self.n_block_actions - self.n_unblock_actions] = 1
-            action_array = action_array.reshape(self.n_ids, self.n_models + self.n_steps + self.n_thrs)
+            action_array[i - self.n_forward_actions - self.n_unforward_actions - self.n_block_actions - self.n_unblock_actions] = 1
+            action_array = action_array.reshape(self.n_ids, self.n_models + self.n_thrs)
             ids_i, value_i = np.where(action_array == 1)
             ids_idx = ids_i[0]
             value = value_i[0]
             ids_ip = self.ids_vms[ids_idx]['ip']
+            on_off_value = np.array(self.nfv_on_off_frame[ids_idx, :])
             if value < self.n_models:
                 param = 'model'
                 value = int(value)
-            elif value < self.n_models + self.n_steps:
-                param = 'step'
-                value = int(value) - self.n_models
+                on_off_value[:self.n_models] = 0
+                on_off_value[value] = 1
             else:
                 param = 'threshold'
-                value = int(value) - self.n_models - self.n_steps
+                value = int(value) - self.n_models
+                on_off_value[self.n_models:] = 0
+                on_off_value[value] = 1
             action_fun = set_vnf_param
             args = (ids_ip, flask_port, param, value)
-            on_off_idx_and_value = None
+            on_off_idx_and_value = (ids_idx, on_off_value)
             queue_the_action = False
         else:
             action_fun = lambda *args: None
@@ -432,8 +437,12 @@ class ReactiveDiscreteEnv():
         else:
             func(*args)
         if on_off_idx_and_value is not None:
-            app_i, j, val = on_off_idx_and_value
-            self.on_off_frame[app_i, j] = val
+            if len(on_off_idx_and_value) == 3:
+                i, j, val = on_off_idx_and_value
+                self.sdn_on_off_frame[i, j] = val
+            elif len(on_off_idx_and_value) == 2:
+                i, val = on_off_idx_and_value
+                self.nfv_on_off_frame[i, :] = val
 
     def _rearange_counts(self, flows, counts, flows_r):
         counts_r = np.zeros_like(counts)
@@ -444,6 +453,9 @@ class ReactiveDiscreteEnv():
         return counts_r
 
     def reset(self, sleep_duration=5):
+
+        attack_label = next(self.label)
+        attack_ips, attack_directions = self.attack_data[attack_label]
 
         #print('Reset start in', self.id)
 
@@ -513,14 +525,18 @@ class ReactiveDiscreteEnv():
             ready = False
             attempt = 0
             while not ready:
-                init_ovs_tables(self.controller, self.ovs_node, self.ovs_veths)
+                init_ovs_tables(self.controller, self.ovs_node, self.ovs_vxlans, self.ovs_veths, attack_ips, attack_directions)
                 sleep(sleep_duration)
                 count = 0
                 for table in tables:
-                    if table == app_table:
-                        n_flows_required = 2 + (len(applications) - 2) * 2
-                    elif table == block_table:
-                        n_flows_required = 2 * len(attackers) + 1
+                    if table == in_table:
+                        n_flows_required = self.n_ids + 1
+                    elif table == app_table:
+                        n_flows_required = (len(applications) - 2) * 2 + 2
+                    elif table == flag_table:
+                        n_flows_required = self.n_flags + 1
+                    elif table in [attacker_in_table, attacker_out_table]:
+                        n_flows_required = len(attack_ips) * len(attack_directions) + 1
                     else:
                         n_flows_required = 1
                     flows, counts = get_flow_counts(self.controller, self.ovs_node, table)
@@ -562,33 +578,69 @@ class ReactiveDiscreteEnv():
 
             self.app_counts_stack.clear()
             self.samples_by_app = np.zeros((self.n_apps, 2))
+            self.samples_by_flag = np.zeros((self.n_flags + 1, 2))
             self.samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
             while len(self.app_counts_stack) < self.app_counts_stack.maxlen:
 
-                # samples = get_flow_samples(self.ovs_vm['ip'], flask_port, flow_window)
-                samples = get_app_counts(self.ovs_vm['ip'], flask_port, in_table + 1)
-                # samples_by_app = self._process_app_samples(samples)
+                app_samples = get_app_counts(self.ovs_vm['ip'], flask_port, app_table)
                 samples_by_app = np.zeros((self.n_apps, 2))
                 for app in applications:
-                    if app in samples['applications']:
-                        idx = samples['applications'].index(app)
-                        samples_by_app[idx, 0] = samples['packets'][idx]
-                        samples_by_app[idx, 1] = samples['bytes'][idx]
+                    if app in app_samples['applications']:
+                        idx = app_samples['applications'].index(app)
+                        samples_by_app[idx, 0] = app_samples['packets'][idx]
+                        samples_by_app[idx, 1] = app_samples['bytes'][idx]
+
+                flag_samples = get_flag_counts(self.ovs_vm['ip'], flask_port, flag_table)
+                samples_by_flag = np.zeros((self.n_flags + 1, 2))
+                for flag in tcp_flags:
+                    if flag in flag_samples['flags']:
+                        idx = flag_samples['flags'].index(flag)
+                    else:
+                        idx = -1
+                    samples_by_flag[idx, 0] = flag_samples['packets'][idx]
+                    samples_by_flag[idx, 1] = flag_samples['bytes'][idx]
+
                 frame = np.hstack([
-                    (samples_by_app - self.samples_by_app) / (np.sum(samples_by_app, axis=0) + 1e-10),
-                    np.zeros((self.n_apps, self.n_ids)),
-                    np.array(self.on_off_frame)
+                    ((samples_by_app - self.samples_by_app) / (np.sum(samples_by_app, axis=0) + 1e-10)).reshape(1, -1).flatten(),  # apps
+                    ((samples_by_flag - self.samples_by_flag) / (np.sum(samples_by_flag, axis=0) + 1e-10)).reshape(1, -1).flatten(),  # flags
+                    np.zeros(self.n_apps * self.n_ids),  # intrusions
+                    np.array(self.sdn_on_off_frame).reshape(1, -1).flatten(),  # sdn actions
+                    np.array(self.nfv_on_off_frame). reshape(1, -1).flatten()  # nfv actions
                 ])
                 self.app_counts_stack.append(frame)
                 self.samples_by_app = np.array(samples_by_app)
+                self.samples_by_flag = np.array(samples_by_flag)
+
             obs = np.array(self.app_counts_stack)
 
             # generate traffic
 
-            attack_label = next(self.label)
             for host in self.internal_hosts:
-                _ = replay_ip_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, attack_label, episode_duration, aug=self.aug)
-                # print(_)
+
+                if host in self.profiles[attack_label].keys():
+                    prob_idx = attack_label
+                    if self.aug:
+                        aug = {'ips': attack_ips, 'directions': attack_directions}
+                    else:
+                        aug = None
+                elif host in self.profiles[0].keys():
+                    prob_idx = 0
+                    aug = None
+                else:
+                    prob_idx = -1
+
+                if prob_idx >= 0:
+                    fname_idx = np.random.choice(np.arange(len(self.profiles[prob_idx][host][1])), p=self.profiles[prob_idx][host][1])
+                    fnames = [f'{self.profiles[prob_idx][host][0][fname_idx]}_label:{prob_idx}']
+                    augments = [aug]
+                    if prob_idx > 0:
+                        fnames.append(f'{self.profiles[prob_idx][host][0][fname_idx]}_label:{0}')
+                        augments.append(None)
+                    for fname, aug in zip(fnames, augments):
+                        flows = prepare_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, fname, augment=aug)
+                        print(prob_idx, fname, len(flows))
+
+                replay_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, episode_duration)
 
             print('Reset complete in env', self.id)
 

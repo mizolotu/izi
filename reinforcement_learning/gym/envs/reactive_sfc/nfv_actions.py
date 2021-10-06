@@ -13,16 +13,10 @@ def reset_ids(ids_ip, ids_port, sleep_interval=0.1):
         except:
             sleep(sleep_interval)
 
-def set_vnf_model(ids_ip, ids_port, value):
-    uri = f'http://{ids_ip}:{ids_port}/model'
-    r = requests.post(uri, json={'model': value})
-    value = r.json()['model']
-    return value
-
-def set_vnf_dscp(ids_ip, ids_port, value):
-    uri = f'http://{ids_ip}:{ids_port}/dscp'
-    r = requests.post(uri, json={'dscp': value})
-    value = r.json()['dscp']
+def set_vnf_param(ids_ip, ids_port, param, value):
+    uri = f'http://{ids_ip}:{ids_port}/{param}'
+    r = requests.post(uri, json={param: value})
+    value = r.json()[param]
     return value
 
 if __name__ == '__main__':
@@ -47,8 +41,8 @@ if __name__ == '__main__':
 
     for ids_vm in ids_vms:
         vals = []
-        m_val = set_vnf_model(ids_vm['mgmt'], flask_port, model)
-        d_val = set_vnf_dscp(ids_vm['mgmt'], flask_port, dscp)
+        m_val = set_vnf_param(ids_vm['mgmt'], flask_port, 'model', model)
+        d_val = set_vnf_param(ids_vm['mgmt'], flask_port, 'dscp', dscp)
         print(ids_vm['vm'], m_val, d_val)
         model += 1
         dscp += 1
