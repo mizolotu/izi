@@ -71,8 +71,8 @@ def app_counts():
 def ip_counts():
     data = request.data.decode('utf-8')
     jdata = json.loads(data)
-    ips_pass, pkts_pass, bts_pass, ips_drop, pkts_drop, bts_drop = flow_collector.parse_ip_table(jdata['table'])
-    return jsonify({'ips_pass': ips_pass, 'packets_pass': pkts_pass, 'bytes_pass': bts_pass, 'ips_drop': ips_drop, 'packets_drop': pkts_drop, 'bytes_drop': bts_drop})
+    ips, pkts, bts = flow_collector.parse_ip_table(jdata['table'])
+    return jsonify({'ips': ips, 'packets': pkts, 'bytes': bts})
 
 @app.route('/report')
 def report():
@@ -292,7 +292,7 @@ class FlowCollector():
                         bts.append(nbts)
         return apps, pkts, bts
 
-    def parse_ip_table(self, table):
+    def parse_block_table(self, table):
         cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']
         with Popen(cmd, stdout=PIPE) as p:
             lines = p.stdout.readlines()
@@ -336,6 +336,38 @@ class FlowCollector():
                         pkts_pass.append(npkts)
                         bts_pass.append(nbts)
         return ips_pass, pkts_pass, bts_pass, ips_drop, pkts_drop, bts_drop
+
+    def parse_ip_table(self, table):
+        cmd = ['sudo', 'ovs-ofctl', 'dump-flows', 'br', f'table={table}']
+        with Popen(cmd, stdout=PIPE) as p:
+            lines = p.stdout.readlines()
+        lines = [line.decode()[1:].strip() for line in lines]
+        ips = []
+        pkts = []
+        bts = []
+        for line in lines:
+            spl = line.split(', ')
+            if len(spl) >= 7:
+                npkts = int(spl[3].split('n_packets=')[1])
+                nbts = int(spl[4].split('n_bytes=')[1])
+                match_actions_spl = spl[6].split(' actions=')
+                match_spl = match_actions_spl[0].split(',')
+                action = match_actions_spl[1]
+                if len(match_spl) == 2:
+                    ips.append('')
+                    pkts.append(npkts)
+                    bts.append(nbts)
+                elif len(match_spl) == 3:
+                    ip = match_spl[2].split('=')[1]
+                    if ip in ips:
+                        idx = ips.index(ip)
+                        pkts[idx] += npkts
+                        bts[idx] += nbts
+                    else:
+                        ips.append(ip)
+                        pkts.append(npkts)
+                        bts.append(nbts)
+        return ips, pkts, bts
 
 if __name__ == '__main__':
 

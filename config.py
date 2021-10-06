@@ -53,7 +53,7 @@ env_vms = {
     },
     'ids': {
         'unique': False,
-        'n': 2,
+        'n': 1,
         'cpus': 4,
         'ips': ['192.168.254.60'],
         'sources': [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']],

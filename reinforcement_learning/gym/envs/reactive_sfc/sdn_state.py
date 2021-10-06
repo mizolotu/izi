@@ -74,8 +74,9 @@ if __name__ == '__main__':
         tstep = time()
         samples0 = get_flag_counts(ovs_vm['mgmt'], flask_port, flag_table)
         samples1 = get_app_counts(ovs_vm['mgmt'], flask_port, app_table)
-        samples2 = get_ip_counts(ovs_vm['mgmt'], flask_port, block_table)
-        print(samples0, samples1, samples2)
+        samples2 = get_ip_counts(ovs_vm['mgmt'], flask_port, attacker_in_table)
+        samples3 = get_ip_counts(ovs_vm['mgmt'], flask_port, attacker_out_table)
+        print(samples0, samples1, samples2, samples3)
         tdelta = time() - tstep
         if tdelta < episode_duration / nsteps:
             print(f'Sleeping for {episode_duration / nsteps - tdelta} seconds')

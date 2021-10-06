@@ -62,8 +62,8 @@ if __name__ == '__main__':
             attacks.append(a)
             attack_ips, attack_directions = reverse_labeler(a)
             attack_data[a] = (attack_ips, attack_directions)
-    attacks = cycle(attacks)
     attack_str = ','.join([str(item) for item in attacks])
+    attacks = cycle(attacks)
 
     # environment and algorithm
 

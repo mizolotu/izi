@@ -1,3 +1,4 @@
+import numpy as np
 import tflite_runtime.interpreter as tflite
 import logging, inspect
 
@@ -65,6 +66,11 @@ def nflows():
     n = interceptor.nflows
     return jsonify({'nflows': n})
 
+@app.route('/nconnections')
+def nconnections():
+    n = interceptor.nconnections
+    return jsonify({'nconnections': n})
+
 @app.route('/delay')
 def delay():
     d = interceptor.delay
@@ -95,6 +101,8 @@ class Interceptor:
         self.flows = []
         self.flow_ids = []
         self.flow_labels = []
+        self.connection_ids = []
+        self.connection_labels = []
         self.intrusion_ids = deque(maxlen=qsize)
         self.model_path = osp.join(main_path, 'weights')
         self.thr_path = osp.join(main_path, 'thresholds')
@@ -179,8 +187,27 @@ class Interceptor:
                             flow_label = 0
                             self.flow_labels.append(flow_label)
 
+                        # add packets to connections
+
+                        con_id = [id[self.src_ip_idx], id[self.dst_ip_idx], id[self.dst_port_idx], id[self.proto_idx]]
+                        reverse_con_id = [id[self.dst_ip_idx], id[self.src_ip_idx], id[self.src_port_idx], id[self.proto_idx]]
+                        if con_id in self.connection_ids:
+                            idx = self.connection_ids.index(con_id)
+                            con_label = self.connection_labels[idx]
+                        elif reverse_con_id in self.connection_ids:
+                            self.connection_ids.append(con_id)
+                            self.connection_labels.append(0)
+                            idx = self.connection_ids.index(reverse_con_id)
+                            con_label = self.connection_labels[idx]
+                        else:
+                            self.connection_ids.append(con_id)
+                            self.connection_ids.append(reverse_con_id)
+                            con_label = 0
+                            self.connection_labels.append(con_label)
+                            self.connection_labels.append(con_label)
+
                         if self.dscp is not None:
-                            dscp = flow_label << (2 + self.dscp)
+                            dscp = con_label << (2 + self.dscp)
                             ether[ip.IP].tos = tos | dscp
                             raw = ether.bin()
 
@@ -213,17 +240,32 @@ class Interceptor:
 
             tnow = datetime.now().timestamp()
             for i, (flow_id, flow_object) in enumerate(zip(self.flow_ids, self.flows)):
-                if self.flow_labels[i] == 0 and (flow_object.nnewpkts > self.nnewpkts_min or (tnow - flow_object.lasttime) > self.lasttime_min):
+
+                con_id = [flow_id[self.src_ip_idx], flow_id[self.dst_ip_idx], flow_id[self.dst_port_idx], flow_id[self.proto_idx]]
+                reverse_con_id = [flow_id[self.dst_ip_idx], flow_id[self.src_ip_idx], flow_id[self.src_port_idx], flow_id[self.proto_idx]]
+                con_ids = []
+                if con_id in self.connection_ids:
+                    con_ids.append(self.connection_ids.index(con_id))
+                if reverse_con_id in self.connection_ids:
+                    con_ids.append(self.connection_ids.index(reverse_con_id))
+                con_label = 0
+                for idx in con_ids:
+                    con_label = np.maximum(con_label, self.connection_labels[idx])
+                if con_label == 0 and (flow_object.nnewpkts > self.nnewpkts_min or (tnow - flow_object.lasttime) > self.lasttime_min):
                     try:
                         p = self.analyze_flow(i)
                     except:
                         p = -np.inf
                     if p > self.thrs[self.thr_idx]:
-                        self.intrusion_ids.appendleft(self.flow_ids[i])
+                        self.intrusion_ids.appendleft(con_id)
+                        self.intrusion_ids.appendleft(reverse_con_id)
                         self.flow_labels[i] = 1
-                        #print(flow_id)
+                        for idx in con_ids:
+                            self.connection_labels[idx] = 1
+
             self.delay = datetime.now().timestamp() - tnow
             self.nflows = len(self.flow_ids)
+            self.nconnections = len(self.connection_ids)
 
     def start(self):
 
@@ -239,8 +281,11 @@ class Interceptor:
                     print('Reseting...')
                     with self.pkt_q.mutex:
                         self.pkt_q.queue.clear()
-                    self.flow_ids = []
                     self.flows = []
+                    self.flow_ids = []
+                    self.flow_labels = []
+                    self.connection_ids = []
+                    self.connection_labels = []
                     self.intrusion_ids.clear()
                     self.to_be_reset = False
 

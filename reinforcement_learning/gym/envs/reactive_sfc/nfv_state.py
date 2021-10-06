@@ -40,7 +40,7 @@ if __name__ == '__main__':
     for ids_vm in ids_vms:
         val = get_vnf_model(ids_vm['mgmt'], flask_port)
         vals = [val]
-        for param in ['delay', 'nflows']:
+        for param in ['delay', 'nflows', 'nconnections']:
             val = get_vnf_param(ids_vm['mgmt'], flask_port, param)
             vals.append(val)
         intrusions = get_intrusions(ids_vm['mgmt'], flask_port)

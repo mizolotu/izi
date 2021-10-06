@@ -13,9 +13,15 @@ def reset_ids(ids_ip, ids_port, sleep_interval=0.1):
         except:
             sleep(sleep_interval)
 
-def set_vnf_param(ids_ip, ids_port, param, value):
+def set_vnf_param(ids_ip, ids_port, param, value, sleep_interval=0.1):
     uri = f'http://{ids_ip}:{ids_port}/{param}'
-    r = requests.post(uri, json={param: value})
+    ready = False
+    while not ready:
+        try:
+            r = requests.post(uri, json={param: value})
+            ready = True
+        except:
+            sleep(sleep_interval)
     value = r.json()[param]
     return value
 
