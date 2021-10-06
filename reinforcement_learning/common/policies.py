@@ -7,7 +7,7 @@ import tensorflow as tf
 from reinforcement_learning.gym.spaces import Discrete
 
 from reinforcement_learning.common.tf_util import batch_to_seq, seq_to_batch
-from reinforcement_learning.common.tf_layers import conv, linear, conv_to_fc, lstm, mlp
+from reinforcement_learning.common.tf_layers import conv, linear, conv_to_fc, lstm, conv1
 from reinforcement_learning.common.distributions import make_proba_dist_type, CategoricalProbabilityDistribution, MultiCategoricalProbabilityDistribution, DiagGaussianProbabilityDistribution, BernoulliProbabilityDistribution
 from reinforcement_learning.common.input import observation_input
 
@@ -58,18 +58,24 @@ def mlp_extractor(flat_observations, net_arch, act_fun, batch_norm=True):
     value_only_layers = []  # Layer sizes of the network that only belongs to the value network
 
     # Iterate through the shared layers and build the shared parts of the network
+
     for idx, layer in enumerate(net_arch):
 
         if isinstance(layer, int):  # Check that this is a shared layer
 
             layer_size = layer
-            latent = act_fun(linear(latent, "shared_fc{}".format(idx), layer_size, init_scale=np.sqrt(2)))
+
+            #latent = act_fun(linear(latent, "shared_fc{}".format(idx), layer_size, init_scale=np.sqrt(2)))
+            latent = act_fun(conv1(latent, "shared_fc{}".format(idx), n_filters=layer_size, filter_size=4, stride=1, init_scale=np.sqrt(2)))
+
             if batch_norm:
                 latent = tf.compat.v1.layers.batch_normalization(latent)
 
         else:
 
             assert isinstance(layer, dict), "Error: the net_arch list can only contain ints and dicts"
+
+            latent = tf.compat.v1.layers.flatten(latent)
 
             if 'pi' in layer:
                 assert isinstance(layer['pi'], list), "Error: net_arch[-1]['pi'] must contain a list of integers."
@@ -603,14 +609,16 @@ class FeedForwardPolicy(ActorCriticPolicy):
 
         if net_arch is None:
             if layers is None:
+                fe_layers = [512]
                 layers = [256, 256]
-            net_arch = [dict(vf=layers, pi=layers)]
+            net_arch = [*fe_layers, dict(vf=layers, pi=layers)]
 
         with tf.compat.v1.variable_scope("model", reuse=reuse):
             if feature_extraction == "cnn":
                 pi_latent = vf_latent = cnn_extractor(self.processed_obs, **kwargs)
             else:
-                pi_latent, vf_latent = mlp_extractor(tf.compat.v1.layers.flatten(self.processed_obs), net_arch, act_fun)
+                #pi_latent, vf_latent = mlp_extractor(tf.compat.v1.layers.flatten(self.processed_obs), net_arch, act_fun)
+                pi_latent, vf_latent = mlp_extractor(self.processed_obs, net_arch, act_fun)
 
             self._value_fn = linear(vf_latent, 'vf', 1)
 

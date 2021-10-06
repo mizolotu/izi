@@ -440,7 +440,6 @@ class PPO2(ActorCriticRLModel):
         return episode_reward, normal_passed, attack_blocked, ids_precision
 
     def save(self, save_path, cloudpickle=False):
-        print(self.policy)
         data = {
             "gamma": self.gamma,
             "n_steps": self.n_steps,

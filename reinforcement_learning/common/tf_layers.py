@@ -29,6 +29,8 @@ def ortho_init(scale=1.0):
         shape = tuple(shape)
         if len(shape) == 2:
             flat_shape = shape
+        elif len(shape) == 3:
+            flat_shape = (np.prod(shape[:-1]), shape[-1])
         elif len(shape) == 4:  # assumes NHWC
             flat_shape = (np.prod(shape[:-1]), shape[-1])
         else:
@@ -61,8 +63,7 @@ def mlp(input_tensor, layers, activ_fn=tf.nn.relu, layer_norm=True):
     return output
 
 
-def conv(input_tensor, scope, *, n_filters, filter_size, stride,
-         pad='VALID', init_scale=1.0, data_format='NHWC', one_dim_bias=False):
+def conv(input_tensor, scope, *, n_filters, filter_size, stride, pad='VALID', init_scale=1.0, data_format='NHWC', one_dim_bias=False):
     """
     Creates a 2d convolutional layer for TensorFlow
 
@@ -79,8 +80,7 @@ def conv(input_tensor, scope, *, n_filters, filter_size, stride,
     :return: (TensorFlow Tensor) 2d convolutional layer
     """
     if isinstance(filter_size, list) or isinstance(filter_size, tuple):
-        assert len(filter_size) == 2, \
-            "Filter size must have 2 elements (height, width), {} were given".format(len(filter_size))
+        assert len(filter_size) == 2, "Filter size must have 2 elements (height, width), {} were given".format(len(filter_size))
         filter_height = filter_size[0]
         filter_width = filter_size[1]
     else:
@@ -105,6 +105,20 @@ def conv(input_tensor, scope, *, n_filters, filter_size, stride,
         if not one_dim_bias and data_format == 'NHWC':
             bias = tf.reshape(bias, bshape)
         return bias + tf.nn.conv2d(input=input_tensor, filters=weight, strides=strides, padding=pad, data_format=data_format)
+
+
+def conv1(input_tensor, scope, *, n_filters, filter_size, stride, pad='VALID', init_scale=1.0):
+    channel_ax = 2
+    strides = [1, stride, 1]
+    bshape = [1, 1, n_filters]
+    bias_var_shape = [1, n_filters, 1]
+    n_input = input_tensor.get_shape()[channel_ax]
+    wshape = [filter_size, n_input, n_filters]
+    with tf.compat.v1.variable_scope(scope):
+        weight = tf.compat.v1.get_variable("w", wshape, initializer=ortho_init(init_scale))
+        bias = tf.compat.v1.get_variable("b", bias_var_shape, initializer=tf.compat.v1.constant_initializer(0.0))
+        bias = tf.reshape(bias, bshape)
+        return bias + tf.nn.conv1d(input=input_tensor, filters=weight, stride=strides, padding=pad)
 
 
 def linear(input_tensor, scope, n_hidden, *, init_scale=1.0, init_bias=0.0):
