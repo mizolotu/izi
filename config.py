@@ -30,7 +30,7 @@ progress_dir = '{0}/progress'.format(figures_dir)
 # vagrantfile
 
 ubuntu_version = '2004'
-nenvs = 1
+nenvs = 4
 mgmt_network = '192.168.122.0/24'
 env_vms = {
     'odl': {
@@ -53,8 +53,8 @@ env_vms = {
     },
     'ids': {
         'unique': False,
-        'n': 1,
-        'cpus': 4,
+        'n': 3,
+        'cpus': 3,
         'ips': ['192.168.254.60'],
         'sources': [['./sources/ids.service', '/home/vagrant/'], ['./sources/ids', '/home/vagrant/']],
         'script': 'scripts/ids.sh',

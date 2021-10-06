@@ -268,19 +268,18 @@ class ReactiveDiscreteEnv():
         for i in range(self.n_ids):
             intrusions = get_intrusions(self.ids_vms[i]['ip'], flask_port)
             for intrusion in intrusions:
-                if len(intrusion) == 5:  # flow
-                    src_ip = intrusion[0]
-                    src_port = intrusion[1]
-                    dst_ip = intrusion[2]
-                    dst_port = intrusion[3]
-                    if intrusion[4] in [1, 6, 17]:
-                        proto, proto_number = ip_proto(intrusion[4])
-                        if (proto, src_port) in applications:
-                            app_idx = applications.index([proto, src_port])
-                        elif (proto, dst_port) in applications:
-                            app_idx = applications.index([proto, dst_port])
-                        else:
-                            app_idx = applications.index([proto])
+                src_ip = intrusion[0]
+                src_port = intrusion[1]
+                dst_ip = intrusion[2]
+                dst_port = intrusion[3]
+                if intrusion[4] in [1, 6, 17]:
+                    proto, proto_number = ip_proto(intrusion[4])
+                    if (proto, src_port) in applications:
+                        app_idx = applications.index([proto, src_port])
+                    elif (proto, dst_port) in applications:
+                        app_idx = applications.index([proto, dst_port])
+                    else:
+                        app_idx = applications.index([proto])
 
                     # update recent intrusions
 
@@ -339,8 +338,8 @@ class ReactiveDiscreteEnv():
         attack = []
 
         for i in range(self.n_attackers + 1):
-            b = sample_counts[i, 0] + sample_counts[i, 1]  # before
-            a = sample_counts[i, 0]  # after
+            b = sample_counts[i, 0]  # before
+            a = sample_counts[i, 1]  # after
             if b > 0:
                 blocked = np.clip(b - a, 0, b)
                 allowed = np.clip(a, 0, b)
@@ -820,23 +819,19 @@ class ReactiveDiscreteEnv():
 
         in_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, attacker_in_table)
         out_samples = get_ip_counts(self.ovs_vm['ip'], flask_port, attacker_out_table)
-        in_samples_by_attacker = np.zeros((self.n_attackers + 1, 1))
-        out_samples_by_attacker = np.zeros((self.n_attackers + 1, 1))
+        samples_by_attacker = np.zeros((self.n_attackers + 1, 2))
         for ip, npkts in zip(in_samples['ips'], in_samples['packets']):
             if ip in attackers:
                 idx = attackers.index(ip)
             else:
                 idx = -1
-            in_samples_by_attacker[idx, 0] += npkts
+            samples_by_attacker[idx, 0] += npkts
         for ip, npkts in zip(out_samples['ips'], out_samples['packets']):
             if ip in attackers:
                 idx = attackers.index(ip)
             else:
                 idx = -1
-            out_samples_by_attacker[idx, 0] += npkts
-        tmp_idx = np.where(in_samples_by_attacker > 0)[0][0]
-        print(attackers[tmp_idx], in_samples_by_attacker[tmp_idx], out_samples_by_attacker[tmp_idx])
-        samples_by_attacker = np.hstack([out_samples_by_attacker, np.clip(in_samples_by_attacker - out_samples_by_attacker, 0, in_samples_by_attacker)])
+            samples_by_attacker[idx, 1] += npkts
         normal, attack = self._get_normal_attack(samples_by_attacker - self.samples_by_attacker)
         self.samples_by_attacker = np.array(samples_by_attacker)
         reward = self._calculate_reward(normal, attack, precision)
