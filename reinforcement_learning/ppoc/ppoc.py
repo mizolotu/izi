@@ -453,8 +453,8 @@ class PPOC(ActorCriticRLModel):
 
                 if writer is not None:
                     total_episode_reward_logger(self.episode_reward,
-                                                true_reward.reshape((self.n_envs, self.n_steps)),
-                                                masks.reshape((self.n_envs, self.n_steps)),
+                                                true_reward.reshape((self.n_envs * 2, self.n_steps)),
+                                                masks.reshape((self.n_envs * 2, self.n_steps)),
                                                 writer, self.num_timesteps)
 
                 if self.verbose >= 1 and (update % log_interval == 0 or update == 1):
