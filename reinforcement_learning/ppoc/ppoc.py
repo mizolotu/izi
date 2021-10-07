@@ -213,8 +213,8 @@ class PPOC(ActorCriticRLModel):
                     self.frw_loss = 0.5 * tf.reduce_sum(tf.math.square(self.obs_next_encoded - self.obs_next_hat))
 
                     #self.inv_loss = - tf.reduce_sum(self.processed_act * tf.math.log(self.act_hat + tf.keras.backend.epsilon()))
-                    print(self.act_hat.shape, self.action_ph.shape)
-                    self.inv_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(self.act_hat, tf.cast(self.action_ph, tf.float32)))
+                    
+                    self.inv_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.act_hat, labels=tf.cast(self.action_ph, tf.float32)))
 
                     self.int_loss = self.beta * self.frw_loss + (1.0 - self.beta) * self.inv_loss
                     loss = self.lmd * (self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef) + self.int_loss
