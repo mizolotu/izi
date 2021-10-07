@@ -724,6 +724,8 @@ class ReactiveDiscreteEnv():
 
         else:
 
+            self.tstart = time()
+            self.tstep = time()
             obs = None
 
         return obs
