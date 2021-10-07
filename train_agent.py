@@ -111,5 +111,5 @@ if __name__ == '__main__':
         logger.configure(os.path.abspath(logdir), format_strs)
         model = algorithm(policy, env, n_steps=nsteps, verbose=1)
     finally:
-        cb = CheckpointCallback(nsteps * nenvs, modeldir, verbose=1)
+        cb = CheckpointCallback(nsteps * nenvs * 10, modeldir, verbose=1)
         model.learn(total_timesteps=total_steps, callback=cb)
