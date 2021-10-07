@@ -213,8 +213,9 @@ class PPOC(ActorCriticRLModel):
                     self.frw_loss = 0.5 * tf.reduce_sum(tf.math.square(self.obs_next_encoded - self.obs_next_hat))
                     self.inv_loss = - tf.reduce_sum(self.processed_act * tf.math.log(self.act_hat + tf.keras.backend.epsilon()))
                     self.int_loss = self.beta * self.frw_loss + (1.0 - self.beta) * self.inv_loss
-
                     loss = self.lmd * (self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef) + self.int_loss
+
+                    self.int_reward = self.eta * self.frw_loss
 
                     tf.compat.v1.summary.scalar('entropy_loss', self.entropy)
                     tf.compat.v1.summary.scalar('policy_gradient_loss', self.pg_loss)
@@ -276,6 +277,12 @@ class PPOC(ActorCriticRLModel):
 
                 self.summary = tf.compat.v1.summary.merge_all()
 
+    def intrinsic_reward(self, obs, obs_next, actions):
+        r = self.sess.run([self.int_reward], {
+            self.observation_ph: obs, self.observation_next_ph: obs_next, self.action_ph: actions,
+        })[0]
+        return r
+
     def _train_step(self, learning_rate, cliprange, obs, obs_next, returns, true_rewards, masks, actions, values, neglogpacs, update, writer, states=None, cliprange_vf=None):
         """
         Training of PPO2 Algorithm
@@ -324,7 +331,7 @@ class PPOC(ActorCriticRLModel):
             self.observation_ph: obs, self.action_ph: actions,
         })
 
-        _ = self.sess.run([self.int_reward], {
+        _ = self.sess.run([self.frw_loss], {
             self.observation_ph: obs, self.observation_next_ph: obs_next, self.action_ph: actions,
         })
 
@@ -543,6 +550,8 @@ class Runner(AbstractEnvRunner):
 
             actions, values, self.states, neglogpacs = self.model.step(self.obs[env_idx:env_idx + 1], self.states, self.dones[env_idx:env_idx + 1])
 
+            last_obs = self.obs[env_idx:env_idx + 1].copy()
+
             # save results
 
             self.mb_obs[env_idx].append(self.obs.copy()[env_idx])
@@ -559,12 +568,14 @@ class Runner(AbstractEnvRunner):
 
             tnow = time.time()
 
-            self.obs[env_idx], rewards, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
+            self.obs[env_idx], reward, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
+
+            int_reward = self.model.intrinsic_reward(last_obs, self.obs[env_idx:env_idx + 1], actions)
 
             self.mb_obs_next[env_idx].append(self.obs.copy()[env_idx])
 
-            self.mb_rewards[env_idx].append(rewards)
-            self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
+            self.mb_rewards[env_idx].append(reward + int_reward)
+            self.scores[env_idx].append([reward, infos['n'], infos['a'], infos['p']])
 
             self.model.num_timesteps += 1
 
