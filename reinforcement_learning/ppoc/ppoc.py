@@ -57,7 +57,7 @@ class PPOC(ActorCriticRLModel):
     def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log='./tensorboard_log', _init_setup_model=True, policy_kwargs=None,
-                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None, beta=0.2, lmd=0.1, int_coef=1.0):
+                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None, beta=0.2, lmd=0.1, eta=100.0):
 
         #tensorboard_log = None
 
@@ -97,7 +97,7 @@ class PPOC(ActorCriticRLModel):
 
         self.beta = beta
         self.lmd = lmd
-        self.int_coef = int_coef
+        self.eta = eta
 
         super().__init__(policy=policy, env=env, verbose=verbose, requires_vec_env=True,
                          _init_setup_model=_init_setup_model, policy_kwargs=policy_kwargs,
@@ -210,11 +210,11 @@ class PPOC(ActorCriticRLModel):
                     weight_params = [v for v in self.params if '/b' not in v.name]
                     l2_loss = tf.reduce_sum([tf.nn.l2_loss(v) for v in weight_params])
 
-                    self.int_reward = 0.5 * tf.reduce_sum(tf.math.square(self.obs_next_encoded - self.obs_next_hat))
+                    self.frw_loss = 0.5 * tf.reduce_sum(tf.math.square(self.obs_next_encoded - self.obs_next_hat))
                     self.inv_loss = - tf.reduce_sum(self.processed_act * tf.math.log(self.act_hat + tf.keras.backend.epsilon()))
-                    self.int_loss = self.beta * self.int_reward + (1.0 - self.beta) * self.inv_loss
+                    self.int_loss = self.beta * self.frw_loss + (1.0 - self.beta) * self.inv_loss
 
-                    loss = self.lmd * (self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef) + self.int_coef * self.int_loss
+                    loss = self.lmd * (self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef) + self.int_loss
 
                     tf.compat.v1.summary.scalar('entropy_loss', self.entropy)
                     tf.compat.v1.summary.scalar('policy_gradient_loss', self.pg_loss)
