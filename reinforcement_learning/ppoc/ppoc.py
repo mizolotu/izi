@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from threading import Thread
-
+from collections import deque
 from reinforcement_learning import logger
 from reinforcement_learning.common import explained_variance, ActorCriticRLModel, tf_util, SetVerbosity, TensorboardWriter
 from reinforcement_learning.common.runners import AbstractEnvRunner
@@ -362,6 +362,14 @@ class PPOC(ActorCriticRLModel):
                 [self.pg_loss, self.vf_loss, self.entropy, self.approxkl, self.clipfrac, self._train], td_map)
 
         return policy_loss, value_loss, int_loss, policy_entropy, approxkl, clipfrac
+
+    def _setup_learn(self):
+        if self.env is None:
+            raise ValueError("Error: cannot train the model without a valid environment, please set an environment with set_env(self, env) method.")
+        if self.episode_reward is None:
+            self.episode_reward = np.zeros((self.n_envs * 2,))
+        if self.ep_info_buf is None:
+            self.ep_info_buf = deque(maxlen=10 * self.n_envs * 2)
 
     def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2", reset_num_timesteps=True):
 
