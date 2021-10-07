@@ -54,7 +54,7 @@ class PPOC(ActorCriticRLModel):
     :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
         If None, the number of cpu of the current machine will be used.
     """
-    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5, train_freq=2,
+    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5, nruns=2,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log='./tensorboard_log', _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None, beta=0.2, lmd=0.1, eta=0.01):
@@ -74,6 +74,8 @@ class PPOC(ActorCriticRLModel):
         self.noptepochs = noptepochs
         self.tensorboard_log = tensorboard_log
         self.full_tensorboard_log = full_tensorboard_log
+
+        self.nruns = nruns
 
         self.action_ph = None
         self.advs_ph = None
@@ -107,7 +109,7 @@ class PPOC(ActorCriticRLModel):
             self.setup_model()
 
     def _make_runner(self):
-        return Runner(env=self.env, model=self, n_steps=self.n_steps, gamma=self.gamma, lam=self.lam)
+        return Runner(env=self.env, model=self, n_runs=self.nruns, n_steps=self.n_steps, gamma=self.gamma, lam=self.lam)
 
     def _get_pretrain_placeholders(self):
         policy = self.act_model
@@ -367,9 +369,9 @@ class PPOC(ActorCriticRLModel):
         if self.env is None:
             raise ValueError("Error: cannot train the model without a valid environment, please set an environment with set_env(self, env) method.")
         if self.episode_reward is None:
-            self.episode_reward = np.zeros((self.n_envs * 2,))
+            self.episode_reward = np.zeros((self.n_envs * self.nruns,))
         if self.ep_info_buf is None:
-            self.ep_info_buf = deque(maxlen=10 * self.n_envs * 2)
+            self.ep_info_buf = deque(maxlen=10 * self.n_envs * self.nruns)
 
     def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2", reset_num_timesteps=True):
 
@@ -412,10 +414,10 @@ class PPOC(ActorCriticRLModel):
 
                 obs, obs_next, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
 
-                for item in [obs, obs_next, returns, masks, actions, values, neglogpacs, states, true_reward]:
-                    if item is not None:
-                        print(item.shape)
-                print(ep_infos)
+                #for item in [obs, obs_next, returns, masks, actions, values, neglogpacs, states, true_reward]:
+                #    if item is not None:
+                #        print(item.shape)
+                #print(ep_infos)
 
                 callback.on_rollout_end()
 
@@ -461,8 +463,8 @@ class PPOC(ActorCriticRLModel):
 
                 if writer is not None:
                     total_episode_reward_logger(self.episode_reward,
-                                                true_reward.reshape((self.n_envs * 2, self.n_steps)),
-                                                masks.reshape((self.n_envs * 2, self.n_steps)),
+                                                true_reward.reshape((self.n_envs * self.nruns, self.n_steps)),
+                                                masks.reshape((self.n_envs * self.nruns, self.n_steps)),
                                                 writer, self.num_timesteps)
 
                 if self.verbose >= 1 and (update % log_interval == 0 or update == 1):
@@ -536,7 +538,7 @@ class PPOC(ActorCriticRLModel):
 
 class Runner(AbstractEnvRunner):
 
-    def __init__(self, *, env, model, n_steps, gamma, lam):
+    def __init__(self, *, env, model, n_runs, n_steps, gamma, lam):
         """
         A runner to learn the policy of an environment for a model
 
@@ -559,8 +561,10 @@ class Runner(AbstractEnvRunner):
         self.mb_rewards = [[] for _ in range(self.n_envs)]
         self.scores = [[] for _ in range(self.n_envs)]
 
-        self.obs = np.zeros((env.num_envs * 2,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
-        self.dones = [False for _ in range(env.num_envs * 2)]
+        self.n_runs = n_runs
+
+        self.obs = np.zeros((env.num_envs * self.n_runs,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
+        self.dones = [False for _ in range(env.num_envs * self.n_runs)]
 
     def _run_one(self, env_idx, run_idx):
 
@@ -636,14 +640,14 @@ class Runner(AbstractEnvRunner):
         """
         # mb stands for minibatch
 
-        self.mb_obs = [[] for _ in range(self.n_envs * 2)]
-        self.mb_obs_next = [[] for _ in range(self.n_envs * 2)]
-        self.mb_actions = [[] for _ in range(self.n_envs * 2)]
-        self.mb_values = [[] for _ in range(self.n_envs * 2)]
-        self.mb_neglogpacs = [[] for _ in range(self.n_envs * 2)]
-        self.mb_dones = [[] for _ in range(self.n_envs * 2)]
-        self.mb_rewards = [[] for _ in range(self.n_envs * 2)]
-        self.scores = [[] for _ in range(self.n_envs * 2)]
+        self.mb_obs = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_obs_next = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_actions = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_values = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_neglogpacs = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_dones = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_rewards = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.scores = [[] for _ in range(self.n_envs * self.n_runs)]
 
         ep_infos = []
 
@@ -662,14 +666,14 @@ class Runner(AbstractEnvRunner):
 
         # combine data gathered into batches
 
-        mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
-        mb_obs_next = [np.stack([self.mb_obs_next[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
-        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
-        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
-        mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
-        mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
-        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
-        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs * 2)]
+        mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_obs_next = [np.stack([self.mb_obs_next[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs * self.n_runs)]
         mb_states = self.states
         self.dones = np.array(self.dones)
 
