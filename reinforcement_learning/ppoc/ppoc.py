@@ -404,7 +404,9 @@ class PPOC(ActorCriticRLModel):
 
                 obs, obs_next, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
 
-                print(obs.shape, obs_next.shape, returns.shape, masks.shape, actions.shape, values.shape, neglogpacs.shape, states.shape, ep_infos.shape, true_reward.shape)
+                for item in [obs, obs_next, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward]:
+                    if item is not None:
+                        print(item.shape)
 
                 callback.on_rollout_end()
 
