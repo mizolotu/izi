@@ -54,10 +54,10 @@ class PPOC(ActorCriticRLModel):
     :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
         If None, the number of cpu of the current machine will be used.
     """
-    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
+    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5, train_freq=2,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log='./tensorboard_log', _init_setup_model=True, policy_kwargs=None,
-                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None, beta=0.2, lmd=0.1, eta=100.0):
+                 full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None, beta=0.2, lmd=0.1, eta=0.01):
 
         #tensorboard_log = None
 
@@ -211,7 +211,10 @@ class PPOC(ActorCriticRLModel):
                     l2_loss = tf.reduce_sum([tf.nn.l2_loss(v) for v in weight_params])
 
                     self.frw_loss = 0.5 * tf.reduce_sum(tf.math.square(self.obs_next_encoded - self.obs_next_hat))
-                    self.inv_loss = - tf.reduce_sum(self.processed_act * tf.math.log(self.act_hat + tf.keras.backend.epsilon()))
+
+                    #self.inv_loss = - tf.reduce_sum(self.processed_act * tf.math.log(self.act_hat + tf.keras.backend.epsilon()))
+                    self.inv_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(self.act_hat, tf.cast(self.action_ph, tf.float32)))
+
                     self.int_loss = self.beta * self.frw_loss + (1.0 - self.beta) * self.inv_loss
                     loss = self.lmd * (self.pg_loss - self.entropy * self.ent_coef + self.vf_loss * self.vf_coef) + self.int_loss
 
@@ -395,8 +398,12 @@ class PPOC(ActorCriticRLModel):
                 callback.on_rollout_start()
                 # true_reward is the reward without discount
                 rollout = self.runner.run(callback)
+
                 # Unpack
+
                 obs, obs_next, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
+
+                print(obs.shape, obs_next.shape, returns.shape, masks.shape, actions.shape, values.shape, neglogpacs.shape, states.shape, ep_infos.shape, true_reward.shape)
 
                 callback.on_rollout_end()
 
@@ -625,17 +632,18 @@ class Runner(AbstractEnvRunner):
 
         ep_infos = []
 
-        self.obs[:] = self.env.reset()
+        for i in range(2):
+            self.obs[:] = self.env.reset()
 
-        # run steps in different threads
+            # run steps in different threads
 
-        threads = []
-        for env_idx in range(self.n_envs):
-            th = Thread(target=self._run_one, args=(env_idx,))
-            th.start()
-            threads.append(th)
-        for th in threads:
-            th.join()
+            threads = []
+            for env_idx in range(self.n_envs):
+                th = Thread(target=self._run_one, args=(env_idx,))
+                th.start()
+                threads.append(th)
+            for th in threads:
+                th.join()
 
         # combine data gathered into batches
 

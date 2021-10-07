@@ -813,7 +813,7 @@ def register_policy(name, policy):
         raise ValueError("Error: the name {} is alreay registered for a different policy, will not override.".format(name))
     _policy_registry[sub_class][name] = policy
 
-def obs_autoencoder(obs, ob_space, net_arch=[256]):
+def obs_autoencoder(obs, ob_space, net_arch=[64, 64]):
     obs_flat = tf.compat.v1.layers.flatten(obs)
     latent = tf.compat.v1.layers.batch_normalization(obs_flat)
     for idx, layer in enumerate(net_arch):
@@ -821,7 +821,7 @@ def obs_autoencoder(obs, ob_space, net_arch=[256]):
     latent = linear(latent, f'ae{idx + 1}', np.prod(ob_space.shape))
     return latent
 
-def inverse_model(obs, obs_next, ac_space, net_arch=[256]):
+def inverse_model(obs, obs_next, ac_space, net_arch=[256, 256]):
     obs_flat = tf.compat.v1.layers.flatten(obs)
     obs_next_flat = tf.compat.v1.layers.flatten(obs_next)
     latent = tf.concat([obs_flat, obs_next_flat], axis=1)
@@ -830,7 +830,7 @@ def inverse_model(obs, obs_next, ac_space, net_arch=[256]):
     latent = tf.sigmoid(linear(latent, f'im{idx + 1}', ac_space.n))
     return latent
 
-def forward_model(obs, act, ob_space, net_arch=[256]):
+def forward_model(obs, act, ob_space, net_arch=[256, 256]):
     obs_flat = tf.compat.v1.layers.flatten(obs)
     latent = tf.concat([obs_flat, act], axis=1)
     for idx, layer in enumerate(net_arch):
