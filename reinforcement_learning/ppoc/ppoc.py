@@ -551,7 +551,10 @@ class Runner(AbstractEnvRunner):
         self.mb_rewards = [[] for _ in range(self.n_envs)]
         self.scores = [[] for _ in range(self.n_envs)]
 
-    def _run_one(self, env_idx):
+        self.obs = np.zeros((env.num_envs * 2,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
+        self.dones = [False for _ in range(env.num_envs * 2)]
+
+    def _run_one(self, env_idx, run_idx):
 
         tstart = time.time()
 
@@ -559,17 +562,17 @@ class Runner(AbstractEnvRunner):
 
             # step model
 
-            actions, values, self.states, neglogpacs = self.model.step(self.obs[env_idx:env_idx + 1], self.states, self.dones[env_idx:env_idx + 1])
+            actions, values, self.states, neglogpacs = self.model.step(self.obs[run_idx:run_idx + 1], self.states, self.dones[run_idx:run_idx + 1])
 
-            last_obs = self.obs[env_idx:env_idx + 1].copy()
+            last_obs = self.obs[run_idx:run_idx + 1].copy()
 
             # save results
 
-            self.mb_obs[env_idx].append(self.obs.copy()[env_idx])
-            self.mb_actions[env_idx].append(actions[0])
-            self.mb_values[env_idx].append(values[0])
-            self.mb_neglogpacs[env_idx].append(neglogpacs[0])
-            self.mb_dones[env_idx].append(self.dones[env_idx])
+            self.mb_obs[run_idx].append(self.obs.copy()[env_idx])
+            self.mb_actions[run_idx].append(actions[0])
+            self.mb_values[run_idx].append(values[0])
+            self.mb_neglogpacs[run_idx].append(neglogpacs[0])
+            self.mb_dones[run_idx].append(self.dones[run_idx])
 
             # Clip the actions to avoid out of bound error
 
@@ -579,14 +582,14 @@ class Runner(AbstractEnvRunner):
 
             tnow = time.time()
 
-            self.obs[env_idx], reward, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
+            self.obs[run_idx], reward, self.dones[run_idx], infos = self.env.step_one(env_idx, clipped_actions)
 
-            int_reward = self.model.intrinsic_reward(last_obs, self.obs[env_idx:env_idx + 1], actions)
+            int_reward = self.model.intrinsic_reward(last_obs, self.obs[run_idx:run_idx + 1], actions)
 
-            self.mb_obs_next[env_idx].append(self.obs.copy()[env_idx])
+            self.mb_obs_next[run_idx].append(self.obs.copy()[run_idx])
 
-            self.mb_rewards[env_idx].append(reward + int_reward)
-            self.scores[env_idx].append([reward, infos['n'], infos['a'], infos['p']])
+            self.mb_rewards[run_idx].append(reward + int_reward)
+            self.scores[run_idx].append([reward, infos['n'], infos['a'], infos['p']])
 
             self.model.num_timesteps += 1
 
@@ -625,25 +628,25 @@ class Runner(AbstractEnvRunner):
         """
         # mb stands for minibatch
 
-        self.mb_obs = [[] for _ in range(self.n_envs)]
-        self.mb_obs_next = [[] for _ in range(self.n_envs)]
-        self.mb_actions = [[] for _ in range(self.n_envs)]
-        self.mb_values = [[] for _ in range(self.n_envs)]
-        self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
-        self.mb_dones = [[] for _ in range(self.n_envs)]
-        self.mb_rewards = [[] for _ in range(self.n_envs)]
-        self.scores = [[] for _ in range(self.n_envs)]
+        self.mb_obs = [[] for _ in range(self.n_envs * 2)]
+        self.mb_obs_next = [[] for _ in range(self.n_envs * 2)]
+        self.mb_actions = [[] for _ in range(self.n_envs * 2)]
+        self.mb_values = [[] for _ in range(self.n_envs * 2)]
+        self.mb_neglogpacs = [[] for _ in range(self.n_envs * 2)]
+        self.mb_dones = [[] for _ in range(self.n_envs * 2)]
+        self.mb_rewards = [[] for _ in range(self.n_envs * 2)]
+        self.scores = [[] for _ in range(self.n_envs * 2)]
 
         ep_infos = []
 
         for i in range(2):
-            self.obs[:] = self.env.reset()
+            self.obs[i * self.n_envs : (i + 1) * self.n_envs] = self.env.reset()
 
             # run steps in different threads
 
             threads = []
             for env_idx in range(self.n_envs):
-                th = Thread(target=self._run_one, args=(env_idx,))
+                th = Thread(target=self._run_one, args=(env_idx, i * self.n_envs + env_idx))
                 th.start()
                 threads.append(th)
             for th in threads:
@@ -651,15 +654,14 @@ class Runner(AbstractEnvRunner):
 
         # combine data gathered into batches
 
-        mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_obs_next = [np.stack([self.mb_obs_next[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-
-        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs)]
+        mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
+        mb_obs_next = [np.stack([self.mb_obs_next[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
+        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
+        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
+        mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
+        mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
+        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs * 2)]) for step in range(self.n_steps)]
+        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs * 2)]
         mb_states = self.states
         self.dones = np.array(self.dones)
 
