@@ -580,7 +580,7 @@ class Runner(AbstractEnvRunner):
 
             # save results
 
-            self.mb_obs[run_idx].append(self.obs.copy()[env_idx])
+            self.mb_obs[run_idx].append(self.obs.copy()[run_idx])
             self.mb_actions[run_idx].append(actions[0])
             self.mb_values[run_idx].append(values[0])
             self.mb_neglogpacs[run_idx].append(neglogpacs[0])
@@ -651,7 +651,7 @@ class Runner(AbstractEnvRunner):
 
         ep_infos = []
 
-        for i in range(2):
+        for i in range(self.n_runs):
             self.obs[i * self.n_envs : (i + 1) * self.n_envs] = self.env.reset()
 
             # run steps in different threads

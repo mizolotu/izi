@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from threading import Thread
-
+from collections import deque
 from reinforcement_learning import logger
 from reinforcement_learning.common import explained_variance, ActorCriticRLModel, tf_util, SetVerbosity, TensorboardWriter
 from reinforcement_learning.common.runners import AbstractEnvRunner
@@ -57,7 +57,7 @@ class PPO2(ActorCriticRLModel):
     :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
         If None, the number of cpu of the current machine will be used.
     """
-    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5,
+    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5, nruns=2,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log='./tensorboard_log', _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
@@ -75,6 +75,8 @@ class PPO2(ActorCriticRLModel):
         self.noptepochs = noptepochs
         self.tensorboard_log = tensorboard_log
         self.full_tensorboard_log = full_tensorboard_log
+
+        self.nruns = nruns
 
         self.action_ph = None
         self.advs_ph = None
@@ -104,7 +106,7 @@ class PPO2(ActorCriticRLModel):
             self.setup_model()
 
     def _make_runner(self):
-        return Runner(env=self.env, model=self, n_steps=self.n_steps,
+        return Runner(env=self.env, model=self, n_runs=self.nruns, n_steps=self.n_steps,
                       gamma=self.gamma, lam=self.lam)
 
     def _get_pretrain_placeholders(self):
@@ -311,6 +313,14 @@ class PPO2(ActorCriticRLModel):
 
         return policy_loss, value_loss, policy_entropy, approxkl, clipfrac
 
+    def _setup_learn(self):
+        if self.env is None:
+            raise ValueError("Error: cannot train the model without a valid environment, please set an environment with set_env(self, env) method.")
+        if self.episode_reward is None:
+            self.episode_reward = np.zeros((self.n_envs * self.nruns,))
+        if self.ep_info_buf is None:
+            self.ep_info_buf = deque(maxlen=10 * self.n_envs * self.nruns)
+
     def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2",
               reset_num_timesteps=True):
         # Transform to callable if needed
@@ -395,8 +405,8 @@ class PPO2(ActorCriticRLModel):
 
                 if writer is not None:
                     total_episode_reward_logger(self.episode_reward,
-                                                true_reward.reshape((self.n_envs, self.n_steps)),
-                                                masks.reshape((self.n_envs, self.n_steps)),
+                                                true_reward.reshape((self.n_envs * self.nruns, self.n_steps)),
+                                                masks.reshape((self.n_envs * self.nruns, self.n_steps)),
                                                 writer, self.num_timesteps)
 
                 if self.verbose >= 1 and (update % log_interval == 0 or update == 1):
@@ -470,7 +480,7 @@ class PPO2(ActorCriticRLModel):
 
 class Runner(AbstractEnvRunner):
 
-    def __init__(self, *, env, model, n_steps, gamma, lam):
+    def __init__(self, *, env, model, n_runs, n_steps, gamma, lam):
         """
         A runner to learn the policy of an environment for a model
 
@@ -492,7 +502,12 @@ class Runner(AbstractEnvRunner):
         self.mb_rewards = [[] for _ in range(self.n_envs)]
         self.scores = [[] for _ in range(self.n_envs)]
 
-    def _run_one(self, env_idx):
+        self.n_runs = n_runs
+
+        self.obs = np.zeros((env.num_envs * self.n_runs,) + env.observation_space.shape, dtype=env.observation_space.dtype.name)
+        self.dones = [False for _ in range(env.num_envs * self.n_runs)]
+
+    def _run_one(self, env_idx, run_idx):
 
         tstart = time.time()
 
@@ -500,15 +515,15 @@ class Runner(AbstractEnvRunner):
 
             # step model
 
-            actions, values, self.states, neglogpacs = self.model.step(self.obs[env_idx:env_idx + 1], self.states, self.dones[env_idx:env_idx + 1])
+            actions, values, self.states, neglogpacs = self.model.step(self.obs[run_idx:run_idx + 1], self.states, self.dones[run_idx:run_idx + 1])
 
             # save results
 
-            self.mb_obs[env_idx].append(self.obs.copy()[env_idx])
-            self.mb_actions[env_idx].append(actions[0])
-            self.mb_values[env_idx].append(values[0])
-            self.mb_neglogpacs[env_idx].append(neglogpacs[0])
-            self.mb_dones[env_idx].append(self.dones[env_idx])
+            self.mb_obs[run_idx].append(self.obs.copy()[run_idx])
+            self.mb_actions[run_idx].append(actions[0])
+            self.mb_values[run_idx].append(values[0])
+            self.mb_neglogpacs[run_idx].append(neglogpacs[0])
+            self.mb_dones[run_idx].append(self.dones[run_idx])
 
             # Clip the actions to avoid out of bound error
 
@@ -518,10 +533,10 @@ class Runner(AbstractEnvRunner):
 
             tnow = time.time()
 
-            self.obs[env_idx], rewards, self.dones[env_idx], infos = self.env.step_one(env_idx, clipped_actions)
+            self.obs[run_idx], rewards, self.dones[run_idx], infos = self.env.step_one(env_idx, clipped_actions)
 
-            self.mb_rewards[env_idx].append(rewards)
-            self.scores[env_idx].append([rewards, infos['n'], infos['a'], infos['p']])
+            self.mb_rewards[run_idx].append(rewards)
+            self.scores[run_idx].append([rewards, infos['n'], infos['a'], infos['p']])
 
             self.model.num_timesteps += 1
 
@@ -560,53 +575,55 @@ class Runner(AbstractEnvRunner):
         """
         # mb stands for minibatch
 
-        self.mb_obs = [[] for _ in range(self.n_envs)]
-        self.mb_actions = [[] for _ in range(self.n_envs)]
-        self.mb_values = [[] for _ in range(self.n_envs)]
-        self.mb_neglogpacs = [[] for _ in range(self.n_envs)]
-        self.mb_dones = [[] for _ in range(self.n_envs)]
-        self.mb_rewards = [[] for _ in range(self.n_envs)]
-        self.scores = [[] for _ in range(self.n_envs)]
+        self.mb_obs = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_actions = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_values = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_neglogpacs = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_dones = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.mb_rewards = [[] for _ in range(self.n_envs * self.n_runs)]
+        self.scores = [[] for _ in range(self.n_envs * self.n_runs)]
 
         ep_infos = []
-        self.obs[:] = self.env.reset()
 
-        while np.isnan(np.sum(self.obs)):
-            controller = self.env.get_attr('controller', [0])[0]
-            switches = self.env.get_attr('ovs_vm')
-            ssh_restart_service(self.env.get_attr('controller_vm', [0])[0], 'odl')
-            ready = False
-            while not ready:
-                op_online = http_check_url(controller.op, auth=controller.auth, headers=controller.headers)
-                cfg_online = http_check_url(controller.cfg, auth=controller.auth, headers=controller.headers)
-                if op_online and cfg_online:
-                    for switch in switches:
-                        delete_flows(switch)
-                    ready = True
-                else:
-                    time.sleep(1)
-            self.obs[:] = self.env.reset()
+        for i in range(self.n_runs):
 
-        # run steps in different threads
+            self.obs[i * self.n_envs : (i + 1) * self.n_envs] = self.env.reset()
 
-        threads = []
-        for env_idx in range(self.n_envs):
-            th = Thread(target=self._run_one, args=(env_idx,))
-            th.start()
-            threads.append(th)
-        for th in threads:
-            th.join()
+            while np.isnan(np.sum(self.obs)):
+                controller = self.env.get_attr('controller', [0])[0]
+                switches = self.env.get_attr('ovs_vm')
+                ssh_restart_service(self.env.get_attr('controller_vm', [0])[0], 'odl')
+                ready = False
+                while not ready:
+                    op_online = http_check_url(controller.op, auth=controller.auth, headers=controller.headers)
+                    cfg_online = http_check_url(controller.cfg, auth=controller.auth, headers=controller.headers)
+                    if op_online and cfg_online:
+                        for switch in switches:
+                            delete_flows(switch)
+                        ready = True
+                    else:
+                        time.sleep(1)
+                self.obs[i * self.n_envs : (i + 1) * self.n_envs] = self.env.reset()
+
+            # run steps in different threads
+
+            threads = []
+            for env_idx in range(self.n_envs):
+                th = Thread(target=self._run_one, args=(env_idx, i * self.n_envs + env_idx))
+                th.start()
+                threads.append(th)
+            for th in threads:
+                th.join()
 
         # combine data gathered into batches
 
-        mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-
-        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs)]) for step in range(self.n_steps)]
-        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs)]
+        mb_obs = [np.stack([self.mb_obs[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_rewards = [np.hstack([self.mb_rewards[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_actions = [np.hstack([self.mb_actions[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_values = [np.hstack([self.mb_values[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_neglogpacs = [np.hstack([self.mb_neglogpacs[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_dones = [np.hstack([self.mb_dones[idx][step] for idx in range(self.n_envs * self.n_runs)]) for step in range(self.n_steps)]
+        mb_scores = [np.vstack([self.scores[idx][step] for step in range(self.n_steps)]) for idx in range(self.n_envs * self.n_runs)]
         mb_states = self.states
         self.dones = np.array(self.dones)
 

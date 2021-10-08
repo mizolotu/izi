@@ -30,7 +30,7 @@ progress_dir = '{0}/progress'.format(figures_dir)
 # vagrantfile
 
 ubuntu_version = '2004'
-nenvs = 3
+nenvs = 1
 mgmt_network = '192.168.122.0/24'
 env_vms = {
     'odl': {

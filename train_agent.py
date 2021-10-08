@@ -84,6 +84,10 @@ if __name__ == '__main__':
     env_fns = [make_env(env_class, env_idx, next(attacks), attack_data, args.augment, env_idx) for env_idx in range(nenvs)]
     env = SubprocVecEnv(env_fns)
 
+    # runs per episode
+
+    nruns = 4 // nenvs
+
     try:
 
         # continue training
@@ -109,7 +113,7 @@ if __name__ == '__main__':
         print(e)
         print('Could not load the model, a new model will be created!')
         logger.configure(os.path.abspath(logdir), format_strs)
-        model = algorithm(policy, env, n_steps=nsteps, verbose=1)
+        model = algorithm(policy, env, nruns=nruns, n_steps=nsteps, verbose=1)
     finally:
-        cb = CheckpointCallback(nsteps * nenvs * 10, modeldir, verbose=1)
+        cb = CheckpointCallback(nsteps * nenvs * nruns * 10, modeldir, verbose=1)
         model.learn(total_timesteps=total_steps, callback=cb)
