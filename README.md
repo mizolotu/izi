@@ -33,13 +33,13 @@ data
 
 4. Install necessary apt packages: 
 ```bash
-sudo apt install libpcap-dev tcpreplay wireshark qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst virt-manager vagrant
+sudo apt install libpcap-dev qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst virt-manager vagrant python3-dev
 ```
 
 5. Install python packages with sudo user:  
 
 ```bash
-sudo pip3 install pypcap kaitaistruct numpy pandas sklearn scipy tensorflow python-vagrant paramiko plotly psutil flask requests cloudpickle opencv-python lxml dicttoxml scapy
+sudo pip3 install pypcap pandas sklearn tensorflow==2.5.0 python-vagrant paramiko cloudpickle opencv-python lxml dicttoxml
 ```
 6. Install tflite runtime:
 
