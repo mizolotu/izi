@@ -57,7 +57,7 @@ class PPO2(ActorCriticRLModel):
     :param n_cpu_tf_sess: (int) The number of threads for TensorFlow operations
         If None, the number of cpu of the current machine will be used.
     """
-    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5, nruns=2,
+    def __init__(self, policy, env, gamma=0.99, n_steps=64, ent_coef=0.01, learning_rate=2.5e-4, vf_coef=0.5, n_runs=2,
                  max_grad_norm=0.5, lam=0.95, nminibatches=4, noptepochs=4, cliprange=0.2, cliprange_vf=None,
                  verbose=0, tensorboard_log='./tensorboard_log', _init_setup_model=True, policy_kwargs=None,
                  full_tensorboard_log=False, seed=None, n_cpu_tf_sess=None):
@@ -76,7 +76,7 @@ class PPO2(ActorCriticRLModel):
         self.tensorboard_log = tensorboard_log
         self.full_tensorboard_log = full_tensorboard_log
 
-        self.nruns = nruns
+        self.n_runs = n_runs
 
         self.action_ph = None
         self.advs_ph = None
@@ -106,7 +106,7 @@ class PPO2(ActorCriticRLModel):
             self.setup_model()
 
     def _make_runner(self):
-        return Runner(env=self.env, model=self, n_runs=self.nruns, n_steps=self.n_steps,
+        return Runner(env=self.env, model=self, n_runs=self.n_runs, n_steps=self.n_steps,
                       gamma=self.gamma, lam=self.lam)
 
     def _get_pretrain_placeholders(self):
@@ -121,7 +121,7 @@ class PPO2(ActorCriticRLModel):
             assert issubclass(self.policy, ActorCriticPolicy), "Error: the input policy for the PPO2 model must be " \
                                                                "an instance of common.policies.ActorCriticPolicy."
 
-            self.n_batch = self.n_envs * self.n_steps
+            self.n_batch = self.n_envs * self.n_runs * self.n_steps
 
             self.graph = tf.Graph()
             with self.graph.as_default():
@@ -141,7 +141,7 @@ class PPO2(ActorCriticRLModel):
                 with tf.compat.v1.variable_scope("train_model", reuse=True,
                                        custom_getter=tf_util.outer_scope_getter("train_model")):
                     train_model = self.policy(self.sess, self.observation_space, self.action_space,
-                                              self.n_envs // self.nminibatches, self.n_steps, n_batch_train,
+                                              self.n_envs * self.n_runs // self.nminibatches, self.n_steps, n_batch_train,
                                               reuse=True, **self.policy_kwargs)
 
                 with tf.compat.v1.variable_scope("loss", reuse=False):
@@ -317,9 +317,9 @@ class PPO2(ActorCriticRLModel):
         if self.env is None:
             raise ValueError("Error: cannot train the model without a valid environment, please set an environment with set_env(self, env) method.")
         if self.episode_reward is None:
-            self.episode_reward = np.zeros((self.n_envs * self.nruns,))
+            self.episode_reward = np.zeros((self.n_envs * self.n_runs,))
         if self.ep_info_buf is None:
-            self.ep_info_buf = deque(maxlen=10 * self.n_envs * self.nruns)
+            self.ep_info_buf = deque(maxlen=10 * self.n_envs * self.n_runs)
 
     def learn(self, total_timesteps, callback=None, log_interval=1, tb_log_name="PPO2",
               reset_num_timesteps=True):
@@ -405,8 +405,8 @@ class PPO2(ActorCriticRLModel):
 
                 if writer is not None:
                     total_episode_reward_logger(self.episode_reward,
-                                                true_reward.reshape((self.n_envs * self.nruns, self.n_steps)),
-                                                masks.reshape((self.n_envs * self.nruns, self.n_steps)),
+                                                true_reward.reshape((self.n_envs * self.n_runs, self.n_steps)),
+                                                masks.reshape((self.n_envs * self.n_runs, self.n_steps)),
                                                 writer, self.num_timesteps)
 
                 if self.verbose >= 1 and (update % log_interval == 0 or update == 1):
@@ -467,6 +467,7 @@ class PPO2(ActorCriticRLModel):
             "observation_space": self.observation_space,
             "action_space": self.action_space,
             "n_envs": self.n_envs,
+            "n_runs": self.n_runs,
             "n_cpu_tf_sess": self.n_cpu_tf_sess,
             "seed": self.seed,
             "_vectorize_action": self._vectorize_action,
