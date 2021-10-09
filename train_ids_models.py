@@ -258,6 +258,7 @@ if __name__ == '__main__':
             t_test = 0
             probs = []
             testy = []
+            count = 0
             for x, y in batches['inference']:
                 t_now = time()
                 predictions = model.predict(x)
@@ -273,6 +274,8 @@ if __name__ == '__main__':
                 probs = np.hstack([probs, new_probs])
                 testy = np.hstack([testy, y_labels])
                 t_test += (time() - t_now)
+                count += 1
+                print(count)
 
             sk_auc = roc_auc_score(testy, probs, max_fpr=np.max(fpr_levels))
             ns_fpr, ns_tpr, ns_thr = roc_curve(testy, probs)

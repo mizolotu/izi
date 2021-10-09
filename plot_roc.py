@@ -13,7 +13,6 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Plot ROC')
     parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['mlp', 'cnn', 'rnn'])
     parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['0,1,2,3'])
-    parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['1', '2', '3'])
     args = parser.parse_args()
 
     colors = ['royalblue', 'firebrick', 'seagreen']
