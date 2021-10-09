@@ -13,6 +13,7 @@ if __name__ == '__main__':
     parser = arp.ArgumentParser(description='Plot ROC')
     parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['mlp', 'cnn', 'rnn'])
     parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['0,1,2,3'])
+    parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['0,1', '0,2', '0,3'])
     args = parser.parse_args()
 
     colors = ['royalblue', 'firebrick', 'seagreen']
@@ -20,11 +21,12 @@ if __name__ == '__main__':
     model_attacks = {
         '1': 'DDoS',
         '2': 'Web',
-        '3': 'Botnet',
-        '1,2,3': 'Baseline'
+        '3': 'Botnet'
     }
 
     for label in os.listdir(ids_results_dir):
+
+        print(label)
 
         if label in args.attacks:
 
@@ -44,10 +46,14 @@ if __name__ == '__main__':
             ws = []
             models_ = []
 
+            print(models)
+
             for m in models:
 
                 spl = m.split('_')
                 train_labels = spl[-2]
+
+                print(train_labels)
 
                 if train_labels in args.labels:
 
@@ -96,7 +102,12 @@ if __name__ == '__main__':
 
             # generate layout and traces
 
-            traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 0.8])
+            print(names)
+            print(data)
+            print(cs_sorted)
+            print(ds_sorted)
+
+            traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 1])
 
             # save results
 

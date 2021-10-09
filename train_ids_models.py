@@ -288,7 +288,7 @@ if __name__ == '__main__':
 
             results = [str(sk_auc)]
 
-            r_path = osp.join(foutput, '{0}_{1}_{2}'.format(model_name, inf_labels_str, step))
+            r_path = osp.join(foutput, '{0}_{1}_{2}'.format(model_name, train_labels_str, step))
             if not osp.isdir(r_path):
                 os.mkdir(r_path)
             stats_path = osp.join(r_path, 'stats.csv')
