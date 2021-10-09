@@ -11,9 +11,9 @@ from config import *
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot ROC')
-    parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['mlp', 'cnn', 'rnn'])
-    parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['0,1,2,3'])
-    parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['1', '2', '3'])
+    parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['ae', 'som', 'mlp'])
+    parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['2,3,4', '1,3,4', '1,2,4', '1,2,3'])
+    parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['1', '2', '3', '4'])
     args = parser.parse_args()
 
     colors = ['royalblue', 'firebrick', 'seagreen']
@@ -21,8 +21,9 @@ if __name__ == '__main__':
     model_attacks = {
         '1': 'DDoS',
         '2': 'Web',
-        '3': 'Botnet',
-        '1,2,3': 'Baseline'
+        '3': 'Infiltration',
+        '4': 'Botnet',
+        '1,2,3,4': 'Baseline'
     }
 
     for label in os.listdir(ids_results_dir):
