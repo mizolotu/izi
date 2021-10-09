@@ -243,7 +243,6 @@ class Interceptor:
 
                 # label flows
 
-                print(len(self.flows), len(self.flow_ids), len(self.flow_labels))
                 for i, (flow_id, flow_object) in enumerate(zip(self.flow_ids, self.flows)):
 
                     con_id = [flow_id[self.src_ip_idx], flow_id[self.dst_ip_idx], flow_id[self.dst_port_idx], flow_id[self.proto_idx]]
