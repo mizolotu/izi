@@ -1,23 +1,26 @@
 import os
 import os.path as osp
-import plotly.io as pio
-import plotly.graph_objs as go
 import numpy as np
 import argparse as arp
 
-from common.plot import generate_line_scatter
+from common.plot import plot_and_save
 from config import *
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot ROC')
-    parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['mlp', 'cnn', 'rnn'])
-    parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['0,1,2,3'])
     parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['0,1', '0,2', '0,3'])
+    #parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['mlp', 'cnn', 'rnn'])
+    parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['aen', 'som', 'bgn'])
+    #parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['0,1,2,3'])
+    parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['0'])
+    #parser.add_argument('-x', '--xlim', help='X limit', default=0.01, type=float)
+    parser.add_argument('-x', '--xlim', help='X limit', default=1, type=float)
+
     args = parser.parse_args()
 
     colors = ['royalblue', 'firebrick', 'seagreen']
-    dashes = [None, 'dash', 'dot', 'dashdot']
+    dashes = ['-', '--', ':', '.-']
     model_attacks = {
         '1': 'DDoS',
         '2': 'Web',
@@ -25,8 +28,6 @@ if __name__ == '__main__':
     }
 
     for label in os.listdir(ids_results_dir):
-
-        print(label)
 
         if label in args.attacks:
 
@@ -46,14 +47,11 @@ if __name__ == '__main__':
             ws = []
             models_ = []
 
-            print(models)
-
+            cd_count = 0
             for m in models:
 
                 spl = m.split('_')
                 train_labels = spl[-2]
-
-                print(train_labels)
 
                 if train_labels in args.labels:
 
@@ -63,29 +61,11 @@ if __name__ == '__main__':
                         m_type = m_type.upper()
 
                         models_.append(m)
-                        if train_labels in model_attacks.keys():
-                            a_type = model_attacks[train_labels]
-                        else:
-                            a_type = None
-                        ma_type = f'{m_type}_{a_type}'
-                        if ma_type not in ls:
-                            ls.append(ma_type)
-                        a_idx = ls.index(ma_type)
-                        cs.append(colors[a_idx])
-
-                        w_size = spl[-1]
-                        if w_size not in ws:
-                            ws.append(w_size)
-                        w_idx = ws.index(w_size)
-                        ds.append(dashes[w_idx])
-
-                        if a_type is not None:
-                            model_name = f'{a_type} {m_type}, {w_size} sec.'
-                        else:
-                            model_name = f'{m_type}, {w_size} sec.'
-                        model_names.append(model_name)
-                        if train_labels not in attack_labels_str:
-                            attack_labels_str.append(train_labels)
+                        ls.append(m_type)
+                        cs.append(colors[cd_count])
+                        ds.append(dashes[cd_count])
+                        cd_count += 1
+                        model_names.append(m_type)
 
             m_idx = sorted(range(len(model_names)), key=lambda k: model_names[k])
             for idx in m_idx:
@@ -102,17 +82,9 @@ if __name__ == '__main__':
 
             # generate layout and traces
 
-            print(names)
-            print(data)
-            print(cs_sorted)
-            print(ds_sorted)
-
-            traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 1])
+            #traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 1])
 
             # save results
 
-            ftypes = ['png', 'pdf']
-            fig_fname = '{0}/{1}_{2}'.format(roc_dir, label, '_'.join(attack_labels_str))
-            fig = go.Figure(data=traces, layout=layout)
-            for ftype in ftypes:
-                pio.write_image(fig, '{0}.{1}'.format(fig_fname, ftype))
+            fig_fname = '{0}/{1}_{2}'.format(roc_dir, label, '_'.join(args.labels))
+            plot_and_save(fig_fname, names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, args.xlim], yrange=[0, 1])
