@@ -430,7 +430,7 @@ class PPO2(ActorCriticRLModel):
             return self
 
     def demo(self, ntests=10):
-        assert self.env.num_envs == 1, "You must pass only one environment when using this function"
+        #assert self.env.num_envs == 1, "You must pass only one environment when using this function"
         normal_passed = []
         attack_blocked = []
         ids_precision = []
@@ -438,11 +438,12 @@ class PPO2(ActorCriticRLModel):
         for episode in range(ntests):
             rollout = self.runner._run()
             obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
-            normal_passed.append(ep_infos[0]['n'])
-            attack_blocked.append(ep_infos[0]['a'])
-            ids_precision.append(ep_infos[0]['p'])
-            episode_reward.append(ep_infos[0]['r'])
-            print(ep_infos[0]['r'])
+            for ep_info in ep_infos:
+                normal_passed.append(ep_info['n'])
+                attack_blocked.append(ep_info['a'])
+                ids_precision.append(ep_info['p'])
+                episode_reward.append(ep_info['r'])
+                print(ep_info['r'])
         print(f'Normal traffic passed: {np.mean(normal_passed)}')
         print(f'Malicious traffic blocked: {np.mean(attack_blocked)}')
         print(f'IDS precision: {np.mean(ids_precision)}')

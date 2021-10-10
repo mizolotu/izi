@@ -143,7 +143,7 @@ train_attacks = [1]
 episode_duration = 32
 nsteps = 64
 nepisodes = 1000000
-ntests = 10
+ntests = 5
 
 # other
 
