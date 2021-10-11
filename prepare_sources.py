@@ -104,6 +104,9 @@ if __name__ == '__main__':
         else:
             alabels = [alabel]
 
+
+        print(model_type, alabel)
+
         # compile?
 
         if model_type in args.models and alabel in args.labels:
