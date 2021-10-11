@@ -105,7 +105,7 @@ if __name__ == '__main__':
             alabels = [alabel]
 
 
-        print(model_type, alabel)
+        print(model_type, alabel, alabels)
 
         # compile?
 
