@@ -32,11 +32,8 @@ def label_cicids17_short(timestamp, src_ip, dst_ip, src_port=None, dst_port=None
     elif (src_ip == '18.218.115.60' or dst_ip == '18.218.115.60') and date in ['2202', '2302']:
         label = 2
         description = 'BruteForce-Web'
-    elif (src_ip == '13.58.225.34' or dst_ip == '13.58.225.34') and date in ['2802', '0103']:
-        label = 3
-        description = 'Infiltration'
     elif (src_ip == '18.219.211.138' or dst_ip == '18.219.211.138') and date == '0203':
-        label = 4
+        label = 3
         description = 'Botnet attack'
     else:
         label = 0
