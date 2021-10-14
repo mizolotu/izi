@@ -52,9 +52,15 @@ def replay_pcap(fpath, iface):
     p = Popen(['tcpreplay', '-i', iface, '--duration', str(episode_duration), fpath]) #, stdout=DEVNULL, stderr=DEVNULL)
     return p
 
-def set_seed(tgu_mgmt_ip, tgu_port, seed):
+def set_seed(tgu_mgmt_ip, tgu_port, seed, sleep_interval=0.01):
     url = 'http://{0}:{1}/seed'.format(tgu_mgmt_ip, tgu_port)
-    requests.post(url, json={'seed': seed})
+    ready = False
+    while not ready:
+        try:
+            requests.post(url, json={'seed': seed})
+            ready = True
+        except:
+            sleep(sleep_interval)
 
 def prepare_traffic_on_interface(ovs_ip, ovs_port, ips, label_idx, duration):
     url = 'http://{0}:{1}/prepare'.format(ovs_ip, ovs_port)
