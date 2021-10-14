@@ -40,7 +40,7 @@ def replay():
         replay_pcap(fpath, iface, duration)
     return jsonify(fpath)
 
-def calculate_probs(samples_dir, fsize_min=100000):
+def calculate_probs(samples_dir, fsize_min=50000):
     ready = False
     while not ready:
         try:
