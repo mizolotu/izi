@@ -59,7 +59,8 @@ def set_seed(tgu_mgmt_ip, tgu_port, seed, sleep_interval=0.01):
         try:
             requests.post(url, json={'seed': seed})
             ready = True
-        except:
+        except Exception as e:
+            print(e)
             sleep(sleep_interval)
 
 def prepare_traffic_on_interface(ovs_ip, ovs_port, ips, label_idx, duration):
