@@ -1,29 +1,31 @@
 import os
 import os.path as osp
-import plotly.io as pio
-import plotly.graph_objs as go
 import numpy as np
 import argparse as arp
 
-from common.plot import generate_line_scatter
+from common.plot import generate_line_scatter, plot_and_save
 from config import *
 
 if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot ROC')
-    parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['ae', 'som', 'mlp'])
-    parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['2,3,4', '1,3,4', '1,2,4', '1,2,3'])
-    parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['1', '2', '3', '4'])
+    parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['mlp'])
+    parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['1', '2', '3', '1,2,3'])
+    parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['1', '2', '3'])
+    #parser.add_argument('-m', '--models', help='Models used for detection', nargs='+', default=['ae', 'som', 'mlp'])
+    #parser.add_argument('-l', '--labels', help='Labels used for model training', nargs='+', default=['1,3'])
+    #parser.add_argument('-a', '--attacks', help='Attacks labels', nargs='+', default=['2'])
     args = parser.parse_args()
 
     colors = ['royalblue', 'firebrick', 'seagreen']
-    dashes = [None, 'dash', 'dot', 'dashdot']
+
+    dashes = ['-', '--', ':', '-.']
+
     model_attacks = {
         '1': 'DDoS',
         '2': 'Web',
-        '3': 'Infiltration',
-        '4': 'Botnet',
-        '1,2,3,4': 'Baseline'
+        '3': 'Botnet',
+        '1,2,3': 'Baseline'
     }
 
     for label in os.listdir(ids_results_dir):
@@ -98,12 +100,15 @@ if __name__ == '__main__':
 
             # generate layout and traces
 
-            traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 0.8])
+            fig_fname = '{0}/{1}_{2}'.format(roc_dir, label, '_'.join(attack_labels_str))
+            plot_and_save(fig_fname, names, data, cs_sorted, ds_sorted, xlabel='False positive rate', ylabel='True positive rate', xrange=[0, 0.1], yrange=[0, 1])
+
+            #traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 0.8])
 
             # save results
 
-            ftypes = ['png', 'pdf']
-            fig_fname = '{0}/{1}_{2}'.format(roc_dir, label, '_'.join(attack_labels_str))
-            fig = go.Figure(data=traces, layout=layout)
-            for ftype in ftypes:
-                pio.write_image(fig, '{0}.{1}'.format(fig_fname, ftype))
+            #ftypes = ['png', 'pdf']
+            #fig_fname = '{0}/{1}_{2}'.format(roc_dir, label, '_'.join(attack_labels_str))
+            #fig = go.Figure(data=traces, layout=layout)
+            #for ftype in ftypes:
+            #    pio.write_image(fig, '{0}.{1}'.format(fig_fname, ftype))

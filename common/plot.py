@@ -1,6 +1,8 @@
 import plotly.graph_objs as go
 import numpy as np
 
+from matplotlib import pyplot as pp
+
 def moving_average(x, step=1, window=25):
 
     seq = []
@@ -11,6 +13,24 @@ def moving_average(x, step=1, window=25):
         seq.append(np.nanmean(x[idx, :], axis=0))
 
     return np.vstack(seq)
+
+
+def plot_and_save(fpath, names, data, colors, linestyles, xlabel, ylabel, xrange, yrange):
+    pp.figure(figsize=(10, 8))
+    for n, d, c, l in zip(names, data, colors, linestyles):
+        x, y = d
+        pp.plot(x, y, linestyle=l, color=c, linewidth=2, label=n)
+    pp.xlim(xrange)
+    if yrange is not None:
+        pp.ylim(yrange)
+    pp.xlabel(xlabel, fontdict={'size': 12})
+    pp.ylabel(ylabel, fontdict={'size': 12})
+    pp.xticks(fontsize=12)
+    pp.yticks(fontsize=12)
+    pp.legend()
+    pp.savefig(f'{fpath}.pdf', bbox_inches='tight')
+    pp.savefig(f'{fpath}.png', bbox_inches='tight')
+    pp.close()
 
 def generate_line_scatter(names, values, colors, dashes, xlabel, ylabel, xrange, yrange, show_legend=True, yanchor='bottom', xlegend=1, ylegend=0):
 
