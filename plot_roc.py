@@ -80,10 +80,6 @@ if __name__ == '__main__':
                     cs_sorted.append(cs[idx])
                     ds_sorted.append(ds[idx])
 
-            # generate layout and traces
-
-            #traces, layout = generate_line_scatter(names, data, cs_sorted, ds_sorted, xlabel='FPR', ylabel='TPR', xrange=[0, 0.01], yrange=[0, 1])
-
             # save results
 
             fig_fname = '{0}/{1}_{2}'.format(roc_dir, label, '_'.join(args.labels))

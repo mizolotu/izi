@@ -19,7 +19,8 @@ def plot_and_save(fpath, names, data, colors, linestyles, xlabel, ylabel, xrange
         x, y = d
         pp.plot(x, y, linestyle=l, color=c, linewidth=2, label=n)
     pp.xlim(xrange)
-    pp.ylim(yrange)
+    if yrange is not None:
+        pp.ylim(yrange)
     pp.xlabel(xlabel, fontdict={'size': 12})
     pp.ylabel(ylabel, fontdict={'size': 12})
     pp.xticks(fontsize=12)

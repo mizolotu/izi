@@ -3,10 +3,8 @@ import os.path as osp
 import argparse as arp
 import pandas as pd
 import numpy as np
-import plotly.io as pio
-import plotly.graph_objs as go
 
-from common.plot import generate_line_scatter, moving_average
+from common.plot import moving_average, plot_and_save
 from config import *
 
 if __name__ == '__main__':
@@ -15,13 +13,11 @@ if __name__ == '__main__':
 
     parser = arp.ArgumentParser(description='Plot progress')
     parser.add_argument('-e', '--environment', help='Environment', default='ReactiveDiscreteEnv')
-    parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['PPOC'])
-    #parser.add_argument('-s', '--scenario', help='Scenario name', default='anomaly_detection')
-    #parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[2])
+    parser.add_argument('-a', '--algorithms', help='Algorithms', nargs='+', default=['baseline', 'PPO2', 'PPOC'])
     parser.add_argument('-s', '--scenario', help='Scenario name', default='intrusion_detection')
-    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[1])
+    parser.add_argument('-l', '--labels', help='Attack labels', nargs='+', default=[3])
     parser.add_argument('-n', '--ntests', help='Number of tests', default=ntests, type=int)
-    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(1.5e5))
+    parser.add_argument('-t', '--timesteps', help='Total timesteps', type=int, default=int(2e5))
     args = parser.parse_args()
 
     # colors and labels
@@ -29,7 +25,10 @@ if __name__ == '__main__':
     names = [['Reward'], ['Benign traffic allowed'], ['Malicious traffic blocked'], ['Precision']]
     fnames = [f"{item}_{','.join([str(item) for item in args.labels])}" for item in ['reward', 'benign', 'malicious', 'precision']]
     ylabels = ['Reward value', 'Benign traffic allowed', 'Malicious traffic blocked', 'Precision']
-    colors = ['rgb(64,120,211)', 'rgb(0,100,80)', 'rgb(237,2,11)', 'rgb(255,165,0)', 'rgb(139,0,139)', 'rgb(0,51,102)']
+
+    colors = ['royalblue', 'firebrick', 'seagreen']
+    dashes = ['-', '--', ':', '.-']
+    alg_names = ['Baseline', 'PPO', 'PPO with curiosity']
 
     # algorithms and scenario
 
@@ -63,7 +62,8 @@ if __name__ == '__main__':
         dx = tt[0]
 
         nanidx = pd.isna(np.sum(p.values, axis=1))
-        if np.sum(nanidx) > 0:
+        print(algorithm, len(nanidx))
+        if 0: # np.sum(nanidx) > 0:
             r = r[~nanidx]
             n = n[~nanidx]
             a = a[~nanidx]
@@ -71,31 +71,29 @@ if __name__ == '__main__':
             tt = tt[~nanidx]
 
         if len(tt) == len(np.unique(tt)):
-            x = tt
+            xmax = tt[-1]
+            print(algorithm, 'here')
         else:
-            x = np.arange(len(r)) * dx
-        r = moving_average(r.reshape(len(r), 1)).reshape(x.shape)
-        n = moving_average(n.reshape(len(n), 1)).reshape(x.shape)
-        a = moving_average(a.reshape(len(a), 1)).reshape(x.shape)
-        p = moving_average(b.reshape(len(a), 1)).reshape(x.shape)
+            xmax = len(r) * dx
 
-        # baseline
+        print(algorithm, xmax, dx)
 
-        n1 = len(r) * dx // args.timesteps
-
-        if n1 == 0:
-            x = np.arange(1, args.timesteps // nsteps) * x[0]
-            r = np.ones(args.timesteps // nsteps) * np.nanmean(r)
-            n = np.ones(args.timesteps // nsteps) * np.nanmean(n)
-            a = np.ones(args.timesteps // nsteps) * np.nanmean(a)
-            p = np.ones(args.timesteps // nsteps) * np.nanmean(p)
+        if xmax == 0:
+            s = args.timesteps // (nsteps  * nenvs)
+            x = np.arange(1, s + 1) * nsteps * nenvs
+            r = np.ones(s) * np.nanmean(r)
+            n = np.ones(s) * np.nanmean(n)
+            a = np.ones(s) * np.nanmean(a)
+            p = np.ones(s) * np.nanmean(p)
         else:
-            idx = np.arange(0, len(r), n1).astype(int)
-            x = x[idx] // n1
-            r = r[idx]
-            n = n[idx]
-            a = a[idx]
-            p = p[idx]
+            dx_ = args.timesteps / xmax * dx
+            print(algorithm, dx, dx_, len(r))
+            x = np.arange(1, len(r) + 1) * dx_
+            print(x[-1])
+            r = moving_average(r.reshape(len(r), 1)).reshape(x.shape)
+            n = moving_average(n.reshape(len(n), 1)).reshape(x.shape)
+            a = moving_average(a.reshape(len(a), 1)).reshape(x.shape)
+            p = moving_average(b.reshape(len(a), 1)).reshape(x.shape)
 
         # append to lists
 
@@ -110,15 +108,5 @@ if __name__ == '__main__':
 
         # generate scatter
 
-        dashes = [None, 'dash', 'dot', 'dashdot']
-        traces, layout = generate_line_scatter(algorithms, d, colors, dashes, 'Time steps', y, show_legend=True, xrange=[0, args.timesteps], yrange=None)
-
-        # save results
-
-        ftypes = ['png', 'pdf']
-        if not osp.exists(progress_dir):
-            os.mkdir(progress_dir)
         fig_fname = '{0}/{1}'.format(progress_dir, f)
-        fig = go.Figure(data=traces, layout=layout)
-        for ftype in ftypes:
-            pio.write_image(fig, '{0}.{1}'.format(fig_fname, ftype))
+        plot_and_save(fig_fname, alg_names, d, colors, dashes, xlabel='Timesteps', ylabel=y, xrange=[0, args.timesteps], yrange=None)
