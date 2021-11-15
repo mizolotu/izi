@@ -20,6 +20,13 @@ def get_intrusions(ids_ip, ids_port):
     value = r.json()
     return value
 
+def get_features(ids_ip, ids_port):
+    uri = f'http://{ids_ip}:{ids_port}/features'
+    r = requests.get(uri)
+    values = r.json()
+    features = values['features']
+    return features
+
 if __name__ == '__main__':
 
     # load data

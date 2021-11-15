@@ -8,7 +8,7 @@ from common.ml import load_meta
 from time import sleep
 from common import data
 
-def calculate_probs(samples_dir, labels, criteria='flows'):
+def calculate_probs(samples_dir, labels, criteria='packets'):
     label_dirs = []
     labels_selected = []
     for label in labels:
@@ -21,13 +21,13 @@ def calculate_probs(samples_dir, labels, criteria='flows'):
         for stats_file in os.listdir(label_dir):
             fpath = osp.join(label_dir, stats_file)
             vals = pandas.read_csv(fpath, header=None).values
-            idx = np.where(vals[:, 2] >= npkts_min)[0]
+            idx = np.where(vals[:, 1] >= npkts_min)[0]
             if len(idx) > 0:
                 fnames = vals[idx, 0]
-                if criteria == 'flows':
-                    probs = vals[idx, 1] / np.sum(vals[idx, 1])
-                elif criteria == 'packets':
+                if criteria == 'flows' and vals.shape[1] > 2:
                     probs = vals[idx, 2] / np.sum(vals[idx, 2])
+                else:
+                    probs = vals[idx, 1] / np.sum(vals[idx, 1])
                 profiles[label][stats_file] = [fnames, probs.astype(dtype=float)]
     return profiles
 

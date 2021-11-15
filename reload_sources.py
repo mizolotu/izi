@@ -18,12 +18,10 @@ if __name__ == '__main__':
     # copy ids files and restart service
 
     for vm in ids_vms:
-        ssh_clear(vm, ids_remote_weights_dir)
-        ssh_clear(vm, ids_remote_thresholds_dir)
         ssh_copy(vm, ids_sources_dir, ids_remote_dir)
         ssh_restart_service(vm, 'ids')
 
-    # copy ids files and restart service
+    # copy ovs files and restart service
 
     for vm in ovs_vms:
         ssh_copy(vm, ovs_sources_dir, ovs_remote_dir)

@@ -5,7 +5,7 @@ import os, sys, shutil
 from time import time
 from common import data
 from common.data import find_data_files, split_by_label_and_extract_flow_features
-from common.utils import isint, clean_dir
+from common.utils import clean_dir
 from pathlib import Path
 from config import *
 
@@ -14,9 +14,11 @@ if __name__ == '__main__':
     # parse args
 
     parser = arp.ArgumentParser(description='Generate datasets')
-    parser.add_argument('-s', '--stepval', help='Time step', type=float)
-    parser.add_argument('-d', '--stepdistr', help='Time step distribution', nargs='+', default=[0.0, 1.0, 0.001, 3.0], type=float)
-    parser.add_argument('-l', '--labeler', help='Labeler', default='label_cicids17_short')
+    parser.add_argument('-s', '--step', help='Time step', nargs='+', default=[0.0, 1.0, 0.001, 3.0], type=float)
+    parser.add_argument('-l', '--labeler', help='Labeler', default='label_cicids')
+    parser.add_argument('-c', '--calculate', help='Calculate features?', type=bool, default=False)
+    parser.add_argument('-f', '--file', help='File name')
+    parser.add_argument('-d', '--dir', help='Directory name')
     args = parser.parse_args()
 
     # import labeler
@@ -29,12 +31,12 @@ if __name__ == '__main__':
 
     # choose step value or distribution
 
-    if args.stepval is not None:
-        step = args.stepval
-    elif args.stepdistr is not None and len(args.stepdistr) == 4:
-        step = args.stepdistr
+    if args.step is not None and len(args.step) == 4:
+        step = args.step
+    elif args.step is not None and len(args.step) == 1:
+        step = args.step[0]
     else:
-        print('You should provide either step value or distribution in form of list: [mu, std, min, max]')
+        print('You should provide step value or distribution in the form of list: [mu, std, min, max]')
         sys.exit(1)
 
     # clean output directories or create new ones if needed
@@ -51,7 +53,7 @@ if __name__ == '__main__':
 
     # input data
 
-    dnames, fnames = find_data_files(spl_dir)
+    dnames, fnames = find_data_files(spl_dir, args.dir, args.file)
 
     # metainfo fpath
 
@@ -76,16 +78,19 @@ if __name__ == '__main__':
             output_f = osp.join(features_label_dir, dname)
             stats_f = osp.join(stats_label_dir, dname)
             fsize = Path(input_f).stat().st_size
-            nv, tt = split_by_label_and_extract_flow_features(input_f, features_dir, stats_dir, dname, meta_f, labeler=labeler, tstep=step, stages=stages, splits=splits)
+            nv, tt = split_by_label_and_extract_flow_features(input_f, features_dir, stats_dir, dname, meta_f, labeler=labeler, tstep=step, stages=stages, splits=splits, calculate_features=args.calculate, ip_flow_len_min=ip_flow_len_min)
             if nv > 0 and tt > 0:
                 ttotal += tt
                 ntotal += nv
         if ntotal > 0:
-            print('Extracted features from {0} files of directory {1}/{2}: {3}, feature vectors: {4}, time per vector: {5}'.format(
-                len(input_fnames), dcount, len(dnames), dname, ntotal, ttotal / ntotal)
-            )
+            if args.features:
+                print('Extracted features from {0} files of directory {1}/{2}: {3}, feature vectors: {4}, time per vector: {5}'.format(
+                    len(input_fnames), dcount, len(dnames), dname, ntotal, ttotal / ntotal)
+                )
+            else:
+                print('Split data first!')
         else:
-            print('Looks like no data have been found. Split the data first.')
+            print(f'Splitted: {len(input_fnames)} files in directory {dcount}/{len(dnames)}: {dname}')
 
     # print time elapsed
 

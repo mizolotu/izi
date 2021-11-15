@@ -1,4 +1,4 @@
-import paramiko, requests, os
+import paramiko, requests, os, shutil
 import os.path as osp
 
 from time import sleep
@@ -15,7 +15,7 @@ def vagrantfile_provider(mgmt_network='192.168.122.0/24', storage_pool_name=None
     lines.append("  end\n\n")
     return lines
 
-def vagrantfile_vms(names, cpus, ips, sources, scripts, mounts, ubuntu):
+def vagrantfile_vms(names, cpus, ips, sources, scripts, mounts, box):
     assert len(names) == len(cpus)
     assert len(names) == len(ips)
     assert len(names) == len(scripts)
@@ -23,7 +23,7 @@ def vagrantfile_vms(names, cpus, ips, sources, scripts, mounts, ubuntu):
     lines = []
     for name, ncpus, ip_list, source_list, script, mount in zip(names, cpus, ips, sources, scripts, mounts):
         lines.append(f"  config.vm.define '{name}', primary: true do |{name}|\n")
-        lines.append(f"    {name}.vm.box = 'generic/ubuntu{ubuntu}'\n")
+        lines.append(f"    {name}.vm.box = '{box}'\n")
         lines.append(f"    {name}.vm.provider :libvirt do |v|\n")
         lines.append(f"      v.cpus = {ncpus}\n")
         lines.append("    end\n")
@@ -140,7 +140,7 @@ def ssh_clear(vm, dir):
     keyfile = vm['key']
     mgmt = vm['mgmt']
     ssh = ssh_connect(mgmt, keyfile)
-    ssh_command(ssh, f'sudo rm {dir}/*')
+    ssh_command(ssh, f'sudo rm -rf {dir}/*')
     ssh.close()
 
 def ssh_restart_service(vm, service):
@@ -200,19 +200,24 @@ def isint(value):
         result = False
     return result
 
-def parse_fname_ip(fname, prefix='172.31.69.'):
-    spl = fname.split(prefix)
-    n = 0
-    for i, c in enumerate(spl[1]):
-        if isint(c):
-            n += 1
-        else:
+def parse_fname_ip(fname, prefixes):
+    prefix_found = False
+    for prefix in prefixes:
+        if prefix in fname:
+            prefix_found = True
             break
-    x = spl[1][:n]
-    if len(x) > 0:
-        result = '{0}{1}'.format(prefix, x)
-    else:
-        result = None
+    result = None
+    if prefix_found:
+        spl = fname.split(prefix)
+        n = 0
+        for i, c in enumerate(spl[1]):
+            if isint(c):
+                n += 1
+            else:
+                break
+        x = spl[1][:n]
+        if len(x) > 0:
+            result = '{0}{1}'.format(prefix, x)
     return result
 
 def download_controller(dir='sources', version='0.12.3', source='https://nexus.opendaylight.org/content/repositories/opendaylight.release/org/opendaylight/integration/opendaylight'):
@@ -227,6 +232,12 @@ def clean_dir(dir_name, postfix):
     for f in os.listdir(dir_name):
         if osp.isfile(osp.join(dir_name, f)) and f.endswith(postfix):
             os.remove(osp.join(dir_name, f))
+        elif osp.isdir(osp.join(dir_name, f)) and f.endswith(postfix):
+            shutil.rmtree(osp.join(dir_name, f))
+
+
+
+
 
 
 

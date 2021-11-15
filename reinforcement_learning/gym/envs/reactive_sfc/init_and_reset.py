@@ -1,4 +1,4 @@
-import json
+import json, requests
 import argparse as arp
 
 from common import data
@@ -7,6 +7,26 @@ from config import *
 from common.ovs import delete_flows
 from common.utils import ip_proto, ssh_restart_service
 from time import sleep
+
+def reset_ids(ids_ip, ids_port, sleep_interval=0.1):
+    uri = f'http://{ids_ip}:{ids_port}/reset'
+    ready = False
+    while not ready:
+        try:
+            requests.get(uri)
+            ready = True
+        except:
+            sleep(sleep_interval)
+
+def set_attackers(ids_ip, ids_port, ips, sleep_interval=0.1):
+    uri = f'http://{ids_ip}:{ids_port}/attackers'
+    ready = False
+    while not ready:
+        try:
+            requests.post(uri, json={'attackers': ips})
+            ready = True
+        except:
+            sleep(sleep_interval)
 
 def clean_ids_tables(controller, ids_nodes):
 

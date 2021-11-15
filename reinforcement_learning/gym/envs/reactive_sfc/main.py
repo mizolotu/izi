@@ -12,16 +12,16 @@ from common.utils import ip_proto
 from threading import Thread
 from itertools import cycle
 
-from reinforcement_learning.gym.envs.reactive_sfc.init_and_reset import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh, init_ids_tables
+from reinforcement_learning.gym.envs.reactive_sfc.init_and_reset import clean_ids_tables, clean_ovs_tables_via_api, init_ovs_tables, clean_ovs_tables_via_ssh, init_ids_tables, reset_ids, set_attackers
 from reinforcement_learning.gym.envs.reactive_sfc.sdn_actions import forward_dscp_to_ids, unforward_dscp_from_ids, block_dscp, unblock_dscp
-from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_param, reset_ids
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_actions import set_vnf_param
 from reinforcement_learning.gym.envs.reactive_sfc.sdn_state import get_flow_counts, reset_flow_collector, get_flag_counts, get_app_counts, get_ip_counts
-from reinforcement_learning.gym.envs.reactive_sfc.nfv_state import get_intrusions, get_vnf_param
+from reinforcement_learning.gym.envs.reactive_sfc.nfv_state import get_intrusions, get_vnf_param, get_features
 from reinforcement_learning.gym.envs.reactive_sfc.generate_traffic import set_seed, calculate_probs, prepare_traffic_on_interface, replay_traffic_on_interface
 
 class ReactiveDiscreteEnv():
 
-    def __init__(self, env_id, label, attack_data, aug, seed=None, policy=None):
+    def __init__(self, env_id, label, attack_data, aug, seed=None, policy=None, debug=False):
 
         # id
 
@@ -37,7 +37,7 @@ class ReactiveDiscreteEnv():
 
         # debug
 
-        self.debug = False
+        self.debug = debug
         self.max_obs_time = 0
 
         # load logs
@@ -153,7 +153,6 @@ class ReactiveDiscreteEnv():
         self.out_samples_by_attacker_stack = deque(maxlen=self.stack_size)
 
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
-        self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
 
         # actions
@@ -207,6 +206,9 @@ class ReactiveDiscreteEnv():
         self.in_samples = 0
         self.out_samples = 0
 
+        if self.debug:
+            print(f'Environment {self.id} has been created!')
+
     def _act(self):
         while True:
             if len(self.actions_queue) > 0:
@@ -259,6 +261,14 @@ class ReactiveDiscreteEnv():
     def _measure_delay(self):
         for i in range(self.n_ids):
             self.delay[i].append(get_vnf_param(self.ids_vms[i]['ip'], flask_port, 'delay'))
+
+    def _update_features(self):
+        for i in range(self.n_ids):
+            features = get_features(self.ids_vms[i]['ip'], flask_port)
+
+        # TO DO: split features to features and labels, update obs
+
+        return features
 
     def _update_intrusions(self):
 
@@ -506,7 +516,7 @@ class ReactiveDiscreteEnv():
         else:
             func(*args)
         if self.debug:
-            print(func, args, on_off_idx_and_value)
+            print(f'Action {func} with arguments {args}: {on_off_idx_and_value}')
         if on_off_idx_and_value is not None:
             if len(on_off_idx_and_value) == 3:
                 i, j, val = on_off_idx_and_value
@@ -528,10 +538,8 @@ class ReactiveDiscreteEnv():
         attack_label = next(self.label)
         attack_ips, attack_directions = self.attack_data[attack_label]
 
-        #print('Reset start in', self.id)
-
         if self.debug:
-            print(f'Max obs time in {self.id}: {self.max_obs_time}')
+            print(f'Environment {self.id} is resetting...')
 
         # end of the episode
 
@@ -555,10 +563,15 @@ class ReactiveDiscreteEnv():
 
         for i in range(self.n_ids):
             reset_ids(self.ids_vms[i]['mgmt'], flask_port)
+
+        # set attackers
+
+        for i in range(self.n_ids):
+            set_attackers(self.ids_vms[i]['mgmt'], flask_port, attack_ips)
+
         self.intrusion_ips = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.intrusion_numbers = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids)]
         self.delay = [[] for _ in range(self.n_ids)]
-        self.ips_to_check_or_block = [[[] for _ in range(self.n_apps)] for __ in range(self.n_ids + 1)]
 
         sdn_restart_required = False
 
@@ -588,7 +601,7 @@ class ReactiveDiscreteEnv():
                 break
 
         if not sdn_restart_required:
-            print('Flow tables are cleared in env', self.id)
+            print('Flow tables are cleared in environment', self.id)
 
         # fill tables and wait for sdn configuration to be processed
 
@@ -624,8 +637,9 @@ class ReactiveDiscreteEnv():
                     ready = True
                 if sdn_restart_required:
                     break
-
-        print('sdn restart required:', sdn_restart_required)
+        if self.debug:
+            if sdn_restart_required:
+                print(f'SDN restart required in environment {self.id}!')
 
         if not sdn_restart_required:
 
@@ -693,7 +707,6 @@ class ReactiveDiscreteEnv():
             # generate traffic
 
             for host in self.internal_hosts:
-
                 if host in self.profiles[attack_label].keys():
                     prob_idx = attack_label
                     if self.aug:
@@ -716,11 +729,11 @@ class ReactiveDiscreteEnv():
                     for fname, aug in zip(fnames, augments):
                         flows = prepare_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, host, fname, augment=aug)
                         if self.debug:
-                            print(prob_idx, fname, len(flows))
+                            print(f'Generating {len(flows)} flows from {fname}')
 
                 replay_traffic_on_interface(self.ovs_vm['mgmt'], flask_port, episode_duration)
-
-            print('Reset complete in env', self.id)
+            if self.debug:
+                print(f'Environment {self.id} is now ready!')
 
         else:
 
@@ -736,7 +749,7 @@ class ReactiveDiscreteEnv():
 
         self.step_count += 1
         if self.debug:
-            print(self.step_count, action)
+            print(f'Step: {self.step_count}, action: {action}')
 
         if len(self.actions_queue) > 0:
             print('There is still an action in the queue, consider decreasing action frequency!')
@@ -749,8 +762,6 @@ class ReactiveDiscreteEnv():
                 self._take_action(action)
         else:
             self._take_action(action)
-        if self.debug:
-            print('take action', time() - t0)
         tnow = time()
         if (tnow - self.tstart) < self.step_duration * self.step_count:
             sleep(self.step_duration * self.step_count - (tnow - self.tstart))
@@ -761,10 +772,7 @@ class ReactiveDiscreteEnv():
         # obs
 
         t0 = time()
-
         app_samples = get_app_counts(self.ovs_vm['ip'], flask_port, app_table)
-        flag_samples = get_flag_counts(self.ovs_vm['ip'], flask_port, flag_table)
-
         if time() - t0 > self.max_obs_time:
             self.max_obs_time = time() - t0
 
@@ -806,6 +814,10 @@ class ReactiveDiscreteEnv():
         self.app_counts_stack.append(frame)
         obs = np.array(self.app_counts_stack)
 
+        # features
+
+        features = self._update_features()
+
         # intrusions
 
         intrusion_ips, intrusion_numbers = self._update_intrusions()
@@ -837,7 +849,7 @@ class ReactiveDiscreteEnv():
         normal, attack = self._get_normal_attack(samples_by_attacker - self.samples_by_attacker)
         self.samples_by_attacker = np.array(samples_by_attacker)
         reward = self._calculate_reward(normal, attack, precision)
-        info = {'n': normal, 'a': attack, 'p': precision}
+        info = {'n': normal, 'a': attack, 'p': precision, 'features': features}
         done = False
 
         return obs, reward, done, info

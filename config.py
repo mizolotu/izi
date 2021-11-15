@@ -29,7 +29,7 @@ progress_dir = '{0}/progress'.format(figures_dir)
 
 # vagrantfile
 
-ubuntu_version = '2004'
+vagrant_box = 'generic/ubuntu2004'
 nenvs = 2
 mgmt_network = '192.168.122.0/24'
 env_vms = {
@@ -46,7 +46,7 @@ env_vms = {
         'unique': False,
         'n': 1,
         'cpus': 3,
-        'ips': ['192.168.254.20', '100.0.0.20'],
+        'ips': ['192.168.254.20'],
         'sources': [['./sources/ovs.service', '/home/vagrant/'], ['./sources/ovs', '/home/vagrant/']],
         'script': 'scripts/ovs.sh',
         'mount': ['./data/spl', '/home/vagrant/data/spl']
@@ -76,6 +76,7 @@ n_ds_params = len(ds_params)
 roc_fname = 'roc.csv'
 fpr_levels = [1e-2, 1e-3, 1e-4, 1e-5, 0]
 gan_latent_dim = 16
+ip_flow_len_min = {6: 5, 17: 2}
 
 # sdn
 
@@ -140,8 +141,8 @@ reward_min = -1.0
 precision_weight = 0
 obs_stack_size = 4
 train_attacks = [1]
-episode_duration = 32
-nsteps = 64
+episode_duration = 64
+nsteps = 128
 nepisodes = 1000000
 ntests = 5
 

@@ -3,16 +3,6 @@ import json, requests
 from config import *
 from time import sleep
 
-def reset_ids(ids_ip, ids_port, sleep_interval=0.1):
-    uri = f'http://{ids_ip}:{ids_port}/reset'
-    ready = False
-    while not ready:
-        try:
-            requests.get(uri)
-            ready = True
-        except:
-            sleep(sleep_interval)
-
 def set_vnf_param(ids_ip, ids_port, param, value, sleep_interval=0.1):
     uri = f'http://{ids_ip}:{ids_port}/{param}'
     ready = False

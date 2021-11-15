@@ -1,6 +1,5 @@
 import os, shutil
 import os.path as osp
-import tensorflow as tf
 import argparse as arp
 
 from common.utils import vagrantfile_provider, vagrantfile_vms, vagrantfile_end, increment_ips, download_controller, clean_dir
@@ -18,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--exclude', help='Model labels to avoid', nargs='+', default=[])
     parser.add_argument('-s', '--storage', help='Libvirt storage pool name')
     parser.add_argument('-m', '--models', help='IDS models', nargs='+', default=['mlp', 'cnn', 'rnn', 'aen', 'som', 'bgn'])
-    parser.add_argument('-u', '--ubuntu', help='Ubuntu version', default=ubuntu_version)
+    parser.add_argument('-b', '--box', help='Vagrant box', default=vagrant_box)
     args = parser.parse_args()
 
     # update nenvs and nidss
@@ -48,7 +47,7 @@ if __name__ == '__main__':
                 break
 
     vagrant_file_lines = vagrantfile_provider(mgmt_network=mgmt_network, storage_pool_name=args.storage)
-    vagrant_file_lines.extend(vagrantfile_vms(vms, cpus, ips, sources, scripts, mounts, args.ubuntu))
+    vagrant_file_lines.extend(vagrantfile_vms(vms, cpus, ips, sources, scripts, mounts, args.box))
     vagrant_file_lines.extend(vagrantfile_end())
     with open('Vagrantfile', 'w') as f:
         f.writelines(vagrant_file_lines)
@@ -74,7 +73,7 @@ if __name__ == '__main__':
 
     # clean directories
 
-    clean_dir(w_dir, postfix='.tflite')
+    clean_dir(w_dir, postfix='')
     clean_dir(t_dir, postfix='.thr')
 
     # label names
@@ -104,24 +103,23 @@ if __name__ == '__main__':
         else:
             alabels = [alabel]
 
-        # compile?
+        # copy?
 
         if model_type in args.models and alabel in args.labels:
-            compile_model = True
+            copy_model = True
             for al in alabels:
                 if al not in label_names or al in args.exclude:
-                    compile_model = False
+                    copy_model = False
                     break
         else:
-            compile_model = False
+            copy_model = False
 
-        # compile model and copy threshold if there is any
+        # copy model and threshold if there is any
 
-        if compile_model:
-            output_name = osp.join(w_dir, '{0}_{1}.tflite'.format(model, sstep))
-            converter = tf.lite.TFLiteConverter.from_saved_model(input_name)
-            tflite_model = converter.convert()
-            open(output_name, "wb").write(tflite_model)
+        if copy_model:
+            output_name = osp.join(w_dir, f'{model}_{sstep}')
+            print(input_name, output_name)
+            shutil.copytree(input_name, output_name)
 
             if 'thr' in os.listdir(input_name):
                 with open(osp.join(input_name, 'thr')) as f:
