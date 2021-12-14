@@ -55,10 +55,7 @@ data
 python3 split_data.py 
 ```
 
-## Train ML classifiers (optional)
-
-
-1. Create datasets:
+4. Create datasets:
 
 ```bash
 python3 extract_features.py
@@ -66,7 +63,11 @@ python3 extract_features.py
 
 This may take some time, depending on the amount of the data and your computational power.
 
-2. Train classifiers:
+
+## Train ML classifiers (optional)
+
+
+1. Train classifiers:
 
 ```bash
 python3 train_ids_models.py -m <model_type> -t <train_labels> -v <validation_labels> -i <inference_labels>
@@ -83,7 +84,7 @@ To train an anomaly detection model using self-organizing map algorithm, execute
 ```bash
 python3 train_ids_models.py -m som -t 0 -v 0,1,2,3 -i 0,1,2,3
 ```
-3. You can plot results with
+2. You can plot results with
 
 ```bash
 python3 plot_roc.py
