@@ -29,7 +29,7 @@ sudo apt install libpcap-dev qemu-kvm libvirt-daemon-system libvirt-clients brid
 4. Install python packages with sudo user:  
 
 ```bash
-pip3 install pypcap pandas sklearn tensorflow==2.5.2 python-vagrant paramiko cloudpickle opencv-python lxml dicttoxml scapy 
+pip3 install pypcap pandas sklearn tensorflow==2.5.2 python-vagrant paramiko cloudpickle opencv-python lxml dicttoxml scapy pypacker
 ```
 
 ## Prepare data
