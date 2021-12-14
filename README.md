@@ -97,21 +97,15 @@ ROC curves will be saved in ```figures/roc``` directory.
 
 ## Create environment
 
-1. Calculate probabilities for sampling certain traffic files depending on the attack scenario:
+1. If needed, modify values ```nenvs``` (number of environments) and ```env_vms['ids']['n']``` (number of security middle boxes in an environment) in file ```config.py```. Minimum values are correspondingly 1 and 1, maximum depend on the amount of computational and memory resources you have. 
 
-```bash
-python3 calculate_frequencies.py
-```
-
-2. If needed, modify values ```nenvs``` (number of environments) and ```env_vms['ids']['n']``` (number of security middle boxes in an environment) in file ```config.py```. Minimum values are correspondingly 1 and 1, maximum depend on the amount of computational and memory resources you have. 
-
-3. Prepare all resources needed for the environment:
+2. Prepare all resources needed for the environment:
 
 ```bash
 python3 prepare_sources.py
 ```
 
-4. Create VMs one-by-one using vagrant command line tool, e.g. 
+3. Create VMs one-by-one using vagrant command line tool, e.g. 
 
 ```bash
 vagrant up <vm name>
@@ -130,13 +124,13 @@ Instead of using vagrant command tool, you can also try to create VMs using this
 python3 create_vms.py -p True
 ```
 
-5. Connect VMs:
+4. Connect VMs:
 
 ```bash
 python3 connect_vms.py
 ```
 
-6. Restart services:
+5. Restart services:
 
 ```bash
 python3 reload_sources.py
