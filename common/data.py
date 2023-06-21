@@ -623,7 +623,7 @@ def extract_flow_features(input, output, stats, meta_fpath, label, tstep, stages
 
         # lists to arrays
 
-        flow_features = np.array(flow_features, dtype=np.float)
+        flow_features = np.array(flow_features, dtype=np.float32)
 
         # load meta
 
@@ -847,8 +847,8 @@ def split_by_label_and_extract_flow_features(input, fdir, sdir, dname, meta_fpat
 
         # lists to arrays
 
-        flow_features = np.array(flow_features, dtype=np.float)
-        flow_feature_labels = np.array(flow_feature_labels, dtype=np.float)
+        flow_features = np.array(flow_features, dtype=np.float32)
+        flow_feature_labels = np.array(flow_feature_labels, dtype=np.float32)
         assert flow_features.shape[0] == len(flow_feature_labels)
 
         # update meta

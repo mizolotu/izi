@@ -120,6 +120,12 @@ if __name__ == '__main__':
         if compile_model:
             output_name = osp.join(w_dir, '{0}_{1}.tflite'.format(model, sstep))
             converter = tf.lite.TFLiteConverter.from_saved_model(input_name)
+
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
+            converter.experimental_new_converter = True
+            converter.allow_custom_ops = True
+
             tflite_model = converter.convert()
             open(output_name, "wb").write(tflite_model)
 
