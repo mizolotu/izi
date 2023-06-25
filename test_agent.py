@@ -6,6 +6,7 @@ import os.path as osp
 
 from reinforcement_learning.gym.envs.reactive_sfc.main import ReactiveDiscreteEnv
 from reinforcement_learning.ppo2.ppo2 import PPO2 as ppo2
+from reinforcement_learning.ppoc.ppoc import PPOC as ppoc
 from reinforcement_learning.common.vec_env.subproc_vec_env import SubprocVecEnv
 from reinforcement_learning.common.policies import MlpPolicy
 from config import *
