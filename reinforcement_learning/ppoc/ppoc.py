@@ -495,7 +495,8 @@ class PPOC(ActorCriticRLModel):
         episode_reward = []
         for episode in range(ntests):
             rollout = self.runner._run()
-            obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
+            #obs, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
+            obs, obs_next, returns, masks, actions, values, neglogpacs, states, ep_infos, true_reward = rollout
             normal_passed.append(ep_infos[0]['n'])
             attack_blocked.append(ep_infos[0]['a'])
             ids_precision.append(ep_infos[0]['p'])
@@ -695,7 +696,7 @@ class Runner(AbstractEnvRunner):
         mb_actions = np.asarray(mb_actions)
         mb_values = np.asarray(mb_values, dtype=np.float32)
         mb_neglogpacs = np.asarray(mb_neglogpacs, dtype=np.float32)
-        mb_dones = np.asarray(mb_dones, dtype=np.bool)
+        mb_dones = np.asarray(mb_dones, dtype=bool)
         last_values = self.model.value(self.obs, self.states, self.dones)
 
         # discount/bootstrap off value fn
