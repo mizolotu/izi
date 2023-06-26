@@ -85,6 +85,6 @@ if __name__ == '__main__':
             'ep_normal_mean': n,
             'ep_attack_mean': a,
             'ep_precision_mean': p,
-            'total_timesteps': [0 for _ in r]
+            'total_timesteps': (np.arange(len(r)) + 1) * nsteps * 4
         })
         p.to_csv(fpath, index=False)
